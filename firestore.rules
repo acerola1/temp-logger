@@ -1,8 +1,32 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Sensor readings — public read, server-only write
     match /sensorReadings/{document=**} {
       allow read: if true;
+      allow write: if false;
+    }
+
+    // Sessions — public read, admin write
+    match /sessions/{sessionId} {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Admin registry — auth read, server-only write
+    match /admins/{uid} {
+      allow read: if isSignedIn();
       allow write: if false;
     }
   }

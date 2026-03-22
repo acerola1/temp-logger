@@ -3,8 +3,10 @@ import {
   collection,
   query,
   orderBy,
+  where,
   onSnapshot,
   type Timestamp,
+  type QueryConstraint,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { SensorReading } from '../types/sensor';
@@ -15,18 +17,25 @@ interface FirestoreDoc {
   humidity: number;
   recordedAt?: string;
   createdAt?: Timestamp;
+  sessionId?: string;
 }
 
-export function useFirestoreReadings() {
+export function useFirestoreReadings(sessionId: string | null) {
   const [readings, setReadings] = useState<SensorReading[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'sensorReadings'),
-      orderBy('createdAt', 'asc'),
-    );
+    setLoading(true);
+    setError(null);
+
+    const constraints: QueryConstraint[] = [];
+    if (sessionId) {
+      constraints.push(where('sessionId', '==', sessionId));
+    }
+    constraints.push(orderBy('createdAt', 'asc'));
+
+    const q = query(collection(db, 'sensorReadings'), ...constraints);
 
     const unsubscribe = onSnapshot(
       q,
@@ -44,6 +53,7 @@ export function useFirestoreReadings() {
             humidity: data.humidity,
             recordedAt: data.recordedAt ?? timestamp,
             createdAt: timestamp,
+            sessionId: data.sessionId,
           };
         });
         setReadings(items);
@@ -58,7 +68,7 @@ export function useFirestoreReadings() {
     );
 
     return unsubscribe;
-  }, []);
+  }, [sessionId]);
 
   return { readings, loading, error };
 }

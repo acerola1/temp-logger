@@ -16,6 +16,15 @@ function setCors(res) {
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
 }
 
+async function getActiveSessionId() {
+  const snapshot = await db
+    .collection("sessions")
+    .where("status", "==", "active")
+    .limit(1)
+    .get();
+  return snapshot.empty ? null : snapshot.docs[0].id;
+}
+
 exports.ingestReading = onRequest(
   {
     region: "europe-west1",
@@ -56,16 +65,19 @@ exports.ingestReading = onRequest(
       return;
     }
 
+    const sessionId = await getActiveSessionId();
+
     const reading = {
       deviceId,
       temperatureC,
       humidity,
       recordedAt: recordedAt || new Date().toISOString(),
-      createdAt: FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp(),
+      ...(sessionId && { sessionId })
     };
 
     const docRef = await db.collection("sensorReadings").add(reading);
-    logger.info("Stored reading", { id: docRef.id, deviceId });
+    logger.info("Stored reading", { id: docRef.id, deviceId, sessionId });
     res.status(201).json({ ok: true, id: docRef.id });
   }
 );
