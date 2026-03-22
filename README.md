@@ -1,6 +1,10 @@
 # ESP32 Temperature Logger
 
-ESP32 + DHT22 alapú hőmérséklet- és páratartalom-logger projekt.
+ESP32 + DHT22 alapú hőmérséklet- és páratartalom-logger projekt, amely a mért adatokat nemcsak elküldi Firebase-be, hanem webes dashboardon meg is jeleníti.
+
+## Dashboard preview
+
+![Dashboard screenshot](docs/dashboard-home.png)
 
 A rendszer részei:
 
@@ -9,6 +13,14 @@ A rendszer részei:
 - Firebase Cloud Function adatfogadáshoz
 - Firestore adattárolás
 - React + Vite dashboard a mért adatok megjelenítésére
+
+## Mit tud a rendszer
+
+- hőmérséklet- és páratartalom-mérés DHT22 szenzorral
+- Wi-Fi konfigurálás setup AP-n keresztül
+- mért adatok feltöltése Firebase Cloud Functionre
+- adatok tárolása Firestore-ban
+- adatok megjelenítése React dashboardon grafikonokkal és táblázatban
 
 ## Projektstruktúra
 
@@ -247,6 +259,7 @@ A projekt jelenleg képes:
 - Firebase HTTPS function hívására
 - Firestore-ba logolásra
 - React dashboardon történő megjelenítésre
+- időbeli trendek megjelenítésére webes felületen
 
 Ha valami nem működik, első körben ezt érdemes ellenőrizni:
 
