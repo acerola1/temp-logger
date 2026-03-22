@@ -3,3 +3,10 @@ platformio.local.ini
 firebase-debug.log
 firestore-debug.log
 functions/node_modules/
+node_modules/
+test-results/
+
+# Dashboard
+dashboard/node_modules/
+dashboard/dist/
+dashboard/bun.lock
