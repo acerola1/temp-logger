@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="hu">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ESP32 Szenzor Monitor</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow">Firebase + ESP32</p>
+        <h1>Szenzor naplo</h1>
+        <p class="subtitle">
+          A legutolso DHT22 meresek Firestore-bol.
+        </p>
+      </section>
+
+      <section class="cards">
+        <article class="card">
+          <p class="label">Homerseklet</p>
+          <p class="value" id="temperature">--.- C</p>
+        </article>
+        <article class="card">
+          <p class="label">Paratartalom</p>
+          <p class="value" id="humidity">--.- %</p>
+        </article>
+        <article class="card">
+          <p class="label">Eszkoz</p>
+          <p class="value small" id="deviceId">--</p>
+        </article>
+        <article class="card">
+          <p class="label">Frissitve</p>
+          <p class="value small" id="updatedAt">--</p>
+        </article>
+      </section>
+
+      <section class="table-card">
+        <div class="table-head">
+          <h2>Utolso meresek</h2>
+          <button id="refreshButton" type="button">Frissites</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Idopont</th>
+              <th>Eszkoz</th>
+              <th>Homerseklet</th>
+              <th>Paratartalom</th>
+            </tr>
+          </thead>
+          <tbody id="readingsTableBody">
+            <tr>
+              <td colspan="4">Betoltes...</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script type="module" src="./firebase-config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

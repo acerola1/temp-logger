@@ -1,0 +1,5 @@
+.pio
+platformio.local.ini
+firebase-debug.log
+firestore-debug.log
+functions/node_modules/
