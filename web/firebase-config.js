@@ -1,8 +1,8 @@
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyB8wMcXdj20BJ_hGqAyjPigWjQ-KK7aO2o",
+  authDomain: "g-temp-log.firebaseapp.com",
+  projectId: "g-temp-log",
+  storageBucket: "g-temp-log.firebasestorage.app",
+  messagingSenderId: "8465518351",
+  appId: "1:8465518351:web:e480c4d631f4ed47a0387a"
 };
