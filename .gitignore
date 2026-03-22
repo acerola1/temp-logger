@@ -2,6 +2,7 @@
 platformio.local.ini
 firebase-debug.log
 firestore-debug.log
+.firebase/
 functions/node_modules/
 dashboard/node_modules/
 dashboard/dist/

@@ -1,14 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-  <!-- Grape cluster -->
-  <circle cx="18" cy="20" r="5.5" fill="#6b7a3d"/>
-  <circle cx="28" cy="20" r="5.5" fill="#6b7a3d"/>
-  <circle cx="13" cy="29" r="5.5" fill="#4a5a28"/>
-  <circle cx="23" cy="29" r="5.5" fill="#4a5a28"/>
-  <circle cx="33" cy="29" r="5.5" fill="#4a5a28"/>
-  <circle cx="18" cy="38" r="5.5" fill="#3a4820"/>
-  <circle cx="28" cy="38" r="5.5" fill="#3a4820"/>
-  <!-- Stem -->
-  <path d="M23 15 Q23 8 28 4" stroke="#0f7b6c" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <!-- Leaf -->
-  <path d="M28 4 Q34 6 32 12 Q28 8 28 4Z" fill="#0f7b6c"/>
+  <!-- Thermometer body -->
+  <rect x="20" y="4" width="8" height="28" rx="4" fill="#f4f1ea" stroke="#0f7b6c" stroke-width="2"/>
+  <!-- Mercury -->
+  <rect x="22.5" y="14" width="3" height="18" rx="1.5" fill="#d97706"/>
+  <!-- Bulb -->
+  <circle cx="24" cy="37" r="7" fill="#f4f1ea" stroke="#0f7b6c" stroke-width="2"/>
+  <circle cx="24" cy="37" r="4.5" fill="#d97706"/>
+  <!-- Temperature marks -->
+  <line x1="28" y1="10" x2="31" y2="10" stroke="#0f7b6c" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="28" y1="16" x2="31" y2="16" stroke="#0f7b6c" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="28" y1="22" x2="31" y2="22" stroke="#0f7b6c" stroke-width="1.5" stroke-linecap="round"/>
 </svg>
