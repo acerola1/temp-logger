@@ -21,7 +21,7 @@ namespace {
 constexpr int kDhtPin = 27;
 constexpr int kDhtType = DHT22;
 constexpr unsigned long kHeartbeatIntervalMs = 5000;
-constexpr unsigned long kReadIntervalMs = 15000;
+constexpr unsigned long kReadIntervalMs = 15UL * 60UL * 1000UL;
 constexpr unsigned long kWifiReconnectIntervalMs = 10000;
 constexpr char kConfigPortalName[] = "ESP32-DHT22-Setup";
 constexpr char kIngestUrl[] = FIREBASE_INGEST_URL;
@@ -33,6 +33,7 @@ WiFiManager wifiManager;
 unsigned long lastHeartbeatAt = 0;
 unsigned long lastReadAt = 0;
 unsigned long lastWifiAttemptAt = 0;
+bool configPortalStarted = false;
 
 const char* wifiStatusText(wl_status_t status) {
   switch (status) {
@@ -58,14 +59,26 @@ bool ensureWifiConnected() {
     return true;
   }
 
-  WiFi.mode(WIFI_STA);
-  wifiManager.setConfigPortalBlocking(false);
-  wifiManager.setConnectTimeout(20);
-  wifiManager.setConfigPortalTimeout(180);
-  const bool connected = wifiManager.autoConnect(kConfigPortalName);
+  if (!configPortalStarted) {
+    WiFi.mode(WIFI_STA);
+    wifiManager.setConfigPortalBlocking(false);
+    wifiManager.setConnectTimeout(20);
+    wifiManager.setConfigPortalTimeout(180);
 
-  if (!connected || WiFi.status() != WL_CONNECTED) {
-    Serial.println("Wi-Fi kapcsolat sikertelen. A setup AP aktiv lehet.");
+    if (wifiManager.autoConnect(kConfigPortalName)) {
+      Serial.print("Wi-Fi kapcsolodva, IP: ");
+      Serial.println(WiFi.localIP());
+      return true;
+    }
+
+    configPortalStarted = true;
+    Serial.print("Setup AP elindult: ");
+    Serial.println(kConfigPortalName);
+    Serial.print("Setup AP IP: ");
+    Serial.println(WiFi.softAPIP());
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
     return false;
   }
 
@@ -112,8 +125,8 @@ void setup() {
   delay(3000);
   Serial.println("ESP32 + DHT22 indul.");
   dht.begin();
-  WiFi.disconnect(true, true);
-  delay(500);
+  lastReadAt = millis() - kReadIntervalMs;
+  WiFi.mode(WIFI_STA);
   wifiManager.setConfigPortalBlocking(false);
   wifiManager.setConnectTimeout(20);
   wifiManager.setConfigPortalTimeout(180);
