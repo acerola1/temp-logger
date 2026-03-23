@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>
+#include <esp_sleep.h>
 
 #ifndef FIREBASE_INGEST_URL
 #error "FIREBASE_INGEST_URL is not defined. Create platformio.local.ini."
@@ -20,9 +21,10 @@
 namespace {
 constexpr int kDhtPin = 27;
 constexpr int kDhtType = DHT22;
-constexpr unsigned long kHeartbeatIntervalMs = 5000;
+constexpr unsigned long kPortalHeartbeatIntervalMs = 5000;
 constexpr unsigned long kReadIntervalMs = 15UL * 60UL * 1000UL;
-constexpr unsigned long kWifiReconnectIntervalMs = 10000;
+constexpr uint64_t kSleepDurationUs =
+    static_cast<uint64_t>(kReadIntervalMs) * 1000ULL;
 constexpr char kConfigPortalName[] = "ESP32-DHT22-Setup";
 constexpr char kIngestUrl[] = FIREBASE_INGEST_URL;
 constexpr char kDeviceToken[] = FIREBASE_DEVICE_TOKEN;
@@ -30,9 +32,7 @@ constexpr char kDeviceId[] = DEVICE_ID;
 
 DHT dht(kDhtPin, kDhtType);
 WiFiManager wifiManager;
-unsigned long lastHeartbeatAt = 0;
-unsigned long lastReadAt = 0;
-unsigned long lastWifiAttemptAt = 0;
+unsigned long lastPortalHeartbeatAt = 0;
 bool configPortalStarted = false;
 
 const char* wifiStatusText(wl_status_t status) {
@@ -63,7 +63,7 @@ bool ensureWifiConnected() {
     WiFi.mode(WIFI_STA);
     wifiManager.setConfigPortalBlocking(false);
     wifiManager.setConnectTimeout(20);
-    wifiManager.setConfigPortalTimeout(180);
+    wifiManager.setConfigPortalTimeout(0);
 
     if (wifiManager.autoConnect(kConfigPortalName)) {
       Serial.print("Wi-Fi kapcsolodva, IP: ");
@@ -85,6 +85,17 @@ bool ensureWifiConnected() {
   Serial.print("Wi-Fi kapcsolodva, IP: ");
   Serial.println(WiFi.localIP());
   return true;
+}
+
+void enterDeepSleep() {
+  Serial.printf("%lu masodperc deep sleep indul.\n", kReadIntervalMs / 1000UL);
+  Serial.flush();
+
+  WiFi.disconnect(true, true);
+  WiFi.mode(WIFI_OFF);
+
+  esp_sleep_enable_timer_wakeup(kSleepDurationUs);
+  esp_deep_sleep_start();
 }
 
 bool postReading(float temperatureC, float humidity) {
@@ -118,58 +129,14 @@ bool postReading(float temperatureC, float humidity) {
   Serial.println(responseBody);
   return statusCode >= 200 && statusCode < 300;
 }
-}
 
-void setup() {
-  Serial.begin(115200);
-  delay(3000);
-  Serial.println("ESP32 + DHT22 indul.");
-  dht.begin();
-  lastReadAt = millis() - kReadIntervalMs;
-  WiFi.mode(WIFI_STA);
-  wifiManager.setConfigPortalBlocking(false);
-  wifiManager.setConnectTimeout(20);
-  wifiManager.setConfigPortalTimeout(180);
-  ensureWifiConnected();
-}
-
-void loop() {
-  const unsigned long now = millis();
-
-  if (WiFi.status() != WL_CONNECTED &&
-      now - lastWifiAttemptAt >= kWifiReconnectIntervalMs) {
-    lastWifiAttemptAt = now;
-    ensureWifiConnected();
-  }
-
-  wifiManager.process();
-
-  if (now - lastHeartbeatAt >= kHeartbeatIntervalMs) {
-    lastHeartbeatAt = now;
-    Serial.println("el a program");
-    Serial.print("Wi-Fi statusz: ");
-    Serial.println(wifiStatusText(WiFi.status()));
-    if (WiFi.status() != WL_CONNECTED) {
-      Serial.print("Setup AP: ");
-      Serial.println(kConfigPortalName);
-    }
-  }
-
-  if (now - lastReadAt < kReadIntervalMs) {
-    return;
-  }
-
-  lastReadAt = now;
-
+void readAndSendThenSleep() {
   const float humidity = dht.readHumidity();
   const float temperatureC = dht.readTemperature();
 
   if (isnan(humidity) || isnan(temperatureC)) {
     Serial.println("DHT olvasasi hiba.");
-    return;
-  }
-
-  if (!ensureWifiConnected()) {
+    enterDeepSleep();
     return;
   }
 
@@ -181,8 +148,46 @@ void loop() {
 
   if (!postReading(temperatureC, humidity)) {
     Serial.println("Firebase kuldes sikertelen.");
+    enterDeepSleep();
     return;
   }
 
   Serial.println("Firebase kuldes sikeres.");
+  enterDeepSleep();
+}
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(3000);
+  Serial.println("ESP32 + DHT22 indul.");
+  dht.begin();
+  WiFi.mode(WIFI_STA);
+  wifiManager.setConfigPortalBlocking(false);
+  wifiManager.setConnectTimeout(20);
+  wifiManager.setConfigPortalTimeout(0);
+
+  if (ensureWifiConnected()) {
+    readAndSendThenSleep();
+  }
+}
+
+void loop() {
+  wifiManager.process();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    readAndSendThenSleep();
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (now - lastPortalHeartbeatAt >= kPortalHeartbeatIntervalMs) {
+    lastPortalHeartbeatAt = now;
+    Serial.print("Wi-Fi statusz: ");
+    Serial.println(wifiStatusText(WiFi.status()));
+    if (configPortalStarted) {
+      Serial.print("Setup AP: ");
+      Serial.println(kConfigPortalName);
+    }
+  }
 }
