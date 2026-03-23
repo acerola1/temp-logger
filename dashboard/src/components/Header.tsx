@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import { Moon, Sun, Grape, LogIn, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { useIsAdmin } from '../hooks/useIsAdmin';
 
 interface HeaderProps {
   theme: 'light' | 'dark';
+  isAdmin: boolean;
   onToggleTheme: () => void;
   onOpenSessionManager: () => void;
 }
 
-export function Header({ theme, onToggleTheme, onOpenSessionManager }: HeaderProps) {
+export function Header({ theme, isAdmin, onToggleTheme, onOpenSessionManager }: HeaderProps) {
   const { user, signInWithGoogle, signOut } = useAuth();
-  const { isAdmin } = useIsAdmin();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (

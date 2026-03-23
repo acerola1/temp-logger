@@ -1,12 +1,31 @@
+import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { formatDateTime } from '../lib/dateFormat';
 import type { SensorReading } from '../types/sensor';
 
 interface ReadingsTableProps {
   readings: SensorReading[];
+  isAdmin: boolean;
+  onDeleteReading: (id: string) => Promise<void>;
 }
 
-export function ReadingsTable({ readings }: ReadingsTableProps) {
+export function ReadingsTable({ readings, isAdmin, onDeleteReading }: ReadingsTableProps) {
   const recent = readings.slice(-20).reverse();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Biztosan törlöd ezt a mérést?')) return;
+
+    setDeletingId(id);
+    try {
+      await onDeleteReading(id);
+    } catch (error) {
+      console.error('Delete reading failed:', error);
+      window.alert('Nem sikerült törölni a mérést.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="bg-white/70 dark:bg-vine-800/70 backdrop-blur-sm rounded-2xl border border-vine-200 dark:border-vine-700 p-4 shadow-sm">
@@ -29,6 +48,11 @@ export function ReadingsTable({ readings }: ReadingsTableProps) {
               <th className="text-right py-2 px-2 font-medium text-vine-400 dark:text-vine-300">
                 Párat.
               </th>
+              {isAdmin && (
+                <th className="text-right py-2 px-2 font-medium text-vine-400 dark:text-vine-300">
+                  Művelet
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -47,6 +71,19 @@ export function ReadingsTable({ readings }: ReadingsTableProps) {
                 <td className="py-2 px-2 text-right font-mono text-vine-900 dark:text-vine-50">
                   {r.humidity.toFixed(1)}%
                 </td>
+                {isAdmin && (
+                  <td className="py-2 px-2 text-right">
+                    <button
+                      onClick={() => handleDelete(r.id)}
+                      disabled={deletingId === r.id}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                      title="Mérés törlése"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      {deletingId === r.id ? 'Törlés...' : 'Törlés'}
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

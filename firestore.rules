@@ -14,7 +14,8 @@ service cloud.firestore {
     // Sensor readings — public read, server-only write
     match /sensorReadings/{document=**} {
       allow read: if true;
-      allow write: if false;
+      allow create, update: if false;
+      allow delete: if isAdmin();
     }
 
     // Sessions — public read, admin write
