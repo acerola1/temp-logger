@@ -41,7 +41,7 @@ export function HumidityChart({ readings, timeRange, isDark }: HumidityChartProp
             y2={95}
             fill={chartColors.humidity.line}
             fillOpacity={0.08}
-            label={{ value: 'Ideális (85-95%)', position: 'insideTopRight', fontSize: 11, fill: isDark ? '#d4cdb8' : '#6b7a3d' }}
+            label={{ value: 'Kalluszosítási cél (85-95%)', position: 'insideTopRight', fontSize: 11, fill: isDark ? '#d4cdb8' : '#6b7a3d' }}
           />
           <XAxis
             dataKey="recordedAt"
