@@ -1,42 +1,16 @@
-import { useEffect, useState } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { useMemo } from 'react';
+import { doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './useAuth';
+import { useFirestoreDocument } from './useFirestoreSubscription';
 
 export function useIsAdmin() {
   const { user } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [checkedUid, setCheckedUid] = useState<string | null>(null);
+  const adminDocRef = useMemo(() => (user ? doc(db, 'admins', user.uid) : null), [user]);
+  const { data: isAdmin, loading } = useFirestoreDocument(adminDocRef, () => true, {
+    initialData: false,
+    enabled: Boolean(user),
+  });
 
-  useEffect(() => {
-    if (!user) {
-      setIsAdmin(false);
-      setLoading(false);
-      setCheckedUid(null);
-      return;
-    }
-
-    setLoading(true);
-    const unsubscribe = onSnapshot(
-      doc(db, 'admins', user.uid),
-      (snapshot) => {
-        setIsAdmin(snapshot.exists());
-        setCheckedUid(user.uid);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('useIsAdmin error:', err);
-        setIsAdmin(false);
-        setCheckedUid(user.uid);
-        setLoading(false);
-      },
-    );
-
-    return unsubscribe;
-  }, [user]);
-
-  const waitingForCurrentUid = Boolean(user && checkedUid !== user.uid);
-
-  return { isAdmin, loading: loading || waitingForCurrentUid };
+  return { isAdmin, loading };
 }

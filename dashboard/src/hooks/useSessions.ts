@@ -1,17 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import {
   collection,
   query,
   orderBy,
-  onSnapshot,
   addDoc,
   updateDoc,
   doc,
   serverTimestamp,
+  type DocumentData,
+  type QuerySnapshot,
   type Timestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { Session } from '../types/sensor';
+import { useFirestoreCollection } from './useFirestoreSubscription';
+
+const EMPTY_SESSIONS: Session[] = [];
 
 interface FirestoreSession {
   name: string;
@@ -22,35 +26,30 @@ interface FirestoreSession {
 }
 
 export function useSessions() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
+  const sessionsQuery = useMemo(
+    () => query(collection(db, 'sessions'), orderBy('createdAt', 'desc')),
+    [],
+  );
 
-  useEffect(() => {
-    const q = query(collection(db, 'sessions'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const items: Session[] = snapshot.docs.map((d) => {
-          const data = d.data() as FirestoreSession;
-          return {
-            id: d.id,
-            name: data.name,
-            status: data.status,
-            startDate: data.startDate,
-            endDate: data.endDate,
-            createdAt: data.createdAt?.toDate().toISOString() ?? new Date().toISOString(),
-          };
-        });
-        setSessions(items);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Sessions error:', err);
-        setLoading(false);
-      },
-    );
-    return unsubscribe;
-  }, []);
+  const mapSessions = useCallback(
+    (snapshot: QuerySnapshot<DocumentData>) =>
+      snapshot.docs.map((d) => {
+        const data = d.data() as FirestoreSession;
+        return {
+          id: d.id,
+          name: data.name,
+          status: data.status,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          createdAt: data.createdAt?.toDate().toISOString() ?? new Date().toISOString(),
+        };
+      }),
+    [],
+  );
+
+  const { data: sessions, loading } = useFirestoreCollection(sessionsQuery, mapSessions, {
+    initialData: EMPTY_SESSIONS,
+  });
 
   const activeSession = sessions.find((s) => s.status === 'active') ?? null;
 
