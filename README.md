@@ -46,6 +46,8 @@ Bekötés:
 4. DHT22 `4. láb (GND)` -> ESP32 `GND`
 5. `4.7k`-`10k` pull-up ellenállás a `VCC` és `DATA` közé
 
+![ESP32 board es bekotes](docs/Screenshot%20from%202026-03-23%2009-56-31.png)
+
 Megjegyzés:
 
 - A szenzort a rácsos oldalával magad felé nézve, lábakkal lefelé számold.
