@@ -75,7 +75,7 @@ export function TemperatureChart({ readings, timeRange, isDark }: TemperatureCha
             dataKey="temperatureC"
             stroke={chartColors.temperature.line}
             strokeWidth={2}
-            isAnimationActive={false}
+            isAnimationActive={true}
             dot={false}
             activeDot={{ r: 4, fill: chartColors.temperature.line }}
           />

@@ -35,6 +35,37 @@ WiFiManager wifiManager;
 unsigned long lastPortalHeartbeatAt = 0;
 bool configPortalStarted = false;
 
+const char* wakeupCauseText(esp_sleep_wakeup_cause_t cause) {
+  switch (cause) {
+    case ESP_SLEEP_WAKEUP_TIMER:
+      return "timer";
+    case ESP_SLEEP_WAKEUP_UNDEFINED:
+      return "power-on/reset";
+    case ESP_SLEEP_WAKEUP_EXT0:
+      return "ext0";
+    case ESP_SLEEP_WAKEUP_EXT1:
+      return "ext1";
+    case ESP_SLEEP_WAKEUP_TOUCHPAD:
+      return "touchpad";
+    case ESP_SLEEP_WAKEUP_ULP:
+      return "ulp";
+    case ESP_SLEEP_WAKEUP_GPIO:
+      return "gpio";
+    case ESP_SLEEP_WAKEUP_UART:
+      return "uart";
+    case ESP_SLEEP_WAKEUP_WIFI:
+      return "wifi";
+    case ESP_SLEEP_WAKEUP_COCPU:
+      return "cocpu";
+    case ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG:
+      return "cocpu-trap";
+    case ESP_SLEEP_WAKEUP_BT:
+      return "bt";
+    default:
+      return "ismeretlen";
+  }
+}
+
 const char* wifiStatusText(wl_status_t status) {
   switch (status) {
     case WL_CONNECTED:
@@ -91,7 +122,8 @@ void enterDeepSleep() {
   Serial.printf("%lu masodperc deep sleep indul.\n", kReadIntervalMs / 1000UL);
   Serial.flush();
 
-  WiFi.disconnect(true, true);
+  // Ne toroljuk az NVS-ben mentett Wi-Fi credentialst deep sleep elott.
+  WiFi.disconnect(false, false);
   WiFi.mode(WIFI_OFF);
 
   esp_sleep_enable_timer_wakeup(kSleepDurationUs);
@@ -161,6 +193,8 @@ void setup() {
   Serial.begin(115200);
   delay(3000);
   Serial.println("ESP32 + DHT22 indul.");
+  Serial.print("Wakeup ok: ");
+  Serial.println(wakeupCauseText(esp_sleep_get_wakeup_cause()));
   dht.begin();
   WiFi.mode(WIFI_STA);
   wifiManager.setConfigPortalBlocking(false);

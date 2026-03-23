@@ -74,7 +74,7 @@ export function HumidityChart({ readings, timeRange, isDark }: HumidityChartProp
             dataKey="humidity"
             stroke={chartColors.humidity.line}
             strokeWidth={2}
-            isAnimationActive={false}
+            isAnimationActive={true}
             dot={false}
             activeDot={{ r: 4, fill: chartColors.humidity.line }}
           />
