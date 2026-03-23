@@ -21,10 +21,12 @@ function Dashboard() {
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
 
   const { sessions, activeSession, loading: sessionsLoading, createSession, archiveSession } = useSessions();
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null | undefined>(undefined);
 
-  // Default to active session if no explicit selection
-  const effectiveSessionId = selectedSessionId ?? activeSession?.id ?? null;
+  // `undefined` means no explicit user choice yet, so default to the active session.
+  // `null` means the user explicitly chose "Összes mérés".
+  const effectiveSessionId =
+    selectedSessionId === undefined ? activeSession?.id ?? null : selectedSessionId;
 
   const { readings: allReadings, loading, error } = useFirestoreReadings(effectiveSessionId);
   const { readings, latest, stats } = useReadings(allReadings, timeRange);
@@ -44,7 +46,7 @@ function Dashboard() {
         {!sessionsLoading && sessions.length > 0 && (
           <SessionSelector
             sessions={sessions}
-            selectedId={effectiveSessionId}
+            selectedId={selectedSessionId === undefined ? effectiveSessionId : selectedSessionId}
             onChange={setSelectedSessionId}
           />
         )}
