@@ -10,6 +10,8 @@ import {
 } from 'recharts';
 import { chartColors } from '../constants/chartColors';
 import { formatDateShort } from '../lib/dateFormat';
+import { buildChartSeries } from '../lib/chartSeries';
+import { getTimeDomain } from '../lib/chartTime';
 import type { SensorReading, TimeRange } from '../types/sensor';
 
 interface HumidityChartProps {
@@ -19,12 +21,14 @@ interface HumidityChartProps {
 }
 
 export function HumidityChart({ readings, timeRange, isDark }: HumidityChartProps) {
-  const data =
+  const filteredReadings =
     timeRange === '30d'
       ? readings.filter((_, i) => i % 4 === 0)
       : timeRange === '7d'
         ? readings.filter((_, i) => i % 2 === 0)
         : readings;
+  const data = buildChartSeries(filteredReadings);
+  const timeDomain = getTimeDomain(data.map((point) => point.recordedAtMs));
 
   const gridColor = isDark ? chartColors.gridDark : chartColors.grid;
 
@@ -39,13 +43,17 @@ export function HumidityChart({ readings, timeRange, isDark }: HumidityChartProp
           <ReferenceArea
             y1={85}
             y2={95}
+            ifOverflow="extendDomain"
             fill={chartColors.humidity.line}
             fillOpacity={0.08}
             label={{ value: 'Kalluszosítási cél (85-95%)', position: 'insideTopRight', fontSize: 11, fill: isDark ? '#d4cdb8' : '#6b7a3d' }}
           />
           <XAxis
-            dataKey="recordedAt"
-            tickFormatter={formatDateShort}
+            dataKey="recordedAtMs"
+            type="number"
+            scale="time"
+            domain={timeDomain}
+            tickFormatter={(value: number) => formatDateShort(value)}
             tick={{ fontSize: 11, fill: isDark ? '#b5ab8e' : '#6b7a3d' }}
             stroke={gridColor}
             interval="preserveStartEnd"
@@ -66,7 +74,7 @@ export function HumidityChart({ readings, timeRange, isDark }: HumidityChartProp
               fontSize: 13,
               color: isDark ? '#f4f1ea' : '#18211b',
             }}
-            labelFormatter={(label) => formatDateShort(String(label))}
+            labelFormatter={(label) => formatDateShort(Number(label))}
             formatter={(value) => [`${Number(value).toFixed(1)}%`, 'Páratartalom']}
           />
           <Line

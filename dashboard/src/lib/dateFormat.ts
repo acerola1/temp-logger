@@ -1,16 +1,22 @@
 import { format } from 'date-fns';
 import { hu } from 'date-fns/locale';
 
-export function formatDateTime(iso: string): string {
-  return format(new Date(iso), 'yyyy.MM.dd. HH:mm', { locale: hu });
+type DateInput = string | number | Date;
+
+function toDate(value: DateInput): Date {
+  return value instanceof Date ? value : new Date(value);
 }
 
-export function formatTime(iso: string): string {
-  return format(new Date(iso), 'HH:mm', { locale: hu });
+export function formatDateTime(value: DateInput): string {
+  return format(toDate(value), 'yyyy.MM.dd. HH:mm', { locale: hu });
 }
 
-export function formatDateShort(iso: string): string {
-  return format(new Date(iso), 'MM.dd. HH:mm', { locale: hu });
+export function formatTime(value: DateInput): string {
+  return format(toDate(value), 'HH:mm', { locale: hu });
+}
+
+export function formatDateShort(value: DateInput): string {
+  return format(toDate(value), 'MM.dd. HH:mm', { locale: hu });
 }
 
 export function formatRelative(iso: string): string {

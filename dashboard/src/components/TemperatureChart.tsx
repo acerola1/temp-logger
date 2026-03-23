@@ -10,6 +10,8 @@ import {
 } from 'recharts';
 import { chartColors } from '../constants/chartColors';
 import { formatDateShort } from '../lib/dateFormat';
+import { buildChartSeries } from '../lib/chartSeries';
+import { getTimeDomain } from '../lib/chartTime';
 import type { SensorReading, TimeRange } from '../types/sensor';
 
 interface TemperatureChartProps {
@@ -19,13 +21,14 @@ interface TemperatureChartProps {
 }
 
 export function TemperatureChart({ readings, timeRange, isDark }: TemperatureChartProps) {
-  // Downsample for 30d view
-  const data =
+  const filteredReadings =
     timeRange === '30d'
       ? readings.filter((_, i) => i % 4 === 0)
       : timeRange === '7d'
         ? readings.filter((_, i) => i % 2 === 0)
         : readings;
+  const data = buildChartSeries(filteredReadings);
+  const timeDomain = getTimeDomain(data.map((point) => point.recordedAtMs));
 
   const gridColor = isDark ? chartColors.gridDark : chartColors.grid;
 
@@ -40,13 +43,17 @@ export function TemperatureChart({ readings, timeRange, isDark }: TemperatureCha
           <ReferenceArea
             y1={24}
             y2={27}
+            ifOverflow="extendDomain"
             fill={chartColors.temperature.line}
             fillOpacity={0.08}
             label={{ value: 'Ideális (24-27°C)', position: 'insideTopRight', fontSize: 11, fill: isDark ? '#d4cdb8' : '#6b7a3d' }}
           />
           <XAxis
-            dataKey="recordedAt"
-            tickFormatter={formatDateShort}
+            dataKey="recordedAtMs"
+            type="number"
+            scale="time"
+            domain={timeDomain}
+            tickFormatter={(value: number) => formatDateShort(value)}
             tick={{ fontSize: 11, fill: isDark ? '#b5ab8e' : '#6b7a3d' }}
             stroke={gridColor}
             interval="preserveStartEnd"
@@ -67,7 +74,7 @@ export function TemperatureChart({ readings, timeRange, isDark }: TemperatureCha
               fontSize: 13,
               color: isDark ? '#f4f1ea' : '#18211b',
             }}
-            labelFormatter={(label) => formatDateShort(String(label))}
+            labelFormatter={(label) => formatDateShort(Number(label))}
             formatter={(value) => [`${Number(value).toFixed(1)}°C`, 'Hőmérséklet']}
           />
           <Line
