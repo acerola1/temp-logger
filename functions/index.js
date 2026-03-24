@@ -16,6 +16,12 @@ function setCors(res) {
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
 }
 
+function pickDefined(fields) {
+  return Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== undefined)
+  );
+}
+
 async function getActiveSessionId() {
   const snapshot = await db
     .collection("sessions")
@@ -54,9 +60,86 @@ exports.ingestReading = onRequest(
       return;
     }
 
-    const { deviceId, temperatureC, humidity, recordedAt } = req.body || {};
+    const {
+      kind = "reading",
+      deviceId,
+      temperatureC,
+      humidity,
+      recordedAt
+    } = req.body || {};
+
+    if (kind === "health") {
+      const {
+        eventType,
+        wakeupCause,
+        resetReason,
+        wifiStatus,
+        rssi,
+        ip,
+        connectDurationMs,
+        queuedReadingsCount,
+        flushedReadingsCount,
+        droppedReadingsCount,
+        consecutiveFailures,
+        lastHttpStatus,
+        lastFailureReason,
+        lastSuccessAt,
+        lastFailureAt,
+        freeHeap,
+        recovered,
+        note
+      } = req.body || {};
+
+      if (typeof deviceId !== "string" || typeof eventType !== "string") {
+        res.status(400).json({ error: "invalid-health-payload" });
+        return;
+      }
+
+      const healthReport = pickDefined({
+        deviceId,
+        eventType,
+        recordedAt: recordedAt || new Date().toISOString(),
+        createdAt: FieldValue.serverTimestamp(),
+        wakeupCause: typeof wakeupCause === "string" ? wakeupCause : undefined,
+        resetReason: typeof resetReason === "string" ? resetReason : undefined,
+        wifiStatus: typeof wifiStatus === "string" ? wifiStatus : undefined,
+        rssi: typeof rssi === "number" ? rssi : undefined,
+        ip: typeof ip === "string" ? ip : undefined,
+        connectDurationMs:
+          typeof connectDurationMs === "number" ? connectDurationMs : undefined,
+        queuedReadingsCount:
+          typeof queuedReadingsCount === "number" ? queuedReadingsCount : undefined,
+        flushedReadingsCount:
+          typeof flushedReadingsCount === "number" ? flushedReadingsCount : undefined,
+        droppedReadingsCount:
+          typeof droppedReadingsCount === "number" ? droppedReadingsCount : undefined,
+        consecutiveFailures:
+          typeof consecutiveFailures === "number" ? consecutiveFailures : undefined,
+        lastHttpStatus:
+          typeof lastHttpStatus === "number" ? lastHttpStatus : undefined,
+        lastFailureReason:
+          typeof lastFailureReason === "string" ? lastFailureReason : undefined,
+        lastSuccessAt:
+          typeof lastSuccessAt === "string" ? lastSuccessAt : undefined,
+        lastFailureAt:
+          typeof lastFailureAt === "string" ? lastFailureAt : undefined,
+        freeHeap: typeof freeHeap === "number" ? freeHeap : undefined,
+        recovered: typeof recovered === "boolean" ? recovered : undefined,
+        note: typeof note === "string" ? note : undefined,
+      });
+
+      const docRef = await db.collection("deviceHealthReports").add(healthReport);
+      logger.info("Stored device health report", {
+        id: docRef.id,
+        deviceId,
+        eventType
+      });
+      res.status(201).json({ ok: true, id: docRef.id });
+      return;
+    }
 
     if (
+      kind !== "reading" ||
       typeof deviceId !== "string" ||
       typeof temperatureC !== "number" ||
       typeof humidity !== "number"

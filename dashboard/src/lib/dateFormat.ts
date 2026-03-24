@@ -19,8 +19,8 @@ export function formatDateShort(value: DateInput): string {
   return format(toDate(value), 'MM.dd. HH:mm', { locale: hu });
 }
 
-export function formatRelative(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+export function formatRelative(iso: string, now = Date.now()): string {
+  const diff = now - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'Most';
   if (mins < 60) return `${mins} perce`;
