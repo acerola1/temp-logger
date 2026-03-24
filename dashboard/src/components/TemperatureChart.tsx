@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -9,9 +10,12 @@ import {
   ReferenceArea,
 } from 'recharts';
 import { chartColors } from '../constants/chartColors';
+import { chartMargin, chartYAxisWidth } from '../constants/chartLayout';
+import { AnimatedTimeAxis } from './AnimatedTimeAxis';
 import { formatDateShort } from '../lib/dateFormat';
 import { buildChartSeries } from '../lib/chartSeries';
 import { getTimeDomain } from '../lib/chartTime';
+import { useElementWidth } from '../hooks/useElementWidth';
 import type { SensorReading, TimeRange } from '../types/sensor';
 
 interface TemperatureChartProps {
@@ -21,6 +25,8 @@ interface TemperatureChartProps {
 }
 
 export function TemperatureChart({ readings, timeRange, isDark }: TemperatureChartProps) {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartWidth = useElementWidth(chartRef);
   const filteredReadings =
     timeRange === '30d'
       ? readings.filter((_, i) => i % 4 === 0)
@@ -31,14 +37,16 @@ export function TemperatureChart({ readings, timeRange, isDark }: TemperatureCha
   const timeDomain = getTimeDomain(data.map((point) => point.recordedAtMs));
 
   const gridColor = isDark ? chartColors.gridDark : chartColors.grid;
+  const plotWidth = Math.max(0, chartWidth - chartYAxisWidth - chartMargin.right);
 
   return (
     <div className="bg-white/70 dark:bg-vine-800/70 backdrop-blur-sm rounded-2xl border border-vine-200 dark:border-vine-700 p-4 shadow-sm mb-4">
       <h2 className="text-base font-semibold text-vine-900 dark:text-vine-50 mb-3">
         Hőmérséklet
       </h2>
-      <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+      <div ref={chartRef} className="relative">
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={data} margin={chartMargin}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
           <ReferenceArea
             y1={24}
@@ -53,8 +61,7 @@ export function TemperatureChart({ readings, timeRange, isDark }: TemperatureCha
             type="number"
             scale="time"
             domain={timeDomain}
-            tickFormatter={(value: number) => formatDateShort(value)}
-            tick={{ fontSize: 11, fill: isDark ? '#b5ab8e' : '#6b7a3d' }}
+            tick={false}
             stroke={gridColor}
             interval="preserveStartEnd"
             minTickGap={60}
@@ -64,7 +71,7 @@ export function TemperatureChart({ readings, timeRange, isDark }: TemperatureCha
             tickFormatter={(v: number) => `${v}°`}
             tick={{ fontSize: 11, fill: isDark ? '#b5ab8e' : '#6b7a3d' }}
             stroke={gridColor}
-            width={45}
+            width={chartYAxisWidth}
           />
           <Tooltip
             contentStyle={{
@@ -83,11 +90,20 @@ export function TemperatureChart({ readings, timeRange, isDark }: TemperatureCha
             stroke={chartColors.temperature.line}
             strokeWidth={2}
             isAnimationActive={true}
+            animationDuration={450}
             dot={false}
             activeDot={{ r: 4, fill: chartColors.temperature.line }}
           />
-        </LineChart>
-      </ResponsiveContainer>
+          </LineChart>
+        </ResponsiveContainer>
+        <AnimatedTimeAxis
+          domain={timeDomain}
+          timeRange={timeRange}
+          isDark={isDark}
+          plotLeft={chartYAxisWidth}
+          plotWidth={plotWidth}
+        />
+      </div>
     </div>
   );
 }
