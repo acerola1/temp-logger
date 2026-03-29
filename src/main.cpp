@@ -27,6 +27,8 @@ constexpr int kDhtType = DHT22;
 constexpr unsigned long kPortalHeartbeatIntervalMs = 5000;
 constexpr unsigned long kWifiConnectTimeoutMs = 20000;
 constexpr unsigned long kReadIntervalMs = 15UL * 60UL * 1000UL;
+constexpr uint8_t kSensorReadAttempts = 3;
+constexpr unsigned long kSensorRetryDelayMs = 2000;
 constexpr uint64_t kSleepDurationUs =
     static_cast<uint64_t>(kReadIntervalMs) * 1000ULL;
 constexpr uint32_t kTelemetryStateMagic = 0x544C4D31UL;
@@ -450,26 +452,39 @@ bool postHealthReport(const char* eventType, uint16_t queuedReadingsCount,
 }
 
 bool readSensor(PendingReading* readingOut) {
-  const float humidity = dht.readHumidity();
-  const float temperatureC = dht.readTemperature();
+  for (uint8_t attempt = 1; attempt <= kSensorReadAttempts; ++attempt) {
+    if (attempt > 1) {
+      Serial.printf("DHT ujraprobalas (%u/%u) %lu ms mulva.\n", attempt,
+                    kSensorReadAttempts, kSensorRetryDelayMs);
+      delay(kSensorRetryDelayMs);
+    }
 
-  if (isnan(humidity) || isnan(temperatureC)) {
-    Serial.println("DHT olvasasi hiba.");
-    return false;
+    const float humidity = dht.readHumidity();
+    const float temperatureC = dht.readTemperature();
+
+    if (isnan(humidity) || isnan(temperatureC)) {
+      Serial.printf("DHT olvasasi hiba (%u/%u).\n", attempt,
+                    kSensorReadAttempts);
+      continue;
+    }
+
+    Serial.print("Homerseklet: ");
+    Serial.print(temperatureC, 1);
+    Serial.print(" C, Paratartalom: ");
+    Serial.print(humidity, 1);
+    Serial.println(" %");
+
+    if (readingOut != nullptr) {
+      readingOut->recordedAtEpochMs = currentEpochMs();
+      readingOut->temperatureC = temperatureC;
+      readingOut->humidity = humidity;
+    }
+    return true;
   }
 
-  Serial.print("Homerseklet: ");
-  Serial.print(temperatureC, 1);
-  Serial.print(" C, Paratartalom: ");
-  Serial.print(humidity, 1);
-  Serial.println(" %");
-
-  if (readingOut != nullptr) {
-    readingOut->recordedAtEpochMs = currentEpochMs();
-    readingOut->temperatureC = temperatureC;
-    readingOut->humidity = humidity;
-  }
-  return true;
+  Serial.printf("DHT olvasas %u probalkozas utan sem sikerult.\n",
+                kSensorReadAttempts);
+  return false;
 }
 
 bool flushPendingReadings(uint16_t* flushedCountOut) {
