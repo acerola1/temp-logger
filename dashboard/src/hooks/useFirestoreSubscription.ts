@@ -21,7 +21,7 @@ interface FirestoreSubscriptionResult<T> {
 }
 
 export function useFirestoreCollection<T>(
-  queryRef: Query<DocumentData>,
+  queryRef: Query<DocumentData> | null,
   mapSnapshot: (snapshot: QuerySnapshot<DocumentData>) => T,
   options: FirestoreSubscriptionOptions<T>,
 ): FirestoreSubscriptionResult<T> {
@@ -31,7 +31,7 @@ export function useFirestoreCollection<T>(
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !queryRef) {
       setData(initialData);
       setLoading(false);
       setError(null);

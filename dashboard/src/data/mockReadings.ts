@@ -34,7 +34,6 @@ function generateReadings(): SensorReading[] {
       temperatureC,
       humidity,
       recordedAt: iso,
-      createdAt: iso,
     });
   }
 

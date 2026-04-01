@@ -25,6 +25,29 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Session types — public read, admin write
+    match /sessionTypes/{sessionTypeId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Devices — public read, admin write from client
+    match /devices/{deviceId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+
+      match /sessions/{sessionId} {
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
+      }
+
+      match /readings/{readingId} {
+        allow read: if true;
+        allow create, update: if false;
+        allow delete: if isAdmin();
+      }
+    }
+
     // Admin registry — auth read, server-only write
     match /admins/{uid} {
       allow read: if isSignedIn();

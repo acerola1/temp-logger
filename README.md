@@ -104,14 +104,52 @@ Példa:
 ```ini
 [env:esp32dev]
 build_flags =
-  -DFIREBASE_INGEST_URL=\"https://europe-west1-g-temp-log.cloudfunctions.net/ingestReading\"
+  -DFIREBASE_INGEST_URL=\"https://europe-west1-g-temp-log.cloudfunctions.net/ingestReadingV2\"
   -DFIREBASE_DEVICE_TOKEN=\"dev-token\"
-  -DDEVICE_ID=\"esp32-lab\"
 ```
 
 Mintafájl:
 
 - `platformio.local.example.ini`
+
+Megjegyzés:
+
+- a `DEVICE_ID` már nem build flagből jön, hanem setup közben állítható és az ESP32 Preferences-ben menti el
+- a `FIREBASE_DEVICE_TOKEN` továbbra is build-time secret marad
+
+## Device token
+
+A `FIREBASE_DEVICE_TOKEN` egy megosztott titok az ESP32 és a Cloud Function között.
+
+Feladata:
+
+- az ESP32 ezt küldi a `X-Device-Token` HTTP headerben
+- a backend ezt ellenőrzi
+- ha nem egyezik, a kérés `401 unauthorized` hibát kap
+
+Fontos:
+
+- ez nem a device azonosítója
+- ez nem a session azonosítója
+- ez nem felhasználónkénti token
+- ez jelenleg egy közös eszköz-token, amit a firmware és a Firebase Functions ismer
+
+Hol van beállítva:
+
+- az ESP32 oldalon: `platformio.local.ini` `FIREBASE_DEVICE_TOKEN`
+- a Firebase oldalon: `DEVICE_TOKEN` secret
+
+Példa header:
+
+```text
+X-Device-Token: dev-token
+```
+
+Ha a token nem egyezik:
+
+- az adat nem mentődik el
+- a function `401` hibát ad vissza
+- az ESP32 soros logjában a HTTP státusz látszani fog
 
 ## Wi-Fi konfiguráció
 
@@ -125,7 +163,8 @@ http://192.168.4.1
 ```
 
 3. Add meg a helyi Wi-Fi SSID-t és jelszót
-4. A board elmenti és reset után automatikusan csatlakozik
+4. Add meg vagy módosítsd a `deviceId` értékét
+5. A board elmenti és reset után automatikusan csatlakozik
 
 ## Firebase backend
 
@@ -136,6 +175,7 @@ Aktív projekt:
 Aktív function:
 
 - `ingestReading`
+- `ingestReadingV2`
 - URL: `https://europe-west1-g-temp-log.cloudfunctions.net/ingestReading`
 
 A function:
@@ -143,6 +183,15 @@ A function:
 - `POST` kérést fogad
 - `X-Device-Token` headerrel autentikál
 - Firestore `sensorReadings` kollekcióba ír
+
+Az új `ingestReadingV2` endpoint:
+
+- `POST` kérést fogad
+- `X-Device-Token` headerrel autentikál
+- az új adatstruktúrába ír:
+  - `devices/{deviceId}/readings`
+- ismeretlen `deviceId` esetén automatikusan létrehozza a `devices/{deviceId}` dokumentumot
+- az adott device aktív sessionjét keresi a `devices/{deviceId}/sessions` alatt
 
 Elvárt payload:
 
@@ -169,6 +218,15 @@ Sikeres válasz:
 {"ok":true,"id":"..."}
 ```
 
+`v2` kézi teszt:
+
+```bash
+curl -i -X POST 'https://europe-west1-g-temp-log.cloudfunctions.net/ingestReadingV2' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Device-Token: dev-token' \
+  -d '{"deviceId":"esp32-test","temperatureC":24.5,"humidity":25.3}'
+```
+
 ## Firebase deploy
 
 Projekt kiválasztás:
@@ -183,16 +241,23 @@ Secret beállítás:
 printf 'dev-token' | firebase functions:secrets:set DEVICE_TOKEN
 ```
 
+Meglévő secret ellenőrzése:
+
+```bash
+firebase functions:secrets:access DEVICE_TOKEN
+```
+
 Functions deploy:
 
 ```bash
-firebase deploy --only functions
+firebase deploy --only functions,firestore:rules,firestore:indexes
 ```
 
 Megjegyzés:
 
 - a function Gen2 (`europe-west1`)
 - az első deploy új projektnél lassú lehet, mert több Google API és Cloud Build/Run erőforrás jön létre
+- ha új endpointot vezetsz be, az ESP32 `FIREBASE_INGEST_URL` értékét is frissíteni kell a megfelelő function URL-re
 
 ## React dashboard
 

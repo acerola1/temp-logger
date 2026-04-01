@@ -42,6 +42,13 @@ cd ..
 firebase functions:secrets:set DEVICE_TOKEN
 ```
 
+Ez a token lesz az a megosztott titok, amit:
+
+- az ESP32 a `X-Device-Token` headerben kuld
+- a Cloud Function a `DEVICE_TOKEN` secretbol ellenoriz
+
+Az ESP32 oldalon ugyanez a token a `platformio.local.ini` fajlban szerepel `FIREBASE_DEVICE_TOKEN` neven.
+
 5. Hozz letre Firestore adatbazist a Firebase konzolban.
 
 6. Töltsd ki a `web/firebase-config.js` fajlt a sajat Firebase web app konfiguracioddal.
@@ -49,7 +56,7 @@ firebase functions:secrets:set DEVICE_TOKEN
 ## Deploy
 
 ```bash
-firebase deploy --only functions,firestore:rules,hosting
+firebase deploy --only functions,firestore:rules,firestore:indexes
 ```
 
 ## ESP32 HTTP payload
@@ -72,12 +79,23 @@ X-Device-Token: <DEVICE_TOKEN titok>
 Content-Type: application/json
 ```
 
+Ha a token nem egyezik:
+
+- a Function `401 unauthorized` valaszt ad
+- az adat nem mentodik el
+
 ## Vart Function URL
 
 Deploy utan a function URL-ja tipikusan ehhez hasonlit:
 
 ```text
 https://europe-west1-YOUR_PROJECT_ID.cloudfunctions.net/ingestReading
+```
+
+Az uj strukturahoz a vart v2 URL:
+
+```text
+https://europe-west1-YOUR_PROJECT_ID.cloudfunctions.net/ingestReadingV2
 ```
 
 ## Kovetkezo lepes

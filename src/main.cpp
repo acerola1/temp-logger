@@ -7,6 +7,7 @@
 #include <WiFiManager.h>
 #include <esp_sleep.h>
 #include <esp_system.h>
+#include <inttypes.h>
 #include <time.h>
 
 #ifndef FIREBASE_INGEST_URL
@@ -15,10 +16,6 @@
 
 #ifndef FIREBASE_DEVICE_TOKEN
 #error "FIREBASE_DEVICE_TOKEN is not defined. Create platformio.local.ini."
-#endif
-
-#ifndef DEVICE_ID
-#define DEVICE_ID "esp32-lab"
 #endif
 
 namespace {
@@ -34,12 +31,14 @@ constexpr uint64_t kSleepDurationUs =
 constexpr uint32_t kTelemetryStateMagic = 0x544C4D31UL;
 constexpr uint16_t kTelemetryStateVersion = 1;
 constexpr size_t kMaxPendingReadings = 96;
+constexpr size_t kMaxDeviceIdLength = 32;
 constexpr time_t kMinValidEpoch = 1704067200;
 constexpr char kConfigPortalName[] = "ESP32-DHT22-Setup";
 constexpr char kTelemetryNamespace[] = "telemetry";
 constexpr char kIngestUrl[] = FIREBASE_INGEST_URL;
 constexpr char kDeviceToken[] = FIREBASE_DEVICE_TOKEN;
-constexpr char kDeviceId[] = DEVICE_ID;
+constexpr char kDefaultDeviceIdPrefix[] = "esp32-";
+constexpr char kDeviceIdPreferenceKey[] = "device_id";
 
 struct PendingReading {
   int64_t recordedAtEpochMs;
@@ -77,7 +76,74 @@ Preferences preferences;
 unsigned long lastPortalHeartbeatAt = 0;
 unsigned long connectAttemptStartedAt = 0;
 bool configPortalStarted = false;
+bool deviceConfigSaved = false;
 TelemetryState telemetryState{};
+char deviceId[kMaxDeviceIdLength + 1] = {};
+char deviceIdInput[kMaxDeviceIdLength + 1] = {};
+WiFiManagerParameter deviceIdParameter(
+    "device_id",
+    "Device ID",
+    deviceIdInput,
+    kMaxDeviceIdLength,
+    "pattern='[a-z0-9-]+' title='kisbetuk, szamok, kotojel'");
+
+String currentDeviceId() {
+  return String(deviceId);
+}
+
+String generateDefaultDeviceId() {
+  const uint32_t chipSuffix = static_cast<uint32_t>(ESP.getEfuseMac() & 0xFFFFFF);
+  char buffer[kMaxDeviceIdLength + 1];
+  snprintf(buffer, sizeof(buffer), "%s%06" PRIx32, kDefaultDeviceIdPrefix,
+           chipSuffix);
+  return String(buffer);
+}
+
+bool isValidDeviceId(const String& candidate) {
+  if (candidate.length() < 3 || candidate.length() > kMaxDeviceIdLength) {
+    return false;
+  }
+
+  for (size_t i = 0; i < candidate.length(); ++i) {
+    const char ch = candidate.charAt(i);
+    const bool isLowercaseLetter = ch >= 'a' && ch <= 'z';
+    const bool isDigit = ch >= '0' && ch <= '9';
+    if (!isLowercaseLetter && !isDigit && ch != '-') {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void saveDeviceId(const String& newDeviceId) {
+  newDeviceId.toCharArray(deviceId, sizeof(deviceId));
+  preferences.putString(kDeviceIdPreferenceKey, newDeviceId);
+}
+
+void loadDeviceId() {
+  String storedDeviceId = preferences.getString(kDeviceIdPreferenceKey, "");
+  if (!isValidDeviceId(storedDeviceId)) {
+    storedDeviceId = generateDefaultDeviceId();
+    preferences.putString(kDeviceIdPreferenceKey, storedDeviceId);
+  }
+
+  storedDeviceId.toCharArray(deviceId, sizeof(deviceId));
+}
+
+void saveDeviceConfigFromPortal() {
+  String newDeviceId(deviceIdParameter.getValue());
+  newDeviceId.trim();
+  if (!isValidDeviceId(newDeviceId)) {
+    Serial.println("Mentett Device ID ervenytelen, regi ertek marad.");
+    return;
+  }
+
+  saveDeviceId(newDeviceId);
+  deviceConfigSaved = true;
+  Serial.print("Device ID elmentve: ");
+  Serial.println(deviceId);
+}
 
 const char* failureReasonText(FailureReason reason) {
   switch (reason) {
@@ -366,12 +432,18 @@ int postJson(const String& payload) {
   Serial.println(statusCode);
   Serial.print("Valasz: ");
   Serial.println(responseBody);
+
+  if (statusCode == 401) {
+    Serial.println("Auth hiba: a X-Device-Token nem egyezik.");
+    Serial.println("Ellenorizd a FIREBASE_DEVICE_TOKEN erteket.");
+  }
+
   return statusCode;
 }
 
 bool postReading(const PendingReading& reading, int* httpStatusOut = nullptr) {
   String payload = "{\"kind\":\"reading\",\"deviceId\":\"";
-  payload += kDeviceId;
+  payload += currentDeviceId();
   payload += "\",\"temperatureC\":";
   payload += String(reading.temperatureC, 1);
   payload += ",\"humidity\":";
@@ -395,7 +467,7 @@ bool postReading(const PendingReading& reading, int* httpStatusOut = nullptr) {
 bool postHealthReport(const char* eventType, uint16_t queuedReadingsCount,
                       uint16_t flushedReadingsCount, bool recovered) {
   String payload = "{\"kind\":\"health\",\"deviceId\":\"";
-  payload += kDeviceId;
+  payload += currentDeviceId();
   payload += "\",\"eventType\":\"";
   payload += eventType;
   payload += "\",\"recordedAt\":\"";
@@ -575,6 +647,12 @@ void startConfigPortal() {
     return;
   }
 
+  deviceConfigSaved = false;
+  strncpy(deviceIdInput, deviceId, sizeof(deviceIdInput) - 1);
+  deviceIdInput[sizeof(deviceIdInput) - 1] = '\0';
+  deviceIdParameter.setValue(deviceIdInput, kMaxDeviceIdLength);
+  wifiManager.setSaveParamsCallback(saveDeviceConfigFromPortal);
+  wifiManager.addParameter(&deviceIdParameter);
   configPortalStarted = true;
   connectAttemptStartedAt = millis();
   wifiManager.setConfigPortalBlocking(false);
@@ -593,6 +671,7 @@ void setup() {
   Serial.begin(115200);
   delay(3000);
   preferences.begin(kTelemetryNamespace, false);
+  loadDeviceId();
   loadTelemetryState();
   telemetryState.bootCount += 1;
   saveTelemetryState();
@@ -603,6 +682,10 @@ void setup() {
   Serial.println(resetReasonText(esp_reset_reason()));
   Serial.print("Queue meret: ");
   Serial.println(telemetryState.pendingCount);
+  Serial.print("Device ID: ");
+  Serial.println(deviceId);
+  Serial.print("Ingest URL: ");
+  Serial.println(kIngestUrl);
   dht.begin();
   WiFi.mode(WIFI_STA);
   wifiManager.setConfigPortalBlocking(false);
@@ -633,6 +716,10 @@ void loop() {
   wifiManager.process();
 
   if (WiFi.status() == WL_CONNECTED) {
+    if (deviceConfigSaved) {
+      saveDeviceConfigFromPortal();
+      deviceConfigSaved = false;
+    }
     handleConnectedCycle();
     return;
   }

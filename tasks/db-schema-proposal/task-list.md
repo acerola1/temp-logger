@@ -21,78 +21,79 @@
   - `temperatureMax`
   - `humidityMin`
   - `humidityMax`
-- [ ] Frissítsük a Firestore rules fájlt az új struktúrához.
-- [ ] Engedélyezzük az olvasást a `sessionTypes` kollekcióra.
-- [ ] Engedélyezzük az olvasást a `devices` kollekcióra.
-- [ ] Engedélyezzük az olvasást a `devices/{deviceId}/sessions` alkollekcióra.
-- [ ] Engedélyezzük az olvasást a `devices/{deviceId}/readings` alkollekcióra.
-- [ ] Hozzuk létre a szükséges indexeket a `readings` alkollekcióra.
-- [ ] Hozzuk létre a szükséges indexeket a `sessions` alkollekcióra.
-- [ ] Készítsük elő a collection group indexet az összesített `readings` nézethez.
+- [x] Frissítsük a Firestore rules fájlt az új struktúrához.
+- [x] Engedélyezzük az olvasást a `sessionTypes` kollekcióra.
+- [x] Engedélyezzük az olvasást a `devices` kollekcióra.
+- [x] Engedélyezzük az olvasást a `devices/{deviceId}/sessions` alkollekcióra.
+- [x] Engedélyezzük az olvasást a `devices/{deviceId}/readings` alkollekcióra.
+- [x] Hozzuk létre a szükséges indexeket a `readings` alkollekcióra.
+- [x] Hozzuk létre a szükséges indexeket a `sessions` alkollekcióra.
+- [x] Készítsük elő a collection group indexet az összesített `readings` nézethez.
 
 ## 3. Backend: v2 endpoint
 
-- [ ] Hozzunk létre új Cloud Function végpontot `ingestReadingV2` néven.
-- [ ] A meglévő `ingestReading` endpoint maradjon változatlan.
-- [ ] A v2 endpoint továbbra is tokennel hitelesítsen.
-- [ ] A v2 endpoint fogadja a `deviceId`, `temperatureC`, `humidity`, `recordedAt` mezőket.
-- [ ] A v2 endpoint az új Firestore struktúrába írjon.
-- [ ] A v2 endpoint ne tartalmazzon `deviceId` validációt.
+- [x] Hozzunk létre új Cloud Function végpontot `ingestReadingV2` néven.
+- [x] A meglévő `ingestReading` endpoint maradjon változatlan.
+- [x] A v2 endpoint továbbra is tokennel hitelesítsen.
+- [x] A v2 endpoint fogadja a `deviceId`, `temperatureC`, `humidity`, `recordedAt` mezőket.
+- [x] A v2 endpoint az új Firestore struktúrába írjon.
+- [x] A v2 endpoint ne tartalmazzon `deviceId` validációt.
 
 ## 4. Backend: device auto-create és device alapadatok
 
-- [ ] A v2 endpoint kezeljen ismeretlen `deviceId`-t is.
-- [ ] Ha a `devices/{deviceId}` dokumentum nem létezik, hozza létre automatikusan.
-- [ ] Az automatikusan létrejövő device dokumentum mezője legyen:
+- [x] A v2 endpoint kezeljen ismeretlen `deviceId`-t is.
+- [x] Ha a `devices/{deviceId}` dokumentum nem létezik, hozza létre automatikusan.
+- [x] Az automatikusan létrejövő device dokumentum mezője legyen:
   - `name`
-- [ ] Az automatikus `name` alapból legyen maga a `deviceId`.
-- [ ] Logoljuk, ha új device dokumentum jön létre.
+- [x] Az automatikus `name` alapból legyen maga a `deviceId`.
+- [x] Logoljuk, ha új device dokumentum jön létre.
 - [ ] Készüljön elő arra is, hogy a device `name` később szerkeszthető legyen a dashboardból.
 
 ## 5. Backend: session feloldás és reading mentés
 
-- [ ] A v2 endpoint az adott device alatt keresse meg az aktív sessiont.
-- [ ] Az aktív session keresése itt történjen:
+- [x] A v2 endpoint az adott device alatt keresse meg az aktív sessiont.
+- [x] Az aktív session keresése itt történjen:
   - `devices/{deviceId}/sessions`
-- [ ] Ha van aktív session, a reading kapjon `sessionId` mezőt.
-- [ ] Ha nincs aktív session, a reading `sessionId: null` formában menjen el.
-- [ ] A reading ide kerüljön:
+- [x] Ha van aktív session, a reading kapjon `sessionId` mezőt.
+- [x] Ha nincs aktív session, a reading `sessionId: null` formában menjen el.
+- [x] A reading ide kerüljön:
   - `devices/{deviceId}/readings/{readingId}`
-- [ ] A reading mezői legyenek:
+- [x] A reading mezői legyenek:
   - `sessionId`
   - `temperatureC`
   - `humidity`
   - `recordedAt`
-- [ ] A v2 endpoint adjon vissza sikeres választ és hibaüzenetet.
+- [x] A v2 endpoint adjon vissza sikeres választ és hibaüzenetet.
 
 ## 6. Firmware: setup átírása
 
-- [ ] A setup folyamatot módosítsuk úgy, hogy a `deviceId` is beállítható legyen.
-- [ ] A setup portálban jelenjen meg külön mező a `deviceId`-nek.
-- [ ] A setup portál töltse be az aktuálisan mentett `deviceId`-t, ha már van.
-- [ ] A setup portál validálja a `deviceId`-t mentés előtt.
+- [x] A setup folyamatot módosítsuk úgy, hogy a `deviceId` is beállítható legyen.
+- [x] A setup portálban jelenjen meg külön mező a `deviceId`-nek.
+- [x] A setup portál töltse be az aktuálisan mentett `deviceId`-t, ha már van.
+- [x] A setup portál validálja a `deviceId`-t mentés előtt.
 - [ ] Hibás `deviceId` esetén jelenjen meg azonnali hibaüzenet.
-- [ ] A setup csak érvényes `deviceId` mellett engedje a mentést.
-- [ ] A setupban a `deviceId` formátuma legyen: kisbetűk, számok, kötőjel.
-- [ ] Ha nincs mentett `deviceId`, generáljunk default értéket.
-- [ ] Az alapértelmezett `deviceId` chip-azonosító alapú generált érték legyen.
+- [x] A setup csak érvényes `deviceId` mellett engedje a mentést.
+- [x] A setupban a `deviceId` formátuma legyen: kisbetűk, számok, kötőjel.
+- [x] Ha nincs mentett `deviceId`, generáljunk default értéket.
+- [x] Az alapértelmezett `deviceId` chip-azonosító alapú generált érték legyen.
 
 ## 7. Firmware: `deviceId` tárolás
 
-- [ ] A `deviceId` ne build flagként éljen tovább.
-- [ ] A `deviceId` Preferences-ben legyen tárolva.
-- [ ] Induláskor a firmware a mentett `deviceId`-t töltse be.
-- [ ] Ha nincs mentett `deviceId`, a firmware mentse el a generált default értéket.
+- [x] A `deviceId` ne build flagként éljen tovább.
+- [x] A `deviceId` Preferences-ben legyen tárolva.
+- [x] Induláskor a firmware a mentett `deviceId`-t töltse be.
+- [x] Ha nincs mentett `deviceId`, a firmware mentse el a generált default értéket.
 - [ ] Ellenőrizzük, hogy a `deviceId` túléli-e a restartot és az alvásból visszatérést.
 
 ## 8. Firmware: v2 endpoint használata
 
-- [ ] A firmware tudjon a v2 endpointnak küldeni.
-- [ ] Az új endpoint URL egyelőre build configból jöjjön.
+- [x] A firmware tudjon a v2 endpointnak küldeni.
+- [x] Az új endpoint URL egyelőre build configból jöjjön.
 - [ ] Az új szenzor rögtön a v2 endpointot használja.
 - [ ] A mostani szenzor átmenetileg maradjon v1-en.
 - [ ] A régi működést egyelőre ne törjük el.
-- [ ] A soros logban látszódjon, hogy a v1 vagy v2 endpointot használja az eszköz.
+- [x] A soros logban látszódjon, hogy a v1 vagy v2 endpointot használja az eszköz.
+- [x] `401 unauthorized` esetén a soros log külön auth hibát írjon ki.
 
 ## 9. Dashboard: alap adatlekérés
 
@@ -169,3 +170,5 @@
 - [ ] Teszteljük a device átnevezést.
 - [ ] Teszteljük a session szerkesztést.
 - [ ] Teszteljük, hogy a régi endpoint továbbra is működik.
+- [ ] Teszteljük, hogy rossz token esetén az ESP32 külön auth hibát jelez.
+- [ ] Teszteljük, hogy rossz token esetén a Cloud Function warningot logol.
