@@ -37,7 +37,6 @@ A rendszer fő részei:
 - `dashboard/`: React dashboard
 - `docs/`: dokumentációs képek
 - `tasks/`: task és terv fájlok
-- `web/`: egyszerű statikus Firebase oldal
 
 ## Hardver
 
@@ -404,14 +403,6 @@ Megjegyzés:
 - az első deploy új projektnél lassú lehet, mert több Google API és Cloud Build/Run erőforrás jön létre
 - ha új endpointot vezetsz be, az ESP32 `FIREBASE_INGEST_URL` értékét is frissíteni kell a megfelelő function URL-re
 - a dugványfotók miatt a Storage rules deploy is a projekt része lett
-
-## Egyszerű statikus webes nézet
-
-A `web/` mappában van egy egyszerűbb, nem React alapú Firebase oldal is:
-
-- `web/index.html`
-- `web/app.js`
-- `web/firebase-config.js`
 
 ## Git
 

@@ -3,7 +3,7 @@
 Ez a mappa egy egyszeru Firebase alapú logolási vázat tartalmaz:
 
 - `functions/index.js`: HTTPS endpoint az ESP32-nek
-- `web/`: Firebase Hosting oldal az adatok megjelenitesere
+- `dashboard/`: React dashboard a mért adatok megjelenítésére
 - `firestore.rules`: Firestore szabalyok
 
 ## Javasolt architektura
@@ -51,7 +51,7 @@ Az ESP32 oldalon ugyanez a token a `platformio.local.ini` fajlban szerepel `FIRE
 
 5. Hozz letre Firestore adatbazist a Firebase konzolban.
 
-6. Töltsd ki a `web/firebase-config.js` fajlt a sajat Firebase web app konfiguracioddal.
+6. Töltsd ki a dashboard Firebase konfigurációját a saját Firebase web app adataiddal.
 
 ## Deploy
 
