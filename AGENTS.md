@@ -28,3 +28,12 @@ When adjusting UI layout, spacing, alignment, visibility, or interaction states:
 - prefer checking the DOM and taking screenshots after each meaningful change
 - change one thing at a time when possible, instead of mixing multiple hypotheses in one edit
 - if repeated small tweaks do not converge, stop tweaking and re-check the actual rendered structure before continuing
+
+## Completion Rule
+
+- do not stop at “almost done” if the requested result is still visibly wrong
+- keep iterating until the task is actually finished, or until there is a real external blocker
+- if a verification step shows the result is still wrong, continue immediately instead of handing the unfinished state back to the user
+- before stopping, explicitly ask yourself: “Did I actually solve the user’s task?”
+- if the honest answer is “not yet”, continue working instead of closing the loop
+- the required “next action” line must not be treated as permission to stop early; it is only a communication requirement

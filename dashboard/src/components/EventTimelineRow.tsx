@@ -82,6 +82,7 @@ export function EventTimelineRow({
           left: plotLeft,
           width: plotWidth,
           top: eventMarkerCenterY,
+          opacity: isDark ? 0.7 : 1,
         }}
       />
 
@@ -89,7 +90,7 @@ export function EventTimelineRow({
         <button
           type="button"
           onClick={onQuickCreateNow}
-          className="absolute flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[4px] border bg-white text-sky-700 shadow-sm transition-colors hover:bg-sky-50 dark:bg-vine-900 dark:text-sky-300 dark:hover:bg-vine-800"
+          className="absolute flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[4px] border bg-white text-sky-700 shadow-sm transition-colors hover:bg-sky-50 dark:bg-vine-800 dark:text-sky-200 dark:hover:bg-vine-700"
           style={{ left: quickCreateLeft, top: eventMarkerCenterY }}
           aria-label="Új esemény az aktuális időponthoz"
         >
@@ -108,8 +109,8 @@ export function EventTimelineRow({
                 left,
                 bottom: eventTimelineRowHeight - eventMarkerCenterY,
                 height: lineHeight,
-                backgroundColor: isDark ? '#7dd3fc' : '#93c5fd',
-                opacity: 0.9,
+                backgroundColor: isDark ? '#67e8f9' : '#93c5fd',
+                opacity: isDark ? 0.65 : 0.9,
               }}
             />
             <button
@@ -121,13 +122,13 @@ export function EventTimelineRow({
               onFocus={() => setHoveredEventId(item.event.id)}
               onBlur={() => setHoveredEventId((current) => (current === item.event.id ? null : current))}
               onClick={() => onEventSelect?.(item.event)}
-              className="absolute z-10 flex h-[20px] w-[20px] -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[4px] border-2 border-white text-[10px] font-semibold leading-none shadow-sm transition-transform hover:scale-110 focus:scale-110 dark:border-vine-900"
+              className="absolute z-10 flex h-[20px] w-[20px] -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[4px] border-2 border-white text-[10px] font-semibold leading-none shadow-sm transition-transform hover:scale-110 focus:scale-110 dark:border-vine-950"
               style={{
                 left,
                 top: eventMarkerCenterY,
-                backgroundColor: '#ffffff',
-                borderColor: isDark ? '#7dd3fc' : '#60a5fa',
-                color: isDark ? '#7dd3fc' : '#2563eb',
+                backgroundColor: isDark ? '#22301a' : '#ffffff',
+                borderColor: isDark ? '#67e8f9' : '#60a5fa',
+                color: isDark ? '#a5f3fc' : '#2563eb',
               }}
               aria-label={item.event.title}
             >
@@ -170,7 +171,7 @@ export function EventTimelineRow({
               <button
                 type="button"
                 onClick={onOpenEventList}
-                className="text-sky-700 underline decoration-sky-300 underline-offset-2 transition-colors hover:text-sky-800 dark:text-sky-300 dark:decoration-sky-500 dark:hover:text-sky-200"
+                className="font-medium text-sky-700 underline decoration-sky-300 underline-offset-2 transition-colors hover:text-sky-800 dark:text-sky-200 dark:decoration-sky-400 dark:hover:text-cyan-100"
               >
                 {eventCountLabel}
               </button>

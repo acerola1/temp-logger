@@ -6,8 +6,7 @@ import { TimeRangeSelector } from './components/TimeRangeSelector';
 import { TemperatureChart } from './components/TemperatureChart';
 import { HumidityChart } from './components/HumidityChart';
 import { ReadingsTable } from './components/ReadingsTable';
-import { DeviceSelector } from './components/DeviceSelector';
-import { SessionSelector } from './components/SessionSelector';
+import { DeviceSessionSelector } from './components/DeviceSessionSelector';
 import { SessionManager } from './components/SessionManager';
 import { SessionEventsDialog } from './components/SessionEventsDialog';
 import { SessionEventDialog } from './components/SessionEventDialog';
@@ -18,6 +17,7 @@ import { useFirestoreReadings } from './hooks/useFirestoreReadings';
 import { useLegacyReadings } from './hooks/useLegacyReadings';
 import { useIsAdmin } from './hooks/useIsAdmin';
 import { useSessions } from './hooks/useSessions';
+import { useAllSessions } from './hooks/useAllSessions';
 import { useSessionEvents } from './hooks/useSessionEvents';
 import { useDevices } from './hooks/useDevices';
 import { useSessionTypes } from './hooks/useSessionTypes';
@@ -118,8 +118,8 @@ function Dashboard() {
   );
 
   const effectiveDeviceId = selectedDeviceId ?? devices[0]?.id ?? null;
-  const { sessions, activeSession, loading: sessionsLoading, createSession, archiveSession } =
-    useSessions(effectiveDeviceId);
+  const { sessions, activeSession, createSession, archiveSession } = useSessions(effectiveDeviceId);
+  const { sessions: allSessions } = useAllSessions(devices);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null | undefined>(
     initialMonitorState.selectedSessionId,
   );
@@ -265,23 +265,23 @@ function Dashboard() {
           onOpenSessionManager={() => setSessionManagerOpen(true)}
         />
 
-        <div className="mb-6 flex items-center gap-2">
+        <div className="mb-6 border-b border-vine-200 dark:border-vine-700 flex gap-6">
           <button
             onClick={() => navigateToView('monitor')}
-            className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+            className={`pb-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
               currentView === 'monitor'
-                ? 'bg-vine-600 text-white'
-                : 'bg-white/70 text-vine-700 border border-vine-200 dark:bg-vine-800/70 dark:text-vine-200 dark:border-vine-700'
+                ? 'border-vine-600 text-vine-700 dark:border-vine-400 dark:text-vine-200'
+                : 'border-transparent text-vine-500 hover:text-vine-700 dark:text-vine-400 dark:hover:text-vine-200'
             }`}
           >
             Monitor
           </button>
           <button
             onClick={() => navigateToView('cuttings')}
-            className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+            className={`pb-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
               currentView === 'cuttings'
-                ? 'bg-vine-600 text-white'
-                : 'bg-white/70 text-vine-700 border border-vine-200 dark:bg-vine-800/70 dark:text-vine-200 dark:border-vine-700'
+                ? 'border-vine-600 text-vine-700 dark:border-vine-400 dark:text-vine-200'
+                : 'border-transparent text-vine-500 hover:text-vine-700 dark:text-vine-400 dark:hover:text-vine-200'
             }`}
           >
             Dugványok
@@ -325,42 +325,22 @@ function Dashboard() {
         )}
 
         {currentView === 'monitor' && dataSourceMode === 'devices' && !devicesLoading && devices.length > 0 && (
-          <DeviceSelector
+          <DeviceSessionSelector
             devices={devices}
-            selectedId={effectiveDeviceId}
-            onChange={(deviceId) => {
+            sessions={allSessions}
+            selectedDeviceId={effectiveDeviceId}
+            selectedSessionId={selectedSessionId === undefined ? effectiveSessionId : selectedSessionId}
+            onChange={(deviceId, sessionId) => {
               setSelectedDeviceId(deviceId);
-              setSelectedSessionId(undefined);
-              pushMonitorUrl({
-                selectedDeviceId: deviceId,
-                selectedSessionId: undefined,
-              });
-            }}
-          />
-        )}
-
-        {currentView === 'monitor' && dataSourceMode === 'devices' && !sessionsLoading && sessions.length > 0 && (
-          <SessionSelector
-            sessions={sessions}
-            selectedId={selectedSessionId === undefined ? effectiveSessionId : selectedSessionId}
-            onChange={(sessionId) => {
               setSelectedSessionId(sessionId);
-              pushMonitorUrl({ selectedSessionId: sessionId });
+              pushMonitorUrl({ selectedDeviceId: deviceId, selectedSessionId: sessionId });
             }}
           />
         )}
 
-        {currentView === 'monitor' && dataSourceMode === 'devices' && selectedDevice && (
-          <div className="mb-2 text-sm text-vine-600 dark:text-vine-300">{selectedDevice.name}</div>
-        )}
-
-        {currentView === 'monitor' && dataSourceMode === 'devices' && selectedSession && (
-          <div className="mb-4 space-y-1">
-            <div className="text-sm text-vine-500 dark:text-vine-400">
-              {selectedSession.name}
-              {selectedSession.status === 'archived' && ' (archivált)'}
-              {selectedSessionType && ` · ${selectedSessionType.name}`}
-            </div>
+        {currentView === 'monitor' && dataSourceMode === 'devices' && selectedSessionType && (
+          <div className="mb-4 text-sm text-vine-500 dark:text-vine-400">
+            {selectedSessionType.name}
           </div>
         )}
 
