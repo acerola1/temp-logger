@@ -6,12 +6,21 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "hosting": {
     "public": "dashboard/dist",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ]
   },
   "emulators": {
@@ -22,6 +31,10 @@
     "firestore": {
       "host": "127.0.0.1",
       "port": 8088
+    },
+    "storage": {
+      "host": "127.0.0.1",
+      "port": 9199
     },
     "hosting": {
       "host": "127.0.0.1",

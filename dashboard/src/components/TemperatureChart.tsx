@@ -14,25 +14,22 @@ import { chartMargin, chartYAxisWidth } from '../constants/chartLayout';
 import { AnimatedTimeAxis } from './AnimatedTimeAxis';
 import { formatDateShort } from '../lib/dateFormat';
 import { buildChartSeries } from '../lib/chartSeries';
+import { sampleReadingsForChart } from '../lib/chartSampling';
 import { getTimeDomain } from '../lib/chartTime';
 import { useElementWidth } from '../hooks/useElementWidth';
-import type { SensorReading, TimeRange } from '../types/sensor';
+import type { SensorReading, SessionType, TimeRange } from '../types/sensor';
 
 interface TemperatureChartProps {
   readings: SensorReading[];
   timeRange: TimeRange;
   isDark: boolean;
+  sessionType: SessionType | null;
 }
 
-export function TemperatureChart({ readings, timeRange, isDark }: TemperatureChartProps) {
+export function TemperatureChart({ readings, timeRange, isDark, sessionType }: TemperatureChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartWidth = useElementWidth(chartRef);
-  const filteredReadings =
-    timeRange === '30d'
-      ? readings.filter((_, i) => i % 4 === 0)
-      : timeRange === '7d'
-        ? readings.filter((_, i) => i % 2 === 0)
-        : readings;
+  const filteredReadings = sampleReadingsForChart(readings, timeRange);
   const data = buildChartSeries(filteredReadings);
   const timeDomain = getTimeDomain(data.map((point) => point.recordedAtMs));
 
@@ -48,14 +45,21 @@ export function TemperatureChart({ readings, timeRange, isDark }: TemperatureCha
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={data} margin={chartMargin}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-          <ReferenceArea
-            y1={24}
-            y2={27}
-            ifOverflow="extendDomain"
-            fill={chartColors.temperature.line}
-            fillOpacity={0.08}
-            label={{ value: 'Ideális (24-27°C)', position: 'insideTopRight', fontSize: 11, fill: isDark ? '#d4cdb8' : '#6b7a3d' }}
-          />
+          {sessionType && (
+            <ReferenceArea
+              y1={sessionType.temperatureMin}
+              y2={sessionType.temperatureMax}
+              ifOverflow="extendDomain"
+              fill={chartColors.temperature.line}
+              fillOpacity={0.08}
+              label={{
+                value: `${sessionType.name} (${sessionType.temperatureMin}-${sessionType.temperatureMax}°C)`,
+                position: 'insideTopRight',
+                fontSize: 11,
+                fill: isDark ? '#d4cdb8' : '#6b7a3d',
+              }}
+            />
+          )}
           <XAxis
             dataKey="recordedAtMs"
             type="number"

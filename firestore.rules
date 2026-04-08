@@ -48,6 +48,12 @@ service cloud.firestore {
       }
     }
 
+    // Cuttings — public read, admin write
+    match /cuttings/{cuttingId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
     // Admin registry — auth read, server-only write
     match /admins/{uid} {
       allow read: if isSignedIn();

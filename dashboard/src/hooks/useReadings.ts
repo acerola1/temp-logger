@@ -25,7 +25,12 @@ const rangeMs: Record<TimeRange, number> = {
 export function useReadings(allReadings: SensorReading[], timeRange: TimeRange): ReadingsResult {
   return useMemo(() => {
     const cutoff = Date.now() - rangeMs[timeRange];
-    const readings = allReadings.filter((r) => new Date(r.recordedAt).getTime() >= cutoff);
+    const readings = allReadings
+      .filter((r) => new Date(r.recordedAt).getTime() >= cutoff)
+      .slice()
+      .sort((left, right) => {
+        return new Date(left.recordedAt).getTime() - new Date(right.recordedAt).getTime();
+      });
 
     const latest = readings.length > 0 ? readings[readings.length - 1] : null;
 

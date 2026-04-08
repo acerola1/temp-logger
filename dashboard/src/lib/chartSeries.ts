@@ -41,11 +41,15 @@ export function buildChartSeries(readings: SensorReading[]): TimeSeriesPoint[] {
     return [];
   }
 
-  const gapThresholdMs = getGapThresholdMs(readings);
+  const sortedReadings = readings.slice().sort((left, right) => {
+    return new Date(left.recordedAt).getTime() - new Date(right.recordedAt).getTime();
+  });
+
+  const gapThresholdMs = getGapThresholdMs(sortedReadings);
   const points: TimeSeriesPoint[] = [];
 
-  for (let index = 0; index < readings.length; index += 1) {
-    const reading = readings[index];
+  for (let index = 0; index < sortedReadings.length; index += 1) {
+    const reading = sortedReadings[index];
     const recordedAtMs = new Date(reading.recordedAt).getTime();
 
     if (!Number.isFinite(recordedAtMs)) {

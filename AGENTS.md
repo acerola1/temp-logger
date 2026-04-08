@@ -11,10 +11,10 @@ Rules:
 - always state when the user needs to run a terminal command
 - always state when the user needs to do a physical action on the ESP32, sensor, cable, or board
 - if there is no user action required, say that explicitly
-- keep the instruction concrete and immediate
+- keep the instruction concrete, immediate, and short
 
 Examples:
 
-- `Neked most ezt kell futtatnod: cd /home/pambruzs/projects/esp32/dashboard && npm run dev`
-- `Neked most ezt kell fizikailag megcsinálnod: dugd vissza az ESP32-t USB-re`
-- `Most nincs tőled teendő, megyek tovább a kódoldali résszel.`
+- `Futtasd: cd dashboard && npm run dev`
+- `Csináld meg: dugd vissza az ESP32-t USB-re`
+- `Nincs teendőd. Megyek tovább.`

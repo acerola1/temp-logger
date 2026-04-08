@@ -17,12 +17,12 @@ interface LegacyReadingDoc {
 }
 
 function pickRecordedAt(data: LegacyReadingDoc): string {
-  if (typeof data.recordedAt === 'string') {
-    return data.recordedAt;
-  }
-
   if (data.createdAt?.toDate) {
     return data.createdAt.toDate().toISOString();
+  }
+
+  if (typeof data.recordedAt === 'string') {
+    return data.recordedAt;
   }
 
   return new Date().toISOString();

@@ -19,6 +19,9 @@ interface FirestoreDoc {
   temperatureC: number;
   humidity: number;
   recordedAt?: string;
+  createdAt?: {
+    toDate?: () => Date;
+  };
 }
 
 export function useFirestoreReadings(deviceId: string | null, sessionId: string | null) {
@@ -44,12 +47,13 @@ export function useFirestoreReadings(deviceId: string | null, sessionId: string 
 
       return snapshot.docs.map((doc) => {
         const data = doc.data() as FirestoreDoc;
+        const serverRecordedAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : undefined;
         return {
           id: doc.id,
           deviceId,
           temperatureC: data.temperatureC,
           humidity: data.humidity,
-          recordedAt: data.recordedAt ?? new Date().toISOString(),
+          recordedAt: serverRecordedAt ?? data.recordedAt ?? new Date().toISOString(),
           sessionId: data.sessionId ?? undefined,
         } satisfies SensorReading;
       });

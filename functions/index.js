@@ -277,6 +277,7 @@ exports.ingestReadingV2 = onRequest(
       temperatureC,
       humidity,
       recordedAt: recordedAt || new Date().toISOString(),
+      createdAt: FieldValue.serverTimestamp(),
     };
 
     const docRef = await deviceRef.collection("readings").add(reading);

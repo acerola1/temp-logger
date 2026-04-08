@@ -16,15 +16,16 @@ import { formatDateShort } from '../lib/dateFormat';
 import { buildChartSeries } from '../lib/chartSeries';
 import { getTimeDomain } from '../lib/chartTime';
 import { useElementWidth } from '../hooks/useElementWidth';
-import type { SensorReading, TimeRange } from '../types/sensor';
+import type { SensorReading, SessionType, TimeRange } from '../types/sensor';
 
 interface HumidityChartProps {
   readings: SensorReading[];
   timeRange: TimeRange;
   isDark: boolean;
+  sessionType: SessionType | null;
 }
 
-export function HumidityChart({ readings, timeRange, isDark }: HumidityChartProps) {
+export function HumidityChart({ readings, timeRange, isDark, sessionType }: HumidityChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartWidth = useElementWidth(chartRef);
   const filteredReadings =
@@ -48,14 +49,21 @@ export function HumidityChart({ readings, timeRange, isDark }: HumidityChartProp
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={data} margin={chartMargin}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-          <ReferenceArea
-            y1={85}
-            y2={95}
-            ifOverflow="extendDomain"
-            fill={chartColors.humidity.line}
-            fillOpacity={0.08}
-            label={{ value: 'Kalluszosítási cél (85-95%)', position: 'insideTopRight', fontSize: 11, fill: isDark ? '#d4cdb8' : '#6b7a3d' }}
-          />
+          {sessionType && (
+            <ReferenceArea
+              y1={sessionType.humidityMin}
+              y2={sessionType.humidityMax}
+              ifOverflow="extendDomain"
+              fill={chartColors.humidity.line}
+              fillOpacity={0.08}
+              label={{
+                value: `${sessionType.name} (${sessionType.humidityMin}-${sessionType.humidityMax}%)`,
+                position: 'insideTopRight',
+                fontSize: 11,
+                fill: isDark ? '#d4cdb8' : '#6b7a3d',
+              }}
+            />
+          )}
           <XAxis
             dataKey="recordedAtMs"
             type="number"
