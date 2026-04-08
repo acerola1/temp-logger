@@ -55,6 +55,7 @@ export function EventTimelineRow({
     [domain, events],
   );
   const quickCreateLeft = plotLeft + plotWidth + 16;
+  const quickCreateRight = quickCreateLeft + 10;
 
   const hoveredEvent = timelinePoints.find((item) => item.event.id === hoveredEventId) ?? null;
 
@@ -113,22 +114,25 @@ export function EventTimelineRow({
               onFocus={() => setHoveredEventId(item.event.id)}
               onBlur={() => setHoveredEventId((current) => (current === item.event.id ? null : current))}
               onClick={() => onEventSelect?.(item.event)}
-              className="absolute h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 rounded-[4px] border-2 border-white shadow-sm transition-transform hover:scale-110 focus:scale-110 dark:border-vine-900"
+              className="absolute z-10 flex h-[20px] w-[20px] -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[4px] border-2 border-white text-[10px] font-semibold leading-none shadow-sm transition-transform hover:scale-110 focus:scale-110 dark:border-vine-900"
               style={{
                 left,
                 top: 8,
                 backgroundColor: '#ffffff',
                 borderColor: isDark ? '#7dd3fc' : '#60a5fa',
+                color: isDark ? '#7dd3fc' : '#2563eb',
               }}
               aria-label={item.event.title}
-            />
+            >
+              <span className="pointer-events-none select-none">{item.event.sequenceNumber}</span>
+            </button>
           </div>
         );
       })}
 
       {hoveredEvent && (
         <div
-          className="absolute z-10 max-w-60 -translate-x-1/2 rounded-xl border px-3 py-2 text-left text-xs shadow-lg"
+          className="pointer-events-none absolute z-10 max-w-60 -translate-x-1/2 rounded-xl border px-3 py-2 text-left text-xs shadow-lg"
           style={{
             left: scaleX(hoveredEvent.recordedAtMs, domain, plotLeft, plotWidth),
             bottom: 26,
@@ -138,6 +142,7 @@ export function EventTimelineRow({
           }}
         >
           <div className="font-semibold">{hoveredEvent.event.title}</div>
+          <div className="mt-1 opacity-80">#{hoveredEvent.event.sequenceNumber}</div>
           {hoveredEvent.event.description && (
             <div className="mt-1 line-clamp-2 opacity-80">{hoveredEvent.event.description}</div>
           )}
@@ -146,7 +151,10 @@ export function EventTimelineRow({
       )}
 
       {(eventCountLabel || errorMessage) && (
-        <div className="absolute bottom-[5px] right-2 flex min-h-4 items-end">
+        <div
+          className="absolute bottom-[5px] flex min-h-4 items-end"
+          style={{ right: `calc(100% - ${quickCreateRight}px)` }}
+        >
           <div className="flex flex-col items-end gap-1 text-xs">
             {eventCountLabel && onOpenEventList && (
               <button

@@ -1,8 +1,9 @@
+import { indexSessionEvents, type IndexedSessionEvent } from './sessionEventSequence';
 import type { SessionEvent } from '../types/sensor';
 
 export interface SessionEventTimelinePoint {
   recordedAtMs: number;
-  event: SessionEvent;
+  event: IndexedSessionEvent;
 }
 
 export function buildSessionEventTimelinePoints(
@@ -11,7 +12,7 @@ export function buildSessionEventTimelinePoints(
 ): SessionEventTimelinePoint[] {
   const [minTime, maxTime] = timeDomain;
 
-  return events
+  return indexSessionEvents(events)
     .map((event) => ({
       recordedAtMs: new Date(event.occurredAt).getTime(),
       event,

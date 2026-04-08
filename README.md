@@ -24,6 +24,8 @@ A rendszer fő részei:
 - több szenzor kezelése `deviceId` alapján
 - session alapú monitorozás külön szenzoronként
 - session típusokhoz tartozó célzónák megjelenítése a grafikonokon
+- session események kezelése időponthoz kötve, opcionális képpel
+- eseményjelölők a grafikon alatti idővonalon, sorszámozott markerekkel
 - régi és új adatstruktúra párhuzamos megjelenítése migrációs átmenethez
 - külön dugványkövető oldal fotókkal és öntözési naplóval
 - admin-only szerkesztés, képfeltöltés és naplózás
@@ -257,6 +259,37 @@ Egy `sessionTypes/{id}` dokumentum mezői:
 - `humidityMin`
 - `humidityMax`
 
+### Session események
+
+Az új adatstruktúrában a sessionökhöz időzített események is rögzíthetők.
+
+Firestore:
+
+- `devices/{deviceId}/sessions/{sessionId}/events/{eventId}`
+
+Egy esemény dokumentum mezői:
+
+- `title`
+- `description`
+- `occurredAt`
+- `imageUrl`
+- `imageStoragePath`
+- `imageWidth`
+- `imageHeight`
+- `createdAt`
+- `updatedAt`
+
+Firebase Storage útvonal:
+
+- `sessions/{deviceId}/{sessionId}/events/{eventId}.jpg`
+
+Dashboard funkciók:
+
+- események létrehozása, szerkesztése és törlése admin módban
+- opcionális képfeltöltés ugyanazzal a kliens oldali átméretezéssel, mint a dugványfotóknál
+- sorszámozott eseménymarkerek a grafikon alatti idővonalon
+- kattintható eseménylista sessionönként
+
 ## Dugványkövetés
 
 A dashboard külön nézetet kapott a cserepezett szőlő dugványok és oltványok nyomon követésére.
@@ -336,6 +369,7 @@ Fő nézetek:
 - session választás
 - session kezelés admin módban
 - hőmérséklet és páratartalom grafikon célzónákkal
+- session események idővonalon, listával és képes részletekkel
 - legutóbbi mérések táblázata
 - dugványkezelő modul
 

@@ -4,6 +4,7 @@ import { CalendarClock, ImagePlus, Loader2, Pencil, Plus, Trash2, X } from 'luci
 import { storage } from '../lib/firebase';
 import { prepareImageUpload } from '../lib/imageUpload';
 import { formatDateTime } from '../lib/dateFormat';
+import { indexSessionEvents } from '../lib/sessionEventSequence';
 import type { Session, SessionEvent } from '../types/sensor';
 
 interface SessionEventsDialogProps {
@@ -129,7 +130,7 @@ export function SessionEventsDialog({
     onQuickCreateHandled();
   }, [isAdmin, onQuickCreateHandled, quickCreateRequest]);
 
-  const sortedEvents = events
+  const sortedEvents = indexSessionEvents(events)
     .slice()
     .sort((left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime());
 
@@ -538,7 +539,7 @@ export function SessionEventsDialog({
                         >
                           <div className="flex items-center gap-2 text-vine-900 dark:text-vine-50">
                             <CalendarClock className="h-4 w-4 text-vine-500" />
-                            <span className="font-medium">{eventItem.title}</span>
+                            <span className="font-medium">#{eventItem.sequenceNumber} {eventItem.title}</span>
                           </div>
                           <p className="mt-1 text-xs text-vine-500 dark:text-vine-300">
                             {formatDateTime(eventItem.occurredAt)}
