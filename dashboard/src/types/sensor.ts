@@ -19,6 +19,21 @@ export interface Session {
   endDate: string | null;
 }
 
+export interface SessionEvent {
+  id: string;
+  deviceId: string;
+  sessionId: string;
+  title: string;
+  description: string;
+  occurredAt: string;
+  imageUrl: string | null;
+  imageStoragePath: string | null;
+  imageWidth: number | null;
+  imageHeight: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Device {
   id: string;
   name: string;

@@ -12,21 +12,41 @@ import {
 import { chartColors } from '../constants/chartColors';
 import { chartMargin, chartYAxisWidth } from '../constants/chartLayout';
 import { AnimatedTimeAxis } from './AnimatedTimeAxis';
+import { EventTimelineRow } from './EventTimelineRow';
 import { formatDateShort } from '../lib/dateFormat';
 import { buildChartSeries } from '../lib/chartSeries';
 import { sampleReadingsForChart } from '../lib/chartSampling';
 import { getTimeDomain } from '../lib/chartTime';
 import { useElementWidth } from '../hooks/useElementWidth';
-import type { SensorReading, SessionType, TimeRange } from '../types/sensor';
+import type { SensorReading, SessionEvent, SessionType, TimeRange } from '../types/sensor';
 
 interface TemperatureChartProps {
   readings: SensorReading[];
+  events: SessionEvent[];
   timeRange: TimeRange;
   isDark: boolean;
   sessionType: SessionType | null;
+  onEventSelect?: (event: SessionEvent) => void;
+  canQuickCreateEvent?: boolean;
+  onQuickCreateNow?: () => void;
+  eventCountLabel?: string | null;
+  onOpenEventList?: () => void;
+  eventErrorMessage?: string | null;
 }
 
-export function TemperatureChart({ readings, timeRange, isDark, sessionType }: TemperatureChartProps) {
+export function TemperatureChart({
+  readings,
+  events,
+  timeRange,
+  isDark,
+  sessionType,
+  onEventSelect,
+  canQuickCreateEvent = false,
+  onQuickCreateNow,
+  eventCountLabel = null,
+  onOpenEventList,
+  eventErrorMessage = null,
+}: TemperatureChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartWidth = useElementWidth(chartRef);
   const filteredReadings = sampleReadingsForChart(readings, timeRange);
@@ -38,9 +58,7 @@ export function TemperatureChart({ readings, timeRange, isDark, sessionType }: T
 
   return (
     <div className="bg-white/70 dark:bg-vine-800/70 backdrop-blur-sm rounded-2xl border border-vine-200 dark:border-vine-700 p-4 shadow-sm mb-4">
-      <h2 className="text-base font-semibold text-vine-900 dark:text-vine-50 mb-3">
-        Hőmérséklet
-      </h2>
+      <h2 className="mb-3 text-base font-semibold text-vine-900 dark:text-vine-50">Hőmérséklet</h2>
       <div ref={chartRef} className="relative">
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={data} margin={chartMargin}>
@@ -100,6 +118,20 @@ export function TemperatureChart({ readings, timeRange, isDark, sessionType }: T
           />
           </LineChart>
         </ResponsiveContainer>
+        <EventTimelineRow
+          events={events}
+          domain={timeDomain}
+          isDark={isDark}
+          plotLeft={chartYAxisWidth}
+          plotWidth={plotWidth}
+          lineHeight={206}
+          onEventSelect={onEventSelect}
+          canQuickCreateEvent={canQuickCreateEvent}
+          onQuickCreateNow={onQuickCreateNow}
+          eventCountLabel={eventCountLabel}
+          onOpenEventList={onOpenEventList}
+          errorMessage={eventErrorMessage}
+        />
         <AnimatedTimeAxis
           domain={timeDomain}
           timeRange={timeRange}

@@ -29,7 +29,18 @@ devices
 │   │   │   ├── sessionTypeId: "callusing"
 │   │   │   ├── status: "active"
 │   │   │   ├── startDate: "2026-03-20T08:00:00.000Z"
-│   │   │   └── endDate: null
+│   │   │   ├── endDate: null
+│   │   │   └── events
+│   │   │       └── repot-1
+│   │   │           ├── title: "Átrakva a hajtató sátorba"
+│   │   │           ├── description: "A dugványok átkerültek a következő szakaszba."
+│   │   │           ├── occurredAt: "2026-03-28T09:30:00.000Z"
+│   │   │           ├── imageUrl: "https://..."
+│   │   │           ├── imageStoragePath: "sessions/esp32-lab/spring-2026-callusing-a/events/repot-1.jpg"
+│   │   │           ├── imageWidth: 1000
+│   │   │           ├── imageHeight: 750
+│   │   │           ├── createdAt: "2026-03-28T09:32:00.000Z"
+│   │   │           └── updatedAt: "2026-03-28T09:32:00.000Z"
 │   │   └── test-session
 │   │       ├── name: "Próba mérés"
 │   │       ├── sessionTypeId: "callusing"
@@ -114,6 +125,24 @@ Szabály:
 
 - egy device-hoz legfeljebb egy aktív session legyen egyszerre
 
+### `devices/{deviceId}/sessions/{sessionId}/events/{eventId}`
+
+- `title`
+- `description`
+- `occurredAt`
+- `imageUrl`: opcionális
+- `imageStoragePath`: opcionális
+- `imageWidth`: opcionális
+- `imageHeight`: opcionális
+- `createdAt`
+- `updatedAt`
+
+Megjegyzés:
+
+- az eseménykép ugyanazzal a kliens oldali átméretezéssel megy fel, mint a dugványfotók
+- a hosszabbik oldal legfeljebb `1000 px`
+- a tényleges fájl Firebase Storage-ba kerül, a Firestore dokumentum csak metaadatot tárol
+
 ### `devices/{deviceId}/readings/{readingId}`
 
 - `sessionId`: opcionális, lehet `null`
@@ -139,6 +168,11 @@ Szabály:
 - `devices/{deviceId}/readings`
 - `where(sessionId == "...")`
 - `orderBy(recordedAt asc)`
+
+### Egy session eseményei
+
+- `devices/{deviceId}/sessions/{sessionId}/events`
+- `orderBy(occurredAt asc vagy desc)`
 
 ### Egy device session nélküli mérései
 

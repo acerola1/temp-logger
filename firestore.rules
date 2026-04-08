@@ -39,6 +39,11 @@ service cloud.firestore {
       match /sessions/{sessionId} {
         allow read: if true;
         allow create, update, delete: if isAdmin();
+
+        match /events/{eventId} {
+          allow read: if true;
+          allow create, update, delete: if isAdmin();
+        }
       }
 
       match /readings/{readingId} {

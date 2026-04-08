@@ -141,6 +141,35 @@
 - [ ] A táblázat jelezze, ha egy reading session nélküli.
 - [ ] A summary kártyák a kiválasztott device adataiból számoljanak.
 
+## 13/B. Dashboard: session események a grafikonokon
+
+- [x] Legyen lehetőség sessionhöz eseményeket rögzíteni.
+- [x] Az események itt legyenek tárolva:
+  - `devices/{deviceId}/sessions/{sessionId}/events/{eventId}`
+- [x] Egy esemény minimális mezői legyenek:
+  - `occurredAt`
+  - `title`
+  - `description`
+  - `imageUrl` opcionális
+  - `imageStoragePath` opcionális
+  - `imageWidth` opcionális
+  - `imageHeight` opcionális
+  - `createdAt`
+  - `updatedAt`
+- [x] Az esemény cím és leírás külön mező legyen.
+- [x] A dashboard a kiválasztott session eseményeit is töltse be.
+- [x] A grafikonokon az események jelenjenek meg külön jelöléssel az idővonalon.
+- [x] Az eseményjelölő fölé húzva az egeret jelenjen meg tooltipben a rövid leírás.
+- [x] Az eseményjelölőre kattintva nyíljon meg részletes popup vagy modal.
+- [x] A popupban jelenjen meg az esemény teljes szövege, időpontja és opcionális képe.
+- [ ] Több esemény közeli időpont esetén se essen szét a grafikon használhatósága.
+- [x] Mobilon is használható legyen az esemény megnyitás.
+- [x] Admin módban lehessen új session eseményt létrehozni.
+- [x] Admin módban lehessen meglévő session eseményt szerkeszteni.
+- [x] Admin módban lehessen session eseményt törölni.
+- [x] Ha az eseményhez kép tartozik, az Firebase Storage-ba kerüljön.
+- [x] Az eseményképeknél ugyanaz a kliens oldali átméretezés menjen, mint a dugványképeknél.
+
 ## 14. Backward kompatibilis átállás
 
 - [ ] A régi adatbázis-struktúrát ne töröljük.

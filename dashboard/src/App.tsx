@@ -9,6 +9,8 @@ import { ReadingsTable } from './components/ReadingsTable';
 import { DeviceSelector } from './components/DeviceSelector';
 import { SessionSelector } from './components/SessionSelector';
 import { SessionManager } from './components/SessionManager';
+import { SessionEventsDialog } from './components/SessionEventsDialog';
+import { SessionEventDialog } from './components/SessionEventDialog';
 import { CuttingsPage } from './components/CuttingsPage';
 import { useTheme } from './hooks/useTheme';
 import { useReadings } from './hooks/useReadings';
@@ -16,9 +18,10 @@ import { useFirestoreReadings } from './hooks/useFirestoreReadings';
 import { useLegacyReadings } from './hooks/useLegacyReadings';
 import { useIsAdmin } from './hooks/useIsAdmin';
 import { useSessions } from './hooks/useSessions';
+import { useSessionEvents } from './hooks/useSessionEvents';
 import { useDevices } from './hooks/useDevices';
 import { useSessionTypes } from './hooks/useSessionTypes';
-import type { TimeRange } from './types/sensor';
+import type { SessionEvent, TimeRange } from './types/sensor';
 import { Loader2 } from 'lucide-react';
 
 type DataSourceMode = 'devices' | 'legacy';
@@ -29,6 +32,16 @@ interface MonitorUrlState {
   timeRange: TimeRange;
   selectedDeviceId: string | null;
   selectedSessionId: string | null | undefined;
+}
+
+interface QuickCreateEventRequest {
+  occurredAt: string;
+  nonce: number;
+}
+
+function toDateTimeLocalValue(value: Date = new Date()): string {
+  const offsetMs = value.getTimezoneOffset() * 60_000;
+  return new Date(value.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
 function getViewFromPath(pathname: string): DashboardView {
@@ -90,6 +103,9 @@ function Dashboard() {
   const initialMonitorState = getMonitorStateFromUrl(window.location.search);
   const [timeRange, setTimeRange] = useState<TimeRange>(initialMonitorState.timeRange);
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<SessionEvent | null>(null);
+  const [sessionEventsDialogOpen, setSessionEventsDialogOpen] = useState(false);
+  const [quickCreateEventRequest, setQuickCreateEventRequest] = useState<QuickCreateEventRequest | null>(null);
   const [currentView, setCurrentView] = useState<DashboardView>(() =>
     getViewFromPath(window.location.pathname),
   );
@@ -128,6 +144,17 @@ function Dashboard() {
   const currentError = dataSourceMode === 'legacy' ? legacyError : devicesError || error;
   const { readings, latest, stats } = useReadings(currentSourceReadings, timeRange);
   const { data: sessionTypes } = useSessionTypes();
+  const {
+    data: sessionEvents,
+    loading: sessionEventsLoading,
+    error: sessionEventsError,
+    createEvent,
+    updateEvent,
+    deleteEvent,
+  } = useSessionEvents(
+    dataSourceMode === 'devices' ? effectiveDeviceId : null,
+    dataSourceMode === 'devices' ? effectiveSessionId : null,
+  );
   const { isAdmin } = useIsAdmin();
   const isDark = theme === 'dark';
 
@@ -161,6 +188,25 @@ function Dashboard() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  useEffect(() => {
+    setSelectedEvent(null);
+    setSessionEventsDialogOpen(false);
+    setQuickCreateEventRequest(null);
+  }, [effectiveDeviceId, effectiveSessionId, dataSourceMode]);
+
+  const handleQuickCreateEventNow = () => {
+    setSessionEventsDialogOpen(true);
+    setQuickCreateEventRequest({
+      occurredAt: toDateTimeLocalValue(),
+      nonce: Date.now(),
+    });
+  };
+
+  const handleCloseSessionEventsDialog = () => {
+    setSessionEventsDialogOpen(false);
+    setQuickCreateEventRequest(null);
+  };
 
   const pushMonitorUrl = (nextState: Partial<MonitorUrlState>) => {
     const url = buildMonitorUrl({
@@ -309,10 +355,12 @@ function Dashboard() {
         )}
 
         {currentView === 'monitor' && dataSourceMode === 'devices' && selectedSession && (
-          <div className="mb-4 text-sm text-vine-500 dark:text-vine-400">
-            {selectedSession.name}
-            {selectedSession.status === 'archived' && ' (archivált)'}
-            {selectedSessionType && ` · ${selectedSessionType.name}`}
+          <div className="mb-4 space-y-1">
+            <div className="text-sm text-vine-500 dark:text-vine-400">
+              {selectedSession.name}
+              {selectedSession.status === 'archived' && ' (archivált)'}
+              {selectedSessionType && ` · ${selectedSessionType.name}`}
+            </div>
           </div>
         )}
 
@@ -354,15 +402,48 @@ function Dashboard() {
             <SummaryCards latest={latest} stats={stats} />
             <TemperatureChart
               readings={readings}
+              events={sessionEvents}
               timeRange={timeRange}
               isDark={isDark}
               sessionType={selectedSessionType}
+              onEventSelect={setSelectedEvent}
+              canQuickCreateEvent={isAdmin && !!selectedSession}
+              onQuickCreateNow={handleQuickCreateEventNow}
+              eventCountLabel={
+                dataSourceMode === 'devices' && selectedSession ? `${sessionEvents.length} esemény` : null
+              }
+              onOpenEventList={
+                dataSourceMode === 'devices' && selectedSession
+                  ? () => {
+                      setQuickCreateEventRequest(null);
+                      setSessionEventsDialogOpen(true);
+                    }
+                  : undefined
+              }
             />
             <HumidityChart
               readings={readings}
+              events={sessionEvents}
               timeRange={timeRange}
               isDark={isDark}
               sessionType={selectedSessionType}
+              onEventSelect={setSelectedEvent}
+              canQuickCreateEvent={isAdmin && !!selectedSession}
+              onQuickCreateNow={handleQuickCreateEventNow}
+              eventCountLabel={
+                dataSourceMode === 'devices' && selectedSession ? `${sessionEvents.length} esemény` : null
+              }
+              onOpenEventList={
+                dataSourceMode === 'devices' && selectedSession
+                  ? () => {
+                      setQuickCreateEventRequest(null);
+                      setSessionEventsDialogOpen(true);
+                    }
+                  : undefined
+              }
+              eventErrorMessage={
+                dataSourceMode === 'devices' && selectedSession ? sessionEventsError : null
+              }
             />
             <ReadingsTable
               readings={readings}
@@ -383,6 +464,26 @@ function Dashboard() {
             onArchiveSession={archiveSession}
           />
         )}
+
+        {sessionEventsDialogOpen && dataSourceMode === 'devices' && selectedSession && effectiveDeviceId && (
+          <SessionEventsDialog
+            deviceId={effectiveDeviceId}
+            session={selectedSession}
+            events={sessionEvents}
+            loading={sessionEventsLoading}
+            error={sessionEventsError}
+            isAdmin={isAdmin}
+            onClose={handleCloseSessionEventsDialog}
+            onCreateEvent={createEvent}
+            onUpdateEvent={updateEvent}
+            onDeleteEvent={deleteEvent}
+            onOpenEvent={setSelectedEvent}
+            quickCreateRequest={quickCreateEventRequest}
+            onQuickCreateHandled={() => setQuickCreateEventRequest(null)}
+          />
+        )}
+
+        {selectedEvent && <SessionEventDialog event={selectedEvent} onClose={() => setSelectedEvent(null)} />}
       </div>
     </div>
   );
