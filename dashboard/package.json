@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "screenshots": "playwright test -c playwright.screenshots.config.ts scripts/dashboard-screenshots.spec.ts"
   },
   "dependencies": {
     "date-fns": "^4.1.0",
@@ -18,6 +19,7 @@
     "recharts": "^3.8.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@eslint/js": "^9.39.4",
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",

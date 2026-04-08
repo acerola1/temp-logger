@@ -1,34 +1,42 @@
 # ESP32 Temperature Logger
 
-ESP32 + DHT22 alapú hőmérséklet- és páratartalom-logger projekt, amely a mért adatokat nemcsak elküldi Firebase-be, hanem webes dashboardon meg is jeleníti.
+ESP32 + DHT22 alapú hőmérséklet- és páratartalom-logger projekt Firebase backendre és React dashboardra építve. A rendszer már nem csak egyetlen szenzort kezel: több eszköz, session-alapú monitorozás és egy külön szőlődugvány-követő nézet is része a dashboardnak.
 
 ## Dashboard preview
 
-![Dashboard screenshot](docs/dashboard-home.png)
+![Monitor screenshot](docs/dashboard-monitor.png)
+![Cuttings screenshot](docs/dashboard-cuttings.png)
 
-A rendszer részei:
+A rendszer fő részei:
 
 - ESP32 firmware PlatformIO-val
 - DHT22 / AM2302 szenzor
-- Firebase Cloud Function adatfogadáshoz
+- Firebase Cloud Functions adatfogadáshoz
 - Firestore adattárolás
-- React + Vite dashboard a mért adatok megjelenítésére
+- Firebase Storage a dugványfotókhoz
+- React + Vite dashboard
 
-## Mit tud a rendszer
+## Mit tud most a rendszer
 
 - hőmérséklet- és páratartalom-mérés DHT22 szenzorral
 - Wi-Fi konfigurálás setup AP-n keresztül
 - mért adatok feltöltése Firebase Cloud Functionre
-- adatok tárolása Firestore-ban
-- adatok megjelenítése React dashboardon grafikonokkal és táblázatban
+- több szenzor kezelése `deviceId` alapján
+- session alapú monitorozás külön szenzoronként
+- session típusokhoz tartozó célzónák megjelenítése a grafikonokon
+- régi és új adatstruktúra párhuzamos megjelenítése migrációs átmenethez
+- külön dugványkövető oldal fotókkal és öntözési naplóval
+- admin-only szerkesztés, képfeltöltés és naplózás
 
 ## Projektstruktúra
 
 - `src/main.cpp`: ESP32 firmware
 - `platformio.ini`: PlatformIO board / port / library config
 - `platformio.local.ini`: lokális, gitből kizárt secret és endpoint config
-- `functions/index.js`: Firebase HTTPS function
+- `functions/index.js`: Firebase HTTPS functionök
 - `dashboard/`: React dashboard
+- `docs/`: dokumentációs képek
+- `tasks/`: task és terv fájlok
 - `web/`: egyszerű statikus Firebase oldal
 
 ## Hardver
@@ -63,6 +71,7 @@ A jelenlegi firmware:
 - indulás után rögtön mér egyet
 - utána `15 percenként` olvas és küld
 - HTTPS `POST`-tal küldi az adatot Firebase Cloud Functionre
+- a `deviceId` setup közben állítható és Preferences-ben mentődik
 
 Fontos soros logok:
 
@@ -104,7 +113,7 @@ Példa:
 ```ini
 [env:esp32dev]
 build_flags =
-  -DFIREBASE_INGEST_URL=\"https://europe-west1-g-temp-log.cloudfunctions.net/ingestReadingV2\"
+  -DFIREBASE_INGEST_URL=\"https://europe-west1-<firebase-project-id>.cloudfunctions.net/ingestReadingV2\"
   -DFIREBASE_DEVICE_TOKEN=\"dev-token\"
 ```
 
@@ -145,12 +154,6 @@ Példa header:
 X-Device-Token: dev-token
 ```
 
-Ha a token nem egyezik:
-
-- az adat nem mentődik el
-- a function `401` hibát ad vissza
-- az ESP32 soros logjában a HTTP státusz látszani fog
-
 ## Wi-Fi konfiguráció
 
 Első indításkor vagy ha nincs mentett hálózat:
@@ -168,30 +171,28 @@ http://192.168.4.1
 
 ## Firebase backend
 
-Aktív projekt:
-
-- `g-temp-log`
-
-Aktív function:
+Példa functionök:
 
 - `ingestReading`
 - `ingestReadingV2`
-- URL: `https://europe-west1-g-temp-log.cloudfunctions.net/ingestReading`
 
-A function:
+Régi endpoint:
 
+- URL minta: `https://europe-west1-<firebase-project-id>.cloudfunctions.net/ingestReading`
 - `POST` kérést fogad
 - `X-Device-Token` headerrel autentikál
-- Firestore `sensorReadings` kollekcióba ír
+- a régi `sensorReadings` kollekcióba ír
 
-Az új `ingestReadingV2` endpoint:
+Új endpoint:
 
+- URL minta: `https://europe-west1-<firebase-project-id>.cloudfunctions.net/ingestReadingV2`
 - `POST` kérést fogad
 - `X-Device-Token` headerrel autentikál
 - az új adatstruktúrába ír:
   - `devices/{deviceId}/readings`
 - ismeretlen `deviceId` esetén automatikusan létrehozza a `devices/{deviceId}` dokumentumot
 - az adott device aktív sessionjét keresi a `devices/{deviceId}/sessions` alatt
+- a readinghez szerveroldali `createdAt` is mentődik, ez a dashboardban az elsődleges időforrás
 
 Elvárt payload:
 
@@ -203,13 +204,22 @@ Elvárt payload:
 }
 ```
 
-Kézi teszt:
+Kézi teszt a régi endpointtal:
 
 ```bash
-curl -i -X POST 'https://europe-west1-g-temp-log.cloudfunctions.net/ingestReading' \
+curl -i -X POST 'https://europe-west1-<firebase-project-id>.cloudfunctions.net/ingestReading' \
   -H 'Content-Type: application/json' \
   -H 'X-Device-Token: dev-token' \
   -d '{"deviceId":"esp32-lab","temperatureC":24.5,"humidity":25.3}'
+```
+
+Kézi teszt az új endpointtal:
+
+```bash
+curl -i -X POST 'https://europe-west1-<firebase-project-id>.cloudfunctions.net/ingestReadingV2' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Device-Token: dev-token' \
+  -d '{"deviceId":"esp32-test","temperatureC":24.5,"humidity":25.3}'
 ```
 
 Sikeres válasz:
@@ -218,46 +228,95 @@ Sikeres válasz:
 {"ok":true,"id":"..."}
 ```
 
-`v2` kézi teszt:
+## Firestore adatmodell
 
-```bash
-curl -i -X POST 'https://europe-west1-g-temp-log.cloudfunctions.net/ingestReadingV2' \
-  -H 'Content-Type: application/json' \
-  -H 'X-Device-Token: dev-token' \
-  -d '{"deviceId":"esp32-test","temperatureC":24.5,"humidity":25.3}'
-```
+Jelenleg két adatfolyam él egymás mellett:
 
-## Firebase deploy
+- legacy:
+  - `sensorReadings`
+  - `sessions`
+- új struktúra:
+  - `devices/{deviceId}`
+  - `devices/{deviceId}/readings`
+  - `devices/{deviceId}/sessions`
+  - `sessionTypes/{sessionTypeId}`
 
-Projekt kiválasztás:
+A dashboardban az új struktúra az elsődleges, a legacy nézet pedig átmeneti kompatibilitási mód.
 
-```bash
-firebase use g-temp-log
-```
+### Session típusok
 
-Secret beállítás:
+A session típusok Firestore-ban vannak:
 
-```bash
-printf 'dev-token' | firebase functions:secrets:set DEVICE_TOKEN
-```
+- `sessionTypes/callusing`
+- `sessionTypes/hajtato-sator`
 
-Meglévő secret ellenőrzése:
+Egy `sessionTypes/{id}` dokumentum mezői:
 
-```bash
-firebase functions:secrets:access DEVICE_TOKEN
-```
+- `name`
+- `temperatureMin`
+- `temperatureMax`
+- `humidityMin`
+- `humidityMax`
 
-Functions deploy:
+## Dugványkövetés
 
-```bash
-firebase deploy --only functions,firestore:rules,firestore:indexes
-```
+A dashboard külön nézetet kapott a cserepezett szőlő dugványok és oltványok nyomon követésére.
 
-Megjegyzés:
+Fő útvonalak:
 
-- a function Gen2 (`europe-west1`)
-- az első deploy új projektnél lassú lehet, mert több Google API és Cloud Build/Run erőforrás jön létre
-- ha új endpointot vezetsz be, az ESP32 `FIREBASE_INGEST_URL` értékét is frissíteni kell a megfelelő function URL-re
+- `/`: monitor
+- `/dugvanyok`: dugványlista
+- `/dugvanyok/{cuttingId}`: egy konkrét dugvány részletes nézete
+
+Fő képességek:
+
+- lista és részletes nézet
+- automatikus, cserépre írható sorszám
+- fajta, típus, ültetési dátum és állapot nyilvántartása
+- több kép feltöltése egy dugványhoz
+- kliens oldali képátméretezés maximum `1000x1000` méretre
+- mobilon külön `Kamera` és `Galéria` indítás
+- öntözési napló rögzítése, szerkesztése és törlése
+- admin-only írás, publikus olvasás
+
+Firestore:
+
+- `cuttings/{cuttingId}`
+
+Egy dugvány dokumentum fő mezői:
+
+- `serialNumber`
+- `variety`
+- `plantType`
+- `plantedAt`
+- `status`
+- `notes`
+- `photos`
+- `wateringLogs`
+- `createdAt`
+- `updatedAt`
+- `createdByUid`
+
+A `photos` tömb elemei:
+
+- `id`
+- `storagePath`
+- `downloadUrl`
+- `capturedAt`
+- `uploadedAt`
+- `width`
+- `height`
+- `caption`
+
+A `wateringLogs` tömb elemei:
+
+- `id`
+- `wateredAt`
+- `notes`
+
+Firebase Storage útvonal:
+
+- `cuttings/{cuttingId}/photos/{photoId}.jpg`
 
 ## React dashboard
 
@@ -271,6 +330,20 @@ Stack:
 - Firebase Web SDK
 - Recharts
 - Tailwind CSS
+
+Fő nézetek:
+
+- több szenzor közötti váltás
+- session választás
+- session kezelés admin módban
+- hőmérséklet és páratartalom grafikon célzónákkal
+- legutóbbi mérések táblázata
+- dugványkezelő modul
+
+Aktuális screenshotok:
+
+- monitor nézet: [docs/dashboard-monitor.png](/home/pambruzs/projects/esp32/docs/dashboard-monitor.png)
+- dugvány nézet: [docs/dashboard-cuttings.png](/home/pambruzs/projects/esp32/docs/dashboard-cuttings.png)
 
 Indítás:
 
@@ -291,7 +364,46 @@ A dashboard Firebase configja:
 
 - `dashboard/src/lib/firebase.ts`
 
-Ez jelenleg a `g-temp-log` Firestore projektet használja.
+Ezt a saját Firebase projektedhez kell igazítani.
+
+## Firebase deploy
+
+Projekt kiválasztás:
+
+```bash
+firebase use <firebase-project-id>
+```
+
+Secret beállítás:
+
+```bash
+printf 'dev-token' | firebase functions:secrets:set DEVICE_TOKEN
+```
+
+Meglévő secret ellenőrzése:
+
+```bash
+firebase functions:secrets:access DEVICE_TOKEN
+```
+
+Functions + rules deploy:
+
+```bash
+firebase deploy --only functions,firestore:rules,firestore:indexes,storage
+```
+
+Hosting deploy:
+
+```bash
+firebase deploy --only hosting
+```
+
+Megjegyzés:
+
+- a function Gen2 (`europe-west1`)
+- az első deploy új projektnél lassú lehet, mert több Google API és Cloud Build/Run erőforrás jön létre
+- ha új endpointot vezetsz be, az ESP32 `FIREBASE_INGEST_URL` értékét is frissíteni kell a megfelelő function URL-re
+- a dugványfotók miatt a Storage rules deploy is a projekt része lett
 
 ## Egyszerű statikus webes nézet
 
@@ -325,8 +437,11 @@ A projekt jelenleg képes:
 - mentett Wi-Fi használatára
 - Firebase HTTPS function hívására
 - Firestore-ba logolásra
+- több szenzor kezelésére
+- session alapú monitorozásra
+- szerveridő-alapú frissítés kijelzésre
 - React dashboardon történő megjelenítésre
-- időbeli trendek megjelenítésére webes felületen
+- szőlő dugványok fotós és öntözési naplós követésére
 
 Ha valami nem működik, első körben ezt érdemes ellenőrizni:
 
@@ -334,3 +449,4 @@ Ha valami nem működik, első körben ezt érdemes ellenőrizni:
 2. a jó soros port van-e használva
 3. a `platformio.local.ini` a jó endpointot és tokent tartalmazza-e
 4. a function tényleg `201`-et ad-e `curl`-lel
+5. a Firestore és Storage rules deployolva vannak-e
