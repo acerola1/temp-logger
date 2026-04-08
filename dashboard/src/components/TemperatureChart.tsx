@@ -10,7 +10,11 @@ import {
   ReferenceArea,
 } from 'recharts';
 import { chartColors } from '../constants/chartColors';
-import { chartMargin, chartYAxisWidth } from '../constants/chartLayout';
+import {
+  chartHeight,
+  chartMargin,
+  chartYAxisWidth,
+} from '../constants/chartLayout';
 import { AnimatedTimeAxis } from './AnimatedTimeAxis';
 import { EventTimelineRow } from './EventTimelineRow';
 import { formatDateShort } from '../lib/dateFormat';
@@ -55,12 +59,13 @@ export function TemperatureChart({
 
   const gridColor = isDark ? chartColors.gridDark : chartColors.grid;
   const plotWidth = Math.max(0, chartWidth - chartYAxisWidth - chartMargin.right);
+  const eventLineHeight = chartHeight - chartMargin.top - chartMargin.bottom;
 
   return (
     <div className="bg-white/70 dark:bg-vine-800/70 backdrop-blur-sm rounded-2xl border border-vine-200 dark:border-vine-700 p-4 shadow-sm mb-4">
       <h2 className="mb-3 text-base font-semibold text-vine-900 dark:text-vine-50">Hőmérséklet</h2>
       <div ref={chartRef} className="relative">
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <LineChart data={data} margin={chartMargin}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
           {sessionType && (
@@ -124,7 +129,7 @@ export function TemperatureChart({
           isDark={isDark}
           plotLeft={chartYAxisWidth}
           plotWidth={plotWidth}
-          lineHeight={206}
+          lineHeight={eventLineHeight}
           onEventSelect={onEventSelect}
           canQuickCreateEvent={canQuickCreateEvent}
           onQuickCreateNow={onQuickCreateNow}

@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
+import {
+  eventMarkerCenterY,
+  eventTimelineRowBottom,
+  eventTimelineRowHeight,
+} from '../constants/chartLayout';
 import { formatDateTime } from '../lib/dateFormat';
 import { buildSessionEventTimelinePoints } from '../lib/sessionEventTimeline';
 import type { SessionEvent } from '../types/sensor';
@@ -61,8 +66,10 @@ export function EventTimelineRow({
 
   return (
     <div
-      className="absolute inset-x-0 bottom-4 h-10"
+      className="absolute inset-x-0"
       style={{
+        bottom: eventTimelineRowBottom,
+        height: eventTimelineRowHeight,
         pointerEvents:
           canQuickCreateEvent || timelinePoints.length > 0 || !!eventCountLabel || !!errorMessage
             ? 'auto'
@@ -74,7 +81,7 @@ export function EventTimelineRow({
         style={{
           left: plotLeft,
           width: plotWidth,
-          top: 8,
+          top: eventMarkerCenterY,
         }}
       />
 
@@ -83,7 +90,7 @@ export function EventTimelineRow({
           type="button"
           onClick={onQuickCreateNow}
           className="absolute flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[4px] border bg-white text-sky-700 shadow-sm transition-colors hover:bg-sky-50 dark:bg-vine-900 dark:text-sky-300 dark:hover:bg-vine-800"
-          style={{ left: quickCreateLeft, top: 8 }}
+          style={{ left: quickCreateLeft, top: eventMarkerCenterY }}
           aria-label="Új esemény az aktuális időponthoz"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -99,7 +106,7 @@ export function EventTimelineRow({
               className="absolute w-px -translate-x-1/2"
               style={{
                 left,
-                bottom: 14,
+                bottom: eventTimelineRowHeight - eventMarkerCenterY,
                 height: lineHeight,
                 backgroundColor: isDark ? '#7dd3fc' : '#93c5fd',
                 opacity: 0.9,
@@ -117,7 +124,7 @@ export function EventTimelineRow({
               className="absolute z-10 flex h-[20px] w-[20px] -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[4px] border-2 border-white text-[10px] font-semibold leading-none shadow-sm transition-transform hover:scale-110 focus:scale-110 dark:border-vine-900"
               style={{
                 left,
-                top: 8,
+                top: eventMarkerCenterY,
                 backgroundColor: '#ffffff',
                 borderColor: isDark ? '#7dd3fc' : '#60a5fa',
                 color: isDark ? '#7dd3fc' : '#2563eb',
@@ -152,8 +159,11 @@ export function EventTimelineRow({
 
       {(eventCountLabel || errorMessage) && (
         <div
-          className="absolute bottom-[5px] flex min-h-4 items-end"
-          style={{ right: `calc(100% - ${quickCreateRight}px)` }}
+          className="absolute flex min-h-4 items-end"
+          style={{
+            right: `calc(100% - ${quickCreateRight}px)`,
+            bottom: 0,
+          }}
         >
           <div className="flex flex-col items-end gap-1 text-xs">
             {eventCountLabel && onOpenEventList && (

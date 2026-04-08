@@ -18,3 +18,13 @@ Examples:
 - `Futtasd: cd dashboard && npm run dev`
 - `Csináld meg: dugd vissza az ESP32-t USB-re`
 - `Nincs teendőd. Megyek tovább.`
+
+## UI Debug Rule
+
+When adjusting UI layout, spacing, alignment, visibility, or interaction states:
+
+- do not keep iterating blindly on pixel values without reproducing the exact visible state first
+- if the issue depends on auth state, admin state, viewport, or data presence, reproduce that same state before changing code
+- prefer checking the DOM and taking screenshots after each meaningful change
+- change one thing at a time when possible, instead of mixing multiple hypotheses in one edit
+- if repeated small tweaks do not converge, stop tweaking and re-check the actual rendered structure before continuing
