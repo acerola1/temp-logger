@@ -170,6 +170,18 @@
 - [x] Ha az eseményhez kép tartozik, az Firebase Storage-ba kerüljön.
 - [x] Az eseményképeknél ugyanaz a kliens oldali átméretezés menjen, mint a dugványképeknél.
 
+## 13/C. Dashboard: animációk és regresszióvédelem
+
+- [x] Az időtengely animáció domain változáskor mutassa, hogy egy adott időpont merre mozdul el az új nézetben.
+- [x] Range váltáskor (`24h` / `7d` / `30d`) az időtengely ne csak fade-eljen, hanem térben is interpoláljon.
+- [x] Lapozáskor (`Régebbi` / `Újabb`) az időtengely irányhelyes mozgást mutasson.
+- [x] Az eseményjelölők lapozáskor irányhelyesen tűnjenek el és jelenjenek meg (régi réteg kifelé, új réteg befelé).
+- [x] Az esemény sorszámozás teljes sessionön belül stabil maradjon, ne ugráljon oldalváltáskor.
+- [x] Kevés adat esetén se törjön el az időtengely tick renderelés (ne tűnjenek el a dátumok invalid domain miatt).
+- [x] Archivált sessionnél az első nézet ablakvége a session `endDate`-hez igazodjon.
+- [x] Aktív sessionnél az első nézet ablakvége az utolsó mérés idejéhez igazodjon.
+- [ ] Legyen rövid vizuális referencia (GIF vagy képernyőfelvétel) a várt animációról a regressziók könnyebb kiszűrésére.
+
 ## 14. Backward kompatibilis átállás
 
 - [ ] A régi adatbázis-struktúrát ne töröljük.

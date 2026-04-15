@@ -150,6 +150,10 @@ export function SessionEventsDialog({
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!isAdmin) {
+      setFormError('Csak admin hozhat létre eseményt.');
+      return;
+    }
 
     const validationError = validateForm(createState);
     if (validationError) {
@@ -202,6 +206,10 @@ export function SessionEventsDialog({
 
   const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!isAdmin) {
+      setFormError('Csak admin szerkeszthet eseményt.');
+      return;
+    }
 
     if (!editingEvent) {
       return;
@@ -260,6 +268,10 @@ export function SessionEventsDialog({
   };
 
   const handleDelete = async (eventItem: SessionEvent) => {
+    if (!isAdmin) {
+      setFormError('Csak admin törölhet eseményt.');
+      return;
+    }
     const confirmed = window.confirm('Biztosan törlöd ezt a session eseményt?');
     if (!confirmed) {
       return;

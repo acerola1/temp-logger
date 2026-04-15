@@ -30,6 +30,12 @@ A rendszer fő részei:
 - külön dugványkövető oldal fotókkal és öntözési naplóval
 - admin-only szerkesztés, képfeltöltés és naplózás
 
+## Jogosultság és biztonság
+
+- Minden módosító művelet (létrehozás, szerkesztés, törlés, képfeltöltés) admin jogosultsághoz kötött.
+- Ez nem csak UI-szintű gombelrejtés: Firestore és Storage szabályok is admin-only írást engednek.
+- A dashboard nem admin felhasználónál megfigyelő módban működik (olvasás engedett, írás tiltott).
+
 ## Projektstruktúra
 
 - `src/main.cpp`: ESP32 firmware

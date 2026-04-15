@@ -252,6 +252,10 @@ function Dashboard() {
         null;
 
   const handleDeleteReading = async (readingId: string) => {
+    if (!isAdmin) {
+      throw new Error('Csak admin törölhet mérést.');
+    }
+
     if (dataSourceMode === 'legacy') {
       await deleteDoc(doc(db, 'sensorReadings', readingId));
       return;

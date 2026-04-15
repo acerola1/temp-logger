@@ -61,7 +61,7 @@ service cloud.firestore {
 
     // Admin registry — auth read, server-only write
     match /admins/{uid} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && request.auth.uid == uid;
       allow write: if false;
     }
   }
