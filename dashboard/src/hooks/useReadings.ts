@@ -16,17 +16,29 @@ interface ReadingsResult {
   stats: Stats;
 }
 
+interface UseReadingsOptions {
+  windowEndMs?: number | null;
+}
+
 const rangeMs: Record<TimeRange, number> = {
   '24h': 24 * 60 * 60 * 1000,
   '7d': 7 * 24 * 60 * 60 * 1000,
   '30d': 30 * 24 * 60 * 60 * 1000,
 };
 
-export function useReadings(allReadings: SensorReading[], timeRange: TimeRange): ReadingsResult {
+export function useReadings(
+  allReadings: SensorReading[],
+  timeRange: TimeRange,
+  options: UseReadingsOptions = {},
+): ReadingsResult {
   return useMemo(() => {
-    const cutoff = Date.now() - rangeMs[timeRange];
+    const windowEndMs = options.windowEndMs ?? Date.now();
+    const cutoff = windowEndMs - rangeMs[timeRange];
     const readings = allReadings
-      .filter((r) => new Date(r.recordedAt).getTime() >= cutoff)
+      .filter((r) => {
+        const recordedAtMs = new Date(r.recordedAt).getTime();
+        return recordedAtMs >= cutoff && recordedAtMs <= windowEndMs;
+      })
       .slice()
       .sort((left, right) => {
         return new Date(left.recordedAt).getTime() - new Date(right.recordedAt).getTime();
@@ -70,5 +82,5 @@ export function useReadings(allReadings: SensorReading[], timeRange: TimeRange):
         avgHumidity: Math.round((sumHumidity / readings.length) * 10) / 10,
       },
     };
-  }, [allReadings, timeRange]);
+  }, [allReadings, options.windowEndMs, timeRange]);
 }

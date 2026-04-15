@@ -13,8 +13,8 @@ import { db } from '../lib/firebase';
 import type {
   CreateCuttingInput,
   Cutting,
+  CuttingEvent,
   CuttingPhoto,
-  CuttingWateringLog,
 } from '../types/cutting';
 import { useFirestoreCollection } from './useFirestoreSubscription';
 import { useAuth } from './useAuth';
@@ -27,7 +27,8 @@ interface FirestoreCutting {
   status?: Cutting['status'];
   notes?: string;
   photos?: CuttingPhoto[];
-  wateringLogs?: CuttingWateringLog[];
+  events?: CuttingEvent[];
+  wateringLogs?: LegacyFirestoreCuttingWateringLog[];
   createdAt?: string;
   updatedAt?: string;
   createdByUid?: string | null;
@@ -48,10 +49,30 @@ interface LegacyFirestoreCuttingPhoto {
 interface LegacyFirestoreCuttingWateringLog {
   id?: string;
   wateredAt?: string;
+  occurredAt?: string;
+  title?: string;
   notes?: string;
 }
 
 const EMPTY_CUTTINGS: Cutting[] = [];
+
+function mapLegacyLogToEvent(
+  log: LegacyFirestoreCuttingWateringLog,
+  fallbackIdPrefix: string,
+  index: number,
+): CuttingEvent | null {
+  const occurredAt = log.occurredAt ?? log.wateredAt;
+  if (!occurredAt) {
+    return null;
+  }
+
+  return {
+    id: log.id ?? `${fallbackIdPrefix}-event-${index}`,
+    occurredAt,
+    title: log.title?.trim() || 'Esemény',
+    notes: log.notes ?? '',
+  } satisfies CuttingEvent;
+}
 
 export function useCuttings() {
   const { user } = useAuth();
@@ -98,21 +119,18 @@ export function useCuttings() {
           status: data.status ?? 'active',
           notes: data.notes ?? '',
           photos: mappedPhotos,
-          wateringLogs: Array.isArray(data.wateringLogs)
-            ? data.wateringLogs
-                .map((log, index) => {
-                  const legacyLog = log as LegacyFirestoreCuttingWateringLog;
-                  if (!legacyLog.wateredAt) {
-                    return null;
-                  }
-
-                  return {
-                    id: legacyLog.id ?? `${snapshotDoc.id}-watering-${index}`,
-                    wateredAt: legacyLog.wateredAt,
-                    notes: legacyLog.notes ?? '',
-                  } satisfies CuttingWateringLog;
-                })
-                .filter((log): log is CuttingWateringLog => log !== null)
+          events: Array.isArray(data.events)
+            ? data.events
+                .map((log, index) =>
+                  mapLegacyLogToEvent(log as LegacyFirestoreCuttingWateringLog, snapshotDoc.id, index),
+                )
+                .filter((log): log is CuttingEvent => log !== null)
+            : Array.isArray(data.wateringLogs)
+              ? data.wateringLogs
+                  .map((log, index) =>
+                    mapLegacyLogToEvent(log as LegacyFirestoreCuttingWateringLog, snapshotDoc.id, index),
+                  )
+                  .filter((log): log is CuttingEvent => log !== null)
             : [],
           createdAt: data.createdAt ?? new Date(0).toISOString(),
           updatedAt: data.updatedAt ?? data.createdAt ?? new Date(0).toISOString(),
@@ -138,7 +156,7 @@ export function useCuttings() {
         status: input.status,
         notes: input.notes.trim(),
         photos: input.photos,
-        wateringLogs: [],
+        events: [],
         createdAt: now,
         updatedAt: now,
         createdByUid: user?.uid ?? null,

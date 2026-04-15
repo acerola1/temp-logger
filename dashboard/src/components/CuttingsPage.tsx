@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { Camera, ImagePlus, Loader2, Plus, Sprout, Droplets, Trash2 } from 'lucide-react';
+import { CalendarDays, Camera, ImagePlus, Loader2, Plus, Sprout, Trash2 } from 'lucide-react';
 import { storage } from '../lib/firebase';
 import { prepareImageUpload } from '../lib/imageUpload';
 import { formatDate, formatDateTime, formatMonthDay } from '../lib/dateFormat';
@@ -136,16 +136,19 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   const [photoActionError, setPhotoActionError] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoDeletingId, setPhotoDeletingId] = useState<string | null>(null);
-  const [wateringNotes, setWateringNotes] = useState('');
-  const [wateringAt, setWateringAt] = useState(toDateTimeLocalValue());
-  const [wateringSaving, setWateringSaving] = useState(false);
-  const [wateringError, setWateringError] = useState<string | null>(null);
-  const [wateringDeletingId, setWateringDeletingId] = useState<string | null>(null);
-  const [editingWateringId, setEditingWateringId] = useState<string | null>(null);
-  const [editingWateringAt, setEditingWateringAt] = useState(toDateTimeLocalValue());
-  const [editingWateringNotes, setEditingWateringNotes] = useState('');
-  const [editingWateringSaving, setEditingWateringSaving] = useState(false);
-  const [editingWateringError, setEditingWateringError] = useState<string | null>(null);
+  const [eventNotes, setEventNotes] = useState('');
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventAt, setEventAt] = useState(toDateTimeLocalValue());
+  const [eventSaving, setEventSaving] = useState(false);
+  const [eventError, setEventError] = useState<string | null>(null);
+  const [eventDeletingId, setEventDeletingId] = useState<string | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editingEventTitle, setEditingEventTitle] = useState('');
+  const [editingEventAt, setEditingEventAt] = useState(toDateTimeLocalValue());
+  const [editingEventNotes, setEditingEventNotes] = useState('');
+  const [editingEventSaving, setEditingEventSaving] = useState(false);
+  const [editingEventError, setEditingEventError] = useState<string | null>(null);
+  const [targetCuttingIds, setTargetCuttingIds] = useState<string[]>([]);
   const [editState, setEditState] = useState<CreateFormState>(DEFAULT_FORM_STATE);
   const [editMode, setEditMode] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
@@ -194,8 +197,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
       setEditMode(false);
       setEditError(null);
       setActivePhotoId(null);
-      setEditingWateringId(null);
-      setEditingWateringError(null);
+      setEditingEventId(null);
+      setEditingEventError(null);
+      setTargetCuttingIds([]);
       return;
     }
 
@@ -209,8 +213,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     setEditMode(false);
     setEditError(null);
     setActivePhotoId(selectedCutting.photos.at(-1)?.id ?? null);
-    setEditingWateringId(null);
-    setEditingWateringError(null);
+    setEditingEventId(null);
+    setEditingEventError(null);
+    setTargetCuttingIds([selectedCutting.id]);
   }, [nextSerialNumber, selectedCutting]);
 
   useEffect(() => {
@@ -363,128 +368,153 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     }
   };
 
-  const handleAddWateringLog = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddEvent = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!selectedCutting || !isAdmin) {
+    if (!isAdmin) {
       return;
     }
 
-    if (!wateringAt) {
-      setWateringError('Az öntözés időpontja kötelező.');
+    if (!eventAt) {
+      setEventError('Az esemény időpontja kötelező.');
       return;
     }
 
-    setWateringSaving(true);
-    setWateringError(null);
+    if (targetCuttingIds.length === 0) {
+      setEventError('Válassz legalább egy dugványt.');
+      return;
+    }
+
+    setEventSaving(true);
+    setEventError(null);
 
     try {
-      await updateCutting(selectedCutting.id, {
-        wateringLogs: [
-          ...selectedCutting.wateringLogs,
-          {
-            id: crypto.randomUUID(),
-            wateredAt: new Date(wateringAt).toISOString(),
-            notes: wateringNotes.trim(),
-          },
-        ],
-      });
-      setWateringAt(toDateTimeLocalValue());
-      setWateringNotes('');
+      const sharedEvent = {
+        id: crypto.randomUUID(),
+        occurredAt: new Date(eventAt).toISOString(),
+        title: eventTitle.trim() || 'Esemény',
+        notes: eventNotes.trim(),
+      };
+      const targetCuttings = cuttings.filter((cutting) => targetCuttingIds.includes(cutting.id));
+
+      await Promise.all(
+        targetCuttings.map((cutting) =>
+          updateCutting(cutting.id, {
+            events: [...cutting.events, sharedEvent],
+          }),
+        ),
+      );
+
+      setEventAt(toDateTimeLocalValue());
+      setEventTitle('');
+      setEventNotes('');
+      setTargetCuttingIds(selectedCutting ? [selectedCutting.id] : []);
     } catch (nextError) {
-      console.error('Cutting watering add error:', nextError);
-      setWateringError(
-        nextError instanceof Error ? nextError.message : 'Nem sikerült menteni az öntözést.',
+      console.error('Cutting event add error:', nextError);
+      setEventError(
+        nextError instanceof Error ? nextError.message : 'Nem sikerült menteni az eseményt.',
       );
     } finally {
-      setWateringSaving(false);
+      setEventSaving(false);
     }
   };
 
-  const startEditingWateringLog = (log: { id: string; wateredAt: string; notes: string }) => {
-    setEditingWateringId(log.id);
-    setEditingWateringAt(toDateTimeLocalValue(log.wateredAt));
-    setEditingWateringNotes(log.notes);
-    setEditingWateringError(null);
+  const startEditingEvent = (log: { id: string; occurredAt: string; title: string; notes: string }) => {
+    setEditingEventId(log.id);
+    setEditingEventAt(toDateTimeLocalValue(log.occurredAt));
+    setEditingEventTitle(log.title);
+    setEditingEventNotes(log.notes);
+    setEditingEventError(null);
   };
 
-  const handleDeleteWateringLog = async (wateringLogId: string) => {
-    if (!selectedCutting || !isAdmin || wateringDeletingId) {
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!selectedCutting || !isAdmin || eventDeletingId) {
       return;
     }
 
-    const confirmed = window.confirm('Biztosan törlöd ezt az öntözési bejegyzést?');
+    const confirmed = window.confirm('Biztosan törlöd ezt az esemény bejegyzést?');
     if (!confirmed) {
       return;
     }
 
-    setWateringDeletingId(wateringLogId);
-    setWateringError(null);
-    setEditingWateringError(null);
+    setEventDeletingId(eventId);
+    setEventError(null);
+    setEditingEventError(null);
 
     try {
       await updateCutting(selectedCutting.id, {
-        wateringLogs: selectedCutting.wateringLogs.filter((log) => log.id !== wateringLogId),
+        events: selectedCutting.events.filter((item) => item.id !== eventId),
       });
 
-      if (editingWateringId === wateringLogId) {
-        setEditingWateringId(null);
-        setEditingWateringNotes('');
-        setEditingWateringAt(toDateTimeLocalValue());
+      if (editingEventId === eventId) {
+        setEditingEventId(null);
+        setEditingEventTitle('');
+        setEditingEventNotes('');
+        setEditingEventAt(toDateTimeLocalValue());
       }
     } catch (nextError) {
-      console.error('Cutting watering delete error:', nextError);
-      setWateringError(
+      console.error('Cutting event delete error:', nextError);
+      setEventError(
         nextError instanceof Error
           ? nextError.message
-          : 'Nem sikerült törölni az öntözési bejegyzést.',
+          : 'Nem sikerült törölni az esemény bejegyzést.',
       );
     } finally {
-      setWateringDeletingId(null);
+      setEventDeletingId(null);
     }
   };
 
-  const handleEditWateringLog = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleEditEvent = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!selectedCutting || !isAdmin || !editingWateringId) {
+    if (!selectedCutting || !isAdmin || !editingEventId) {
       return;
     }
 
-    if (!editingWateringAt) {
-      setEditingWateringError('Az öntözés időpontja kötelező.');
+    if (!editingEventAt) {
+      setEditingEventError('Az esemény időpontja kötelező.');
       return;
     }
 
-    setEditingWateringSaving(true);
-    setEditingWateringError(null);
+    setEditingEventSaving(true);
+    setEditingEventError(null);
 
     try {
       await updateCutting(selectedCutting.id, {
-        wateringLogs: selectedCutting.wateringLogs.map((log) =>
-          log.id === editingWateringId
+        events: selectedCutting.events.map((log) =>
+          log.id === editingEventId
             ? {
                 ...log,
-                wateredAt: new Date(editingWateringAt).toISOString(),
-                notes: editingWateringNotes.trim(),
+                occurredAt: new Date(editingEventAt).toISOString(),
+                title: editingEventTitle.trim() || 'Esemény',
+                notes: editingEventNotes.trim(),
               }
             : log,
         ),
       });
 
-      setEditingWateringId(null);
-      setEditingWateringNotes('');
-      setEditingWateringAt(toDateTimeLocalValue());
+      setEditingEventId(null);
+      setEditingEventTitle('');
+      setEditingEventNotes('');
+      setEditingEventAt(toDateTimeLocalValue());
     } catch (nextError) {
-      console.error('Cutting watering edit error:', nextError);
-      setEditingWateringError(
+      console.error('Cutting event edit error:', nextError);
+      setEditingEventError(
         nextError instanceof Error
           ? nextError.message
-          : 'Nem sikerült menteni az öntözési bejegyzést.',
+          : 'Nem sikerült menteni az esemény bejegyzést.',
       );
     } finally {
-      setEditingWateringSaving(false);
+      setEditingEventSaving(false);
     }
+  };
+
+  const toggleTargetCutting = (cuttingId: string) => {
+    setTargetCuttingIds((current) =>
+      current.includes(cuttingId)
+        ? current.filter((id) => id !== cuttingId)
+        : [...current, cuttingId],
+    );
   };
 
   const handleSelectCutting = (cuttingId: string) => {
@@ -707,7 +737,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
               Mentés
             </button>
             <span className="text-xs text-vine-500 dark:text-vine-400">
-              Öntözési log hozzáadása a következő körben jön.
+              Esemény napló a részletes nézetben adható hozzá.
             </span>
           </div>
         </form>
@@ -1129,24 +1159,36 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
 
                 <section className="space-y-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-vine-700 dark:text-vine-200">
-                    <Droplets className="h-4 w-4" />
-                    Öntözési napló
+                    <CalendarDays className="h-4 w-4" />
+                    Esemény napló
                   </div>
 
                   {isAdmin && (
                     <form
-                      onSubmit={handleAddWateringLog}
+                      onSubmit={handleAddEvent}
                       className="rounded-2xl border border-vine-200 bg-vine-50/80 p-4 dark:border-vine-700 dark:bg-vine-800/40"
                     >
-                      <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)_auto]">
+                      <div className="grid gap-3 md:grid-cols-[220px_220px_minmax(0,1fr)]">
                         <label className="space-y-1">
                           <span className="text-xs font-medium text-vine-700 dark:text-vine-200">
                             Időpont
                           </span>
                           <input
                             type="datetime-local"
-                            value={wateringAt}
-                            onChange={(event) => setWateringAt(event.target.value)}
+                            value={eventAt}
+                            onChange={(event) => setEventAt(event.target.value)}
+                            className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
+                          />
+                        </label>
+
+                        <label className="space-y-1">
+                          <span className="text-xs font-medium text-vine-700 dark:text-vine-200">
+                            Cím
+                          </span>
+                          <input
+                            value={eventTitle}
+                            onChange={(event) => setEventTitle(event.target.value)}
+                            placeholder="pl. Permetezés"
                             className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                           />
                         </label>
@@ -1156,43 +1198,89 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                             Jegyzet
                           </span>
                           <input
-                            value={wateringNotes}
-                            onChange={(event) => setWateringNotes(event.target.value)}
-                            placeholder="pl. alapos öntözés"
+                            value={eventNotes}
+                            onChange={(event) => setEventNotes(event.target.value)}
+                            placeholder="pl. lombtrágya kijuttatva"
                             className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                           />
                         </label>
+                      </div>
 
-                        <div className="flex items-end">
-                          <button
-                            type="submit"
-                            disabled={wateringSaving}
-                            className="inline-flex items-center gap-2 rounded-xl bg-vine-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-vine-700 disabled:cursor-not-allowed disabled:opacity-70"
-                          >
-                            {wateringSaving && <Loader2 className="h-4 w-4 animate-spin" />}
-                            Öntözés mentése
-                          </button>
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-vine-700 dark:text-vine-200">
+                            Érintett dugványok
+                          </span>
+                          <div className="flex items-center gap-2 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => setTargetCuttingIds(cuttings.map((cutting) => cutting.id))}
+                              className="rounded-lg border border-vine-200 bg-white px-2 py-1 text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
+                            >
+                              Mind
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setTargetCuttingIds([])}
+                              className="rounded-lg border border-vine-200 bg-white px-2 py-1 text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
+                            >
+                              Törlés
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-vine-200 bg-white p-2 dark:border-vine-700 dark:bg-vine-900">
+                          {cuttings.map((cutting) => (
+                            <label
+                              key={cutting.id}
+                              className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm text-vine-800 hover:bg-vine-50 dark:text-vine-100 dark:hover:bg-vine-800"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={targetCuttingIds.includes(cutting.id)}
+                                onChange={() => toggleTargetCutting(cutting.id)}
+                                className="h-4 w-4 rounded border-vine-300 text-vine-600 focus:ring-vine-500"
+                              />
+                              <span>
+                                #{cutting.serialNumber} - {cutting.variety}
+                              </span>
+                            </label>
+                          ))}
                         </div>
                       </div>
 
-                      {wateringError && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <button
+                          type="submit"
+                          disabled={eventSaving}
+                          className="inline-flex items-center gap-2 rounded-xl bg-vine-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-vine-700 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {eventSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                          Esemény mentése ({targetCuttingIds.length})
+                        </button>
+                        <span className="text-xs text-vine-500 dark:text-vine-300">
+                          Tömeges mentés több dugványra.
+                        </span>
+                      </div>
+
+                      {eventError && (
                         <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                          {wateringError}
+                          {eventError}
                         </div>
                       )}
                     </form>
                   )}
 
-                  {selectedCutting.wateringLogs.length === 0 ? (
+                  {selectedCutting.events.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-vine-300 px-4 py-6 text-sm text-vine-500 dark:border-vine-700 dark:text-vine-300">
-                      Még nincs öntözési bejegyzés.
+                      Még nincs esemény bejegyzés.
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {[...selectedCutting.wateringLogs]
-                        .sort((a, b) => new Date(b.wateredAt).getTime() - new Date(a.wateredAt).getTime())
+                      {[...selectedCutting.events]
+                        .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
                         .map((log) => {
-                          const isEditing = editingWateringId === log.id;
+                          const isEditing = editingEventId === log.id;
 
                           return (
                             <div
@@ -1200,16 +1288,27 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                               className="rounded-2xl bg-vine-50 px-4 py-3 text-sm text-vine-700 dark:bg-vine-800/50 dark:text-vine-100"
                             >
                               {isEditing && isAdmin ? (
-                                <form onSubmit={handleEditWateringLog} className="space-y-3">
-                                  <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+                                <form onSubmit={handleEditEvent} className="space-y-3">
+                                  <div className="grid gap-3 md:grid-cols-[220px_220px_minmax(0,1fr)]">
                                     <label className="space-y-1">
                                       <span className="text-xs font-medium text-vine-700 dark:text-vine-200">
                                         Időpont
                                       </span>
                                       <input
                                         type="datetime-local"
-                                        value={editingWateringAt}
-                                        onChange={(event) => setEditingWateringAt(event.target.value)}
+                                        value={editingEventAt}
+                                        onChange={(event) => setEditingEventAt(event.target.value)}
+                                        className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
+                                      />
+                                    </label>
+
+                                    <label className="space-y-1">
+                                      <span className="text-xs font-medium text-vine-700 dark:text-vine-200">
+                                        Cím
+                                      </span>
+                                      <input
+                                        value={editingEventTitle}
+                                        onChange={(event) => setEditingEventTitle(event.target.value)}
                                         className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                                       />
                                     </label>
@@ -1219,26 +1318,26 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                                         Jegyzet
                                       </span>
                                       <input
-                                        value={editingWateringNotes}
-                                        onChange={(event) => setEditingWateringNotes(event.target.value)}
+                                        value={editingEventNotes}
+                                        onChange={(event) => setEditingEventNotes(event.target.value)}
                                         className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                                       />
                                     </label>
                                   </div>
 
-                                  {editingWateringError && (
+                                  {editingEventError && (
                                     <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                                      {editingWateringError}
+                                      {editingEventError}
                                     </div>
                                   )}
 
                                   <div className="flex flex-wrap items-center gap-2">
                                     <button
                                       type="submit"
-                                      disabled={editingWateringSaving}
+                                      disabled={editingEventSaving}
                                       className="inline-flex items-center gap-2 rounded-xl bg-vine-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-vine-700 disabled:cursor-not-allowed disabled:opacity-70"
                                     >
-                                      {editingWateringSaving && (
+                                      {editingEventSaving && (
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                       )}
                                       Mentés
@@ -1246,8 +1345,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        setEditingWateringId(null);
-                                        setEditingWateringError(null);
+                                        setEditingEventId(null);
+                                        setEditingEventTitle('');
+                                        setEditingEventError(null);
                                       }}
                                       className="rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
                                     >
@@ -1259,7 +1359,8 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                                 <>
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
-                                      <div className="font-medium">{formatDateTime(log.wateredAt)}</div>
+                                      <div className="font-semibold">{log.title || 'Esemény'}</div>
+                                      <div className="font-medium">{formatDateTime(log.occurredAt)}</div>
                                       {log.notes && (
                                         <div className="mt-1 text-vine-500 dark:text-vine-300">
                                           {log.notes}
@@ -1271,18 +1372,18 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                                       <div className="flex shrink-0 items-center gap-2">
                                         <button
                                           type="button"
-                                          onClick={() => startEditingWateringLog(log)}
+                                          onClick={() => startEditingEvent(log)}
                                           className="rounded-lg border border-vine-200 bg-white px-2.5 py-1.5 text-xs font-medium text-vine-700 transition-colors hover:bg-vine-100 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
                                         >
                                           Szerkesztés
                                         </button>
                                         <button
                                           type="button"
-                                          onClick={() => void handleDeleteWateringLog(log.id)}
-                                          disabled={wateringDeletingId === log.id}
+                                          onClick={() => void handleDeleteEvent(log.id)}
+                                          disabled={eventDeletingId === log.id}
                                           className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-red-900 dark:bg-vine-900 dark:text-red-300 dark:hover:bg-red-950/30"
                                         >
-                                          {wateringDeletingId === log.id ? (
+                                          {eventDeletingId === log.id ? (
                                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                           ) : (
                                             <Trash2 className="h-3.5 w-3.5" />

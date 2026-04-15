@@ -85,7 +85,7 @@ test.describe('dashboard screenshots', () => {
 
     await page.goto(new URL('/dugvanyok', baseUrl).toString(), { waitUntil: 'domcontentloaded' });
     await waitForLoadedState('cuttings', page);
-    await expect(page.getByText('Öntözési napló')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Esemény napló')).toBeVisible({ timeout: 15_000 });
     await waitForLoadedImages('cuttings', page);
 
     await page.screenshot({ path: cuttingsOutput, fullPage: true });

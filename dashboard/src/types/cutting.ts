@@ -12,9 +12,10 @@ export interface CuttingPhoto {
   caption: string;
 }
 
-export interface CuttingWateringLog {
+export interface CuttingEvent {
   id: string;
-  wateredAt: string;
+  occurredAt: string;
+  title: string;
   notes: string;
 }
 
@@ -27,7 +28,7 @@ export interface Cutting {
   status: CuttingStatus;
   notes: string;
   photos: CuttingPhoto[];
-  wateringLogs: CuttingWateringLog[];
+  events: CuttingEvent[];
   createdAt: string;
   updatedAt: string;
   createdByUid: string | null;

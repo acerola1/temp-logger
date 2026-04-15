@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { deleteDoc, doc } from 'firebase/firestore';
 import { AuthProvider } from './lib/auth';
 import { Header } from './components/Header';
 import { SummaryCards } from './components/SummaryCards';
@@ -21,8 +22,10 @@ import { useAllSessions } from './hooks/useAllSessions';
 import { useSessionEvents } from './hooks/useSessionEvents';
 import { useDevices } from './hooks/useDevices';
 import { useSessionTypes } from './hooks/useSessionTypes';
+import { db } from './lib/firebase';
+import { formatDateTime } from './lib/dateFormat';
 import type { SessionEvent, TimeRange } from './types/sensor';
-import { Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 type DataSourceMode = 'devices' | 'legacy';
 type DashboardView = 'monitor' | 'cuttings';
@@ -98,6 +101,53 @@ function buildMonitorUrl(state: MonitorUrlState): string {
   return query.length > 0 ? `/?${query}` : '/';
 }
 
+function getRangeDurationMs(range: TimeRange): number {
+  switch (range) {
+    case '7d':
+      return 7 * 24 * 60 * 60 * 1000;
+    case '30d':
+      return 30 * 24 * 60 * 60 * 1000;
+    default:
+      return 24 * 60 * 60 * 1000;
+  }
+}
+
+function toValidTimeMs(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getLatestReadingMs(readings: { recordedAt: string }[]): number | null {
+  let latest: number | null = null;
+  for (const reading of readings) {
+    const next = toValidTimeMs(reading.recordedAt);
+    if (next === null) {
+      continue;
+    }
+    if (latest === null || next > latest) {
+      latest = next;
+    }
+  }
+  return latest;
+}
+
+function getOldestReadingMs(readings: { recordedAt: string }[]): number | null {
+  let oldest: number | null = null;
+  for (const reading of readings) {
+    const next = toValidTimeMs(reading.recordedAt);
+    if (next === null) {
+      continue;
+    }
+    if (oldest === null || next < oldest) {
+      oldest = next;
+    }
+  }
+  return oldest;
+}
+
 function Dashboard() {
   const { theme, toggle } = useTheme();
   const initialMonitorState = getMonitorStateFromUrl(window.location.search);
@@ -106,6 +156,7 @@ function Dashboard() {
   const [selectedEvent, setSelectedEvent] = useState<SessionEvent | null>(null);
   const [sessionEventsDialogOpen, setSessionEventsDialogOpen] = useState(false);
   const [quickCreateEventRequest, setQuickCreateEventRequest] = useState<QuickCreateEventRequest | null>(null);
+  const [archivedPageOffset, setArchivedPageOffset] = useState(0);
   const [currentView, setCurrentView] = useState<DashboardView>(() =>
     getViewFromPath(window.location.pathname),
   );
@@ -116,10 +167,22 @@ function Dashboard() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(
     initialMonitorState.selectedDeviceId,
   );
-
-  const effectiveDeviceId = selectedDeviceId ?? devices[0]?.id ?? null;
-  const { sessions, activeSession, createSession, archiveSession } = useSessions(effectiveDeviceId);
   const { sessions: allSessions } = useAllSessions(devices);
+  const firstActiveSessionInList = useMemo(() => {
+    for (const device of devices) {
+      const deviceSessions = allSessions
+        .filter((session) => session.deviceId === device.id)
+        .sort((a, b) => b.startDate.localeCompare(a.startDate));
+      const active = deviceSessions.find((session) => session.status === 'active');
+      if (active) {
+        return { deviceId: device.id, sessionId: active.id };
+      }
+    }
+    return null;
+  }, [allSessions, devices]);
+  const effectiveDeviceId =
+    selectedDeviceId ?? firstActiveSessionInList?.deviceId ?? devices[0]?.id ?? null;
+  const { sessions, activeSession, createSession, archiveSession } = useSessions(effectiveDeviceId);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null | undefined>(
     initialMonitorState.selectedSessionId,
   );
@@ -127,7 +190,9 @@ function Dashboard() {
   // `undefined` means no explicit user choice yet, so default to the active session.
   // `null` means the user explicitly chose "Összes mérés".
   const effectiveSessionId =
-    selectedSessionId === undefined ? activeSession?.id ?? null : selectedSessionId;
+    selectedSessionId === undefined
+      ? sessions.find((session) => session.status === 'active')?.id ?? null
+      : selectedSessionId;
 
   const { readings: allReadings, loading, error } = useFirestoreReadings(
     effectiveDeviceId,
@@ -142,7 +207,26 @@ function Dashboard() {
   const currentLoading =
     dataSourceMode === 'legacy' ? legacyLoading : devicesLoading || loading;
   const currentError = dataSourceMode === 'legacy' ? legacyError : devicesError || error;
-  const { readings, latest, stats } = useReadings(currentSourceReadings, timeRange);
+  const rangeDurationMs = getRangeDurationMs(timeRange);
+  const selectedSession = sessions.find((s) => s.id === effectiveSessionId);
+  const isSessionPagingView =
+    currentView === 'monitor' &&
+    dataSourceMode === 'devices' &&
+    typeof effectiveSessionId === 'string';
+  const latestReadingMs = getLatestReadingMs(currentSourceReadings);
+  const sessionReferenceEndMs =
+    selectedSession?.status === 'archived'
+      ? selectedSession?.endDate
+        ? (toValidTimeMs(selectedSession.endDate) ?? latestReadingMs)
+        : latestReadingMs
+      : latestReadingMs ?? Date.now();
+  const pagedWindowEndMs =
+    isSessionPagingView && sessionReferenceEndMs !== null && Number.isFinite(sessionReferenceEndMs)
+      ? sessionReferenceEndMs - archivedPageOffset * rangeDurationMs
+      : null;
+  const { readings, latest, stats } = useReadings(currentSourceReadings, timeRange, {
+    windowEndMs: pagedWindowEndMs,
+  });
   const { data: sessionTypes } = useSessionTypes();
   const {
     data: sessionEvents,
@@ -158,7 +242,6 @@ function Dashboard() {
   const { isAdmin } = useIsAdmin();
   const isDark = theme === 'dark';
 
-  const selectedSession = sessions.find((s) => s.id === effectiveSessionId);
   const selectedDevice = devices.find((device) => device.id === effectiveDeviceId) ?? null;
   const callusingSessionType = sessionTypes.find((type) => type.id === 'callusing') ?? null;
   const selectedSessionType =
@@ -168,8 +251,17 @@ function Dashboard() {
         sessionTypes.find((type) => type.id === activeSession?.sessionTypeId) ??
         null;
 
-  const handleDeleteReading = async (_readingId: string) => {
-    window.alert('Az új struktúrában a törlés még nincs bekötve.');
+  const handleDeleteReading = async (readingId: string) => {
+    if (dataSourceMode === 'legacy') {
+      await deleteDoc(doc(db, 'sensorReadings', readingId));
+      return;
+    }
+
+    if (!effectiveDeviceId) {
+      throw new Error('Nincs kiválasztott eszköz a mérés törléséhez.');
+    }
+
+    await deleteDoc(doc(db, 'devices', effectiveDeviceId, 'readings', readingId));
   };
 
   useEffect(() => {
@@ -195,6 +287,10 @@ function Dashboard() {
     setQuickCreateEventRequest(null);
   }, [effectiveDeviceId, effectiveSessionId, dataSourceMode]);
 
+  useEffect(() => {
+    setArchivedPageOffset(0);
+  }, [currentView, dataSourceMode, effectiveDeviceId, effectiveSessionId, timeRange]);
+
   const handleQuickCreateEventNow = () => {
     setSessionEventsDialogOpen(true);
     setQuickCreateEventRequest({
@@ -203,10 +299,36 @@ function Dashboard() {
     });
   };
 
+  const handleQuickCreateEventAt = (occurredAtIso: string) => {
+    const parsed = new Date(occurredAtIso);
+    setSessionEventsDialogOpen(true);
+    setQuickCreateEventRequest({
+      occurredAt: toDateTimeLocalValue(Number.isNaN(parsed.getTime()) ? new Date() : parsed),
+      nonce: Date.now(),
+    });
+  };
+
   const handleCloseSessionEventsDialog = () => {
     setSessionEventsDialogOpen(false);
     setQuickCreateEventRequest(null);
   };
+
+  const oldestReadingMs = getOldestReadingMs(currentSourceReadings);
+  const pagedWindowStartMs =
+    pagedWindowEndMs !== null ? pagedWindowEndMs - rangeDurationMs : null;
+  const hasOlderArchivedPage =
+    isSessionPagingView &&
+    oldestReadingMs !== null &&
+    pagedWindowStartMs !== null &&
+    Number.isFinite(oldestReadingMs) &&
+    oldestReadingMs < pagedWindowStartMs;
+  const hasNewerArchivedPage = isSessionPagingView && archivedPageOffset > 0;
+  const effectiveWindowEndMs =
+    pagedWindowEndMs !== null && Number.isFinite(pagedWindowEndMs) ? pagedWindowEndMs : Date.now();
+  const effectiveWindowDomain: [number, number] = [
+    effectiveWindowEndMs - rangeDurationMs,
+    effectiveWindowEndMs,
+  ];
 
   const pushMonitorUrl = (nextState: Partial<MonitorUrlState>) => {
     const url = buildMonitorUrl({
@@ -361,6 +483,33 @@ function Dashboard() {
           />
         )}
 
+        {currentView === 'monitor' && isSessionPagingView && pagedWindowEndMs !== null && (
+          <div className="-mt-4 mb-6 flex flex-wrap items-center gap-2 text-sm text-vine-600 dark:text-vine-300">
+            <button
+              type="button"
+              onClick={() => setArchivedPageOffset((current) => current + 1)}
+              disabled={!hasOlderArchivedPage}
+              className="inline-flex items-center gap-1 rounded-lg border border-vine-200 bg-white px-2.5 py-1.5 transition-colors hover:bg-vine-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-vine-700 dark:bg-vine-900 dark:hover:bg-vine-800"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Régebbi
+            </button>
+            <button
+              type="button"
+              onClick={() => setArchivedPageOffset((current) => Math.max(0, current - 1))}
+              disabled={!hasNewerArchivedPage}
+              className="inline-flex items-center gap-1 rounded-lg border border-vine-200 bg-white px-2.5 py-1.5 transition-colors hover:bg-vine-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-vine-700 dark:bg-vine-900 dark:hover:bg-vine-800"
+            >
+              Újabb
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <span>
+              Ablak: {formatDateTime(pagedWindowStartMs ?? pagedWindowEndMs)} -{' '}
+              {formatDateTime(pagedWindowEndMs)}
+            </span>
+          </div>
+        )}
+
         {currentView === 'monitor' && currentLoading && (
           <div className="flex items-center justify-center py-20 text-vine-400">
             <Loader2 className="w-6 h-6 animate-spin mr-2" />
@@ -386,9 +535,11 @@ function Dashboard() {
               timeRange={timeRange}
               isDark={isDark}
               sessionType={selectedSessionType}
+              timeDomainOverride={effectiveWindowDomain}
               onEventSelect={setSelectedEvent}
               canQuickCreateEvent={isAdmin && !!selectedSession}
               onQuickCreateNow={handleQuickCreateEventNow}
+              onQuickCreateAt={handleQuickCreateEventAt}
               eventCountLabel={
                 dataSourceMode === 'devices' && selectedSession ? `${sessionEvents.length} esemény` : null
               }
@@ -407,9 +558,11 @@ function Dashboard() {
               timeRange={timeRange}
               isDark={isDark}
               sessionType={selectedSessionType}
+              timeDomainOverride={effectiveWindowDomain}
               onEventSelect={setSelectedEvent}
               canQuickCreateEvent={isAdmin && !!selectedSession}
               onQuickCreateNow={handleQuickCreateEventNow}
+              onQuickCreateAt={handleQuickCreateEventAt}
               eventCountLabel={
                 dataSourceMode === 'devices' && selectedSession ? `${sessionEvents.length} esemény` : null
               }

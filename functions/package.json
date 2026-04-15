@@ -7,7 +7,13 @@
   "main": "index.js",
   "scripts": {
     "serve": "firebase emulators:start --only functions,firestore,hosting",
-    "deploy": "firebase deploy --only functions,firestore:rules,hosting"
+    "deploy": "firebase deploy --only functions,firestore:rules,hosting",
+    "migrate:legacy-readings:dry": "node scripts/migrate-legacy-readings.js",
+    "migrate:legacy-readings:debug": "node scripts/migrate-legacy-readings.js --debug",
+    "migrate:legacy-readings": "node scripts/migrate-legacy-readings.js --apply",
+    "migrate:legacy-sessions:dry": "node scripts/migrate-legacy-sessions.js",
+    "migrate:legacy-sessions:debug": "node scripts/migrate-legacy-sessions.js --debug",
+    "migrate:legacy-sessions": "node scripts/migrate-legacy-sessions.js --apply"
   },
   "dependencies": {
     "firebase-admin": "^13.5.0",
