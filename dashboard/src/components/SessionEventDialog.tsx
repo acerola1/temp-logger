@@ -35,8 +35,17 @@ export function SessionEventDialog({ event, onClose }: SessionEventDialogProps) 
           )}
 
           {event.imageUrl && (
-            <a href={event.imageUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl border border-vine-200 dark:border-vine-700">
-              <img src={event.imageUrl} alt={event.title} className="max-h-[420px] w-full object-cover" />
+            <a
+              href={event.imageUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block overflow-hidden rounded-2xl border border-vine-300/90 bg-vine-50 p-1 shadow-[0_8px_20px_-14px_rgba(15,23,42,0.45)] dark:border-vine-600 dark:bg-vine-900/55 dark:shadow-[0_10px_24px_-14px_rgba(0,0,0,0.7)]"
+            >
+              <img
+                src={event.imageUrl}
+                alt={event.title}
+                className="max-h-[420px] w-full rounded-xl border border-vine-200/90 object-cover dark:border-vine-700/70"
+              />
             </a>
           )}
         </div>

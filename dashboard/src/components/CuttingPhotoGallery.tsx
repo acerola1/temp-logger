@@ -26,6 +26,7 @@ interface CuttingPhotoGalleryProps {
   onUpdateCutting: (cuttingId: string, updates: Partial<Omit<Cutting, 'id'>>) => Promise<void>;
   updateErrorMessage: string | null;
   onClearUpdateError: () => void;
+  highlightedPhotoId?: string | null;
 }
 
 export function CuttingPhotoGallery({
@@ -34,6 +35,7 @@ export function CuttingPhotoGallery({
   onUpdateCutting,
   updateErrorMessage,
   onClearUpdateError,
+  highlightedPhotoId = null,
 }: CuttingPhotoGalleryProps) {
   const [photoDeletingId, setPhotoDeletingId] = useState<string | null>(null);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
@@ -287,7 +289,7 @@ export function CuttingPhotoGallery({
       ) : (
         <div className="space-y-3">
           {activePhoto && (
-            <div className="overflow-hidden rounded-3xl border border-vine-200 bg-vine-50 dark:border-vine-700 dark:bg-vine-800/50">
+            <div className="overflow-hidden rounded-3xl border border-vine-300/90 bg-vine-50 p-1.5 shadow-[0_8px_20px_-12px_rgba(15,23,42,0.45)] dark:border-vine-500/70 dark:bg-vine-800/55 dark:shadow-[0_10px_26px_-14px_rgba(0,0,0,0.75)]">
               <div className="relative">
                 <button
                   type="button"
@@ -301,7 +303,7 @@ export function CuttingPhotoGallery({
                   <img
                     src={activePhoto.downloadUrl}
                     alt={cutting.variety}
-                    className="h-72 w-full object-cover transition-transform duration-200 group-hover:scale-[1.01] sm:h-80"
+                    className="h-72 w-full rounded-[1.2rem] border border-vine-200/90 object-cover shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)] transition-transform duration-200 group-hover:scale-[1.01] dark:border-vine-600/80 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] sm:h-80"
                   />
                 </button>
 
@@ -353,19 +355,27 @@ export function CuttingPhotoGallery({
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-6">
             {cutting.photos.map((photo) => {
               const isActive = photo.id === activePhoto?.id;
+              const isHighlighted = photo.id === highlightedPhotoId;
 
               return (
                 <button
                   key={photo.id}
+                  data-photo-id={photo.id}
                   type="button"
                   onClick={() => setActivePhotoId(photo.id)}
-                  className={`relative overflow-hidden rounded-2xl border text-left transition-colors ${
-                    isActive
-                      ? 'border-vine-500 ring-2 ring-vine-300 dark:border-vine-300 dark:ring-vine-700'
-                      : 'border-vine-200 dark:border-vine-700'
+                  className={`relative overflow-hidden rounded-2xl border bg-white/90 p-1 text-left shadow-sm transition-all duration-200 dark:bg-vine-900/60 ${
+                    isHighlighted
+                      ? 'border-amber-500 ring-2 ring-amber-300 dark:border-amber-400 dark:ring-amber-500/60'
+                      : isActive
+                        ? 'border-vine-500 ring-2 ring-vine-300 dark:border-vine-300 dark:ring-vine-700'
+                        : 'border-vine-300/90 hover:border-vine-400 dark:border-vine-600 dark:hover:border-vine-500'
                   }`}
                 >
-                  <img src={photo.downloadUrl} alt={cutting.variety} className="h-24 w-full object-cover" />
+                  <img
+                    src={photo.downloadUrl}
+                    alt={cutting.variety}
+                    className="h-24 w-full rounded-xl border border-vine-200/80 object-cover dark:border-vine-700/70"
+                  />
                   <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
                     {formatMonthDay(photo.capturedAt ?? photo.uploadedAt)}
                   </span>

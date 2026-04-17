@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CalendarDays, Loader2, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { CuttingForm } from './CuttingForm';
 import { CuttingPhotoGallery } from './CuttingPhotoGallery';
+import { CuttingTimeline } from './CuttingTimeline';
+import type { TimelineSelection } from './CuttingTimeline';
 import {
   plantTypeLabel,
   statusBadgeClass,
@@ -59,6 +61,7 @@ export function CuttingDetail({
   const [eventDeletingId, setEventDeletingId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [targetCuttingIds, setTargetCuttingIds] = useState<string[]>([]);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   const {
     register: registerAddEvent,
@@ -110,6 +113,14 @@ export function CuttingDetail({
         : [],
     [selectedCutting],
   );
+
+  const handleTimelineActiveChange = useCallback((selection: TimelineSelection | null) => {
+    if (!selection?.entityId) {
+      setHighlightedId(null);
+      return;
+    }
+    setHighlightedId(selection.entityId);
+  }, []);
 
   const handleEditSubmit = async (values: CuttingFormValues) => {
     if (!selectedCutting || !isAdmin) {
@@ -343,7 +354,10 @@ export function CuttingDetail({
               onUpdateCutting={onUpdateCutting}
               updateErrorMessage={updateErrorMessage}
               onClearUpdateError={onClearUpdateError}
+              highlightedPhotoId={highlightedId}
             />
+
+            <CuttingTimeline cutting={selectedCutting} onActiveItemChange={handleTimelineActiveChange} />
 
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">
@@ -481,7 +495,8 @@ export function CuttingDetail({
                     return (
                       <div
                         key={log.id}
-                        className="rounded-2xl bg-vine-50 px-4 py-3 text-sm text-vine-700 dark:bg-vine-800/50 dark:text-vine-100"
+                        data-event-id={log.id}
+                        className={`rounded-2xl px-4 py-3 text-sm text-vine-700 transition-all duration-200 dark:text-vine-100 ${highlightedId === log.id ? 'bg-vine-50 ring-2 ring-blue-400 dark:bg-vine-800/50 dark:ring-blue-500/50' : 'bg-vine-50 dark:bg-vine-800/50'}`}
                       >
                         {isEditing && isAdmin ? (
                           <form
