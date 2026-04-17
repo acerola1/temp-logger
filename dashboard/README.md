@@ -15,6 +15,38 @@ VITE_FIREBASE_APP_ID=
 
 You can copy the committed `dashboard/.env.example` file and fill in the real Firebase values locally.
 
+## E2E tests (Playwright + Firebase emulators)
+
+The dashboard E2E suite runs against local Firebase emulators (Auth, Firestore, Storage), not against production.
+
+Commands:
+
+```bash
+# Install Playwright browser once (local machine)
+npx playwright install chromium
+
+# Run complete E2E suite with emulator startup + seed
+npm run test:e2e
+
+# Run only Playwright tests (expects emulators and seed already running)
+npm run test:e2e:run
+```
+
+Test files live in `dashboard/e2e/`.
+Seed data is created by `dashboard/scripts/seed-e2e-data.mjs`.
+Emulator mode includes a `Teszt admin belépés` button in the header for admin CRUD E2E flows.
+
+## CI
+
+GitHub Actions workflow: `.github/workflows/ci.yml`
+
+Pipeline steps:
+
+1. install dependencies (`npm ci`)
+2. install Playwright browser
+3. run `npm run test:e2e` (emulator-based)
+4. run `npm run build`
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

@@ -2,6 +2,8 @@
 
 A dashboard kódbázis rendezése: duplikációk megszüntetése, nagy fájlok szétbontása, form kezelés egységesítése, hookök kiemelése.
 
+**Instrukció:** ami elkészült, azt azonnal jelöld `- [x]` állapotra.
+
 ## QA — regresszió ellenőrzés minden feladat után
 
 Minden fejezet elvégzése után az alábbi ellenőrzéseket kell lefuttatni. Ha bármelyik elbukik, a feladat nem tekinthető késznek.
@@ -30,66 +32,85 @@ Az egyes fejezetek QA blokkjában felsorolt extra ellenőrzések.
 
 ## 0. Playwright e2e tesztek — baseline rögzítés a refaktor előtt
 
-A refaktor előtt fel kell írni a teszteket, hogy a meglévő működés rögzítve legyen. A tesztek a Firebase prod backend ellen futnak (read-only tesztek), az admin CRUD teszteknél Firebase emulátort vagy test accountot használunk.
+A refaktor előtt fel kell írni a teszteket, hogy a meglévő működés rögzítve legyen.  
+Alapelv: CI-ban **ne** a Firebase prod backend ellen teszteljünk, hanem Firebase emulátorral (Auth + Firestore + szükség esetén Functions). A prod adatbázis legfeljebb külön, manuális smoke ellenőrzésre maradjon.
 
-- [ ] Playwright telepítése és konfigurálása:
+- [x] Playwright telepítése és konfigurálása:
   - `npm install -D @playwright/test`
   - `npx playwright install chromium`
   - `playwright.config.ts` létrehozása: baseURL, webServer (dev szerver indítás)
-- [ ] Tesztek könyvtárstruktúra: `e2e/` mappa a dashboard gyökerében
-- [ ] `package.json` script: `"test:e2e": "playwright test"`
+- [x] Tesztek könyvtárstruktúra: `e2e/` mappa a dashboard gyökerében
+- [x] `package.json` e2e scriptek: `test:e2e:seed`, `test:e2e:run`, `test:e2e`
+- [x] Emulátoros e2e script-struktúra kialakítása (`../tasteroom` mintára):
+  - `test:e2e:seed` — determinisztikus teszt adatok seedelése emulátorba
+  - `test:e2e:run` — Playwright futtatás
+  - `test:e2e` — `firebase emulators:exec` alatt seed + e2e futtatás
+- [x] Külön CI env változók definiálása (pl. `VITE_USE_EMULATORS=true`, emulátor portok, test project id)
+
+### 0/A. GitHub CI bekötés (dashboard e2e)
+
+- [x] `.github/workflows/ci.yml` létrehozása/frissítése:
+  - checkout + Node.js 22 setup
+  - Java setup (Firestore emulator miatt)
+  - `npm ci` a dashboardban (és ahol kell, functions-ben is)
+  - `npx playwright install --with-deps chromium`
+  - `npm run test:e2e` (emulátoros módban)
+  - `npm run build`
+- [x] CI trigger: `pull_request` + `push` a fő branch(ek)re
+- [x] Playwright report/artifact mentés hiba esetén
+- [x] README-ben rövid CI + helyi e2e futtatási leírás
 
 ### Monitor oldal tesztek (`e2e/monitor.spec.ts`)
 
-- [ ] Oldal betölt, "Hőmérséklet" és "Páratartalom" chart cím megjelenik
-- [ ] Grafikonok renderelődnek (SVG `<path>` elemek jelen vannak a chart konténerekben)
-- [ ] Időszak választó gombok (`24h`, `7d`, `30d`) kattinthatók, grafikon frissül
-- [ ] Tooltip megjelenik hoverre (tooltip elem `visibility: visible` lesz)
-- [ ] Tooltip rögzül kattintásra (X gomb megjelenik)
-- [ ] Tooltip bezárul félrekattintásra (tooltip elem `visibility: hidden` lesz)
-- [ ] Esemény timeline sor megjelenik a chartokon
+- [x] Oldal betölt, "Hőmérséklet" és "Páratartalom" chart cím megjelenik
+- [x] Grafikonok renderelődnek (SVG `<path>` elemek jelen vannak a chart konténerekben)
+- [x] Időszak választó gombok (`24h`, `7d`, `30d`) kattinthatók, grafikon frissül
+- [x] Tooltip megjelenik hoverre (tooltip elem `visibility: visible` lesz)
+- [x] Tooltip rögzül kattintásra (X gomb megjelenik)
+- [x] Tooltip bezárul félrekattintásra (tooltip elem `visibility: hidden` lesz)
+- [x] Esemény timeline sor megjelenik a chartokon
 
 ### Navigáció tesztek (`e2e/navigation.spec.ts`)
 
-- [ ] Monitor → Dugvány oldal navigáció működik
-- [ ] Dugvány → Monitor navigáció működik
-- [ ] URL direkt megnyitás működik mindkét oldalra (`/`, `/cuttings`)
-- [ ] Dugvány részletes nézet URL működik (`/cuttings/:id`)
-- [ ] Böngésző vissza gomb helyes navigáció
+- [x] Monitor → Dugvány oldal navigáció működik
+- [x] Dugvány → Monitor navigáció működik
+- [x] URL direkt megnyitás működik mindkét oldalra (`/`, `/dugvanyok`)
+- [x] Dugvány részletes nézet URL működik (`/dugvanyok/:id`)
+- [x] Böngésző vissza gomb helyes navigáció
 
 ### Dugvány oldal tesztek (`e2e/cuttings.spec.ts`)
 
-- [ ] Dugvány lista betölt, legalább 1 kártya megjelenik
-- [ ] Kártya tartalmazza: sorszám, fajta, típus, státusz
-- [ ] Részletes nézet megnyílik kártyára kattintva
-- [ ] Részletes nézetben fotók megjelennek (ha vannak)
-- [ ] Részletes nézetben öntözési napló megjelenik (ha van)
-- [ ] Nem-admin: "Új dugvány" gomb nem látható
-- [ ] Nem-admin: szerkesztés/törlés gombok nem láthatók
+- [x] Dugvány lista betölt, legalább 1 kártya megjelenik
+- [x] Kártya tartalmazza: sorszám, fajta, típus, státusz
+- [x] Részletes nézet megnyílik kártyára kattintva
+- [x] Részletes nézetben fotók megjelennek (ha vannak)
+- [x] Részletes nézetben öntözési napló megjelenik (ha van)
+- [x] Nem-admin: "Új dugvány" gomb nem látható
+- [x] Nem-admin: szerkesztés/törlés gombok nem láthatók
 
 ### Admin CRUD tesztek (`e2e/admin.spec.ts`)
 
-Ezek a tesztek Firebase auth-ot igényelnek — test account vagy emulator.
+Ezek a tesztek Firebase auth-ot igényelnek — elsődlegesen emulatorral (test account csak külön, manuális smoke célra).
 
-- [ ] Auth setup: test admin user bejelentkeztetése a tesztek előtt
-- [ ] Új dugvány létrehozás: űrlap kitöltés → mentés → megjelenik a listában
-- [ ] Dugvány szerkesztés: mező módosítás → mentés → frissült érték látszik
-- [ ] Öntözési log hozzáadás → megjelenik az időrendben
-- [ ] Öntözési log szerkesztés → frissült érték látszik
-- [ ] Öntözési log törlés → eltűnik a listából
-- [ ] Fotó feltöltés → megjelenik a galériában
-- [ ] Fotó törlés → eltűnik a galériából
-- [ ] Session esemény létrehozás → megjelenik az eseménylistában
+- [x] Auth setup: test admin user bejelentkeztetése a tesztek előtt
+- [x] Új dugvány létrehozás: űrlap kitöltés → mentés → megjelenik a listában
+- [x] Dugvány szerkesztés: mező módosítás → mentés → frissült érték látszik
+- [x] Öntözési log hozzáadás → megjelenik az időrendben
+- [x] Öntözési log szerkesztés → frissült érték látszik
+- [x] Öntözési log törlés → eltűnik a listából
+- [x] Fotó feltöltés → megjelenik a galériában
+- [x] Fotó törlés → eltűnik a galériából
+- [x] Session esemény létrehozás → megjelenik az eseménylistában
 - [ ] Session esemény szerkesztés → frissült érték
-- [ ] Session esemény törlés → eltűnik
-- [ ] Létrehozott teszt adatok takarítása a teszt végén (afterAll)
+- [x] Session esemény törlés → eltűnik
+- [x] Létrehozott teszt adatok takarítása a teszt végén (afterAll)
 
 ### Reszponzív tesztek (`e2e/responsive.spec.ts`)
 
-- [ ] Mobil viewport (375x667): monitor oldal layout nem törik el
-- [ ] Mobil viewport: dugvány lista olvasható
-- [ ] Mobil viewport: dugvány részletes nézet görgethető
-- [ ] Tablet viewport (768x1024): layout helyes
+- [x] Mobil viewport (375x667): monitor oldal layout nem törik el
+- [x] Mobil viewport: dugvány lista olvasható
+- [x] Mobil viewport: dugvány részletes nézet görgethető
+- [x] Tablet viewport (768x1024): layout helyes
 
 ---
 

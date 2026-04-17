@@ -10,8 +10,9 @@ interface HeaderProps {
 }
 
 export function Header({ theme, isAdmin, onToggleTheme, onOpenSessionManager }: HeaderProps) {
-  const { user, signInWithGoogle, signOut } = useAuth();
+  const { user, signInWithGoogle, signInWithTestAdmin, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const isEmulatorMode = import.meta.env.VITE_USE_EMULATORS === 'true';
 
   return (
     <header className="flex items-center justify-between mb-6">
@@ -40,13 +41,25 @@ export function Header({ theme, isAdmin, onToggleTheme, onOpenSessionManager }: 
         </button>
 
         {!user ? (
-          <button
-            onClick={signInWithGoogle}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/70 dark:bg-vine-800/70 backdrop-blur-sm border border-vine-200 dark:border-vine-700 hover:bg-vine-100 dark:hover:bg-vine-700 transition-colors text-sm text-vine-700 dark:text-vine-200"
-          >
-            <LogIn className="w-4 h-4" />
-            <span className="hidden sm:inline">Belépés</span>
-          </button>
+          <>
+            {isEmulatorMode && (
+              <button
+                onClick={signInWithTestAdmin}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-vine-600 text-white border border-vine-700 hover:bg-vine-700 transition-colors text-sm"
+              >
+                <LogIn className="w-4 h-4" />
+                <span className="hidden sm:inline">Teszt admin belépés</span>
+                <span className="sm:hidden">Teszt admin</span>
+              </button>
+            )}
+            <button
+              onClick={signInWithGoogle}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/70 dark:bg-vine-800/70 backdrop-blur-sm border border-vine-200 dark:border-vine-700 hover:bg-vine-100 dark:hover:bg-vine-700 transition-colors text-sm text-vine-700 dark:text-vine-200"
+            >
+              <LogIn className="w-4 h-4" />
+              <span className="hidden sm:inline">Belépés</span>
+            </button>
+          </>
         ) : (
           <div className="relative">
             <button

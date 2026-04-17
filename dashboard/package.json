@@ -5,10 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:e2e": "VITE_FIREBASE_API_KEY=test-api-key VITE_FIREBASE_AUTH_DOMAIN=test.local VITE_FIREBASE_PROJECT_ID=demo-esp32-e2e VITE_FIREBASE_STORAGE_BUCKET=demo-esp32-e2e.appspot.com VITE_FIREBASE_MESSAGING_SENDER_ID=1 VITE_FIREBASE_APP_ID=1:1:web:1 VITE_USE_EMULATORS=true VITE_FIRESTORE_EMULATOR_HOST=127.0.0.1 VITE_FIRESTORE_EMULATOR_PORT=8088 VITE_AUTH_EMULATOR_HOST=127.0.0.1 VITE_AUTH_EMULATOR_PORT=9099 VITE_STORAGE_EMULATOR_HOST=127.0.0.1 VITE_STORAGE_EMULATOR_PORT=9199 VITE_E2E_ADMIN_EMAIL=admin-e2e@example.com VITE_E2E_ADMIN_PASSWORD=Admin1234! vite --host 127.0.0.1 --port 4173",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "screenshots": "playwright test -c playwright.screenshots.config.ts scripts/dashboard-screenshots.spec.ts"
+    "screenshots": "playwright test -c playwright.screenshots.config.ts scripts/dashboard-screenshots.spec.ts",
+    "test:e2e:seed": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8088 GCLOUD_PROJECT=demo-esp32-e2e node scripts/seed-e2e-data.mjs",
+    "test:e2e:run": "playwright test",
+    "test:e2e": "npx firebase-tools emulators:exec --project demo-esp32-e2e --config ../firebase.e2e.json --only auth,firestore,storage \"npm run test:e2e:seed && npm run test:e2e:run\""
   },
   "dependencies": {
     "date-fns": "^4.1.0",
@@ -20,6 +24,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
+    "firebase-admin": "^13.6.0",
     "@eslint/js": "^9.39.4",
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",

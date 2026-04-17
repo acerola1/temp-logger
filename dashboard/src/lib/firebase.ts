@@ -1,7 +1,10 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { getStorage } from 'firebase/storage';
+import {
+  connectFirestoreEmulator,
+  getFirestore,
+} from 'firebase/firestore';
+import { connectAuthEmulator, getAuth } from 'firebase/auth';
+import { connectStorageEmulator, getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -16,3 +19,32 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+const shouldUseEmulators = import.meta.env.VITE_USE_EMULATORS === 'true';
+
+if (shouldUseEmulators) {
+  // Prevent duplicate emulator connections during HMR in dev.
+  const emulatorsConnected = (globalThis as { __esp32FirebaseEmulatorsConnected?: boolean })
+    .__esp32FirebaseEmulatorsConnected;
+
+  if (!emulatorsConnected) {
+    connectFirestoreEmulator(
+      db,
+      import.meta.env.VITE_FIRESTORE_EMULATOR_HOST ?? '127.0.0.1',
+      Number(import.meta.env.VITE_FIRESTORE_EMULATOR_PORT ?? 8088),
+    );
+    connectAuthEmulator(
+      auth,
+      `http://${import.meta.env.VITE_AUTH_EMULATOR_HOST ?? '127.0.0.1'}:${import.meta.env.VITE_AUTH_EMULATOR_PORT ?? 9099}`,
+      { disableWarnings: true },
+    );
+    connectStorageEmulator(
+      storage,
+      import.meta.env.VITE_STORAGE_EMULATOR_HOST ?? '127.0.0.1',
+      Number(import.meta.env.VITE_STORAGE_EMULATOR_PORT ?? 9199),
+    );
+
+    (globalThis as { __esp32FirebaseEmulatorsConnected?: boolean })
+      .__esp32FirebaseEmulatorsConnected = true;
+  }
+}
