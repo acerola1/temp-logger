@@ -270,25 +270,25 @@ A jelenlegi adatlekérés useEffect + useState kombókkal megy, kézi loading/er
 
 ## 9. Hibakezelés egységesítése
 
-- [ ] Egységes hibaállapot minta kialakítása:
+- [x] Egységes hibaállapot minta kialakítása:
   - Jelenleg: `formError`, `eventError`, `photoActionError`, `saveError` — mind különböző
   - Cél: a react-hook-form saját hibakezelése + react-query mutációk `error` mezője
   - A legtöbb kézi hibakezelés megszűnik a §2 + §8 bevezetésével
 
 **QA:**
-- [ ] `grep -r "setFormError\|setEventError\|setPhotoActionError\|setSaveError" src/` — 0 vagy minimális találat
-- [ ] Minden CRUD művelet hibája látható a felhasználónak
-- [ ] Hibák eltűnnek amikor a felhasználó újrapróbálja a műveletet
+- [x] `grep -r "setFormError\|setEventError\|setPhotoActionError\|setSaveError" src/` — 0 vagy minimális találat
+- [x] Minden CRUD művelet hibája látható a felhasználónak
+- [x] Hibák eltűnnek amikor a felhasználó újrapróbálja a műveletet
 
 ## 10. Típusok rendezése
 
-- [ ] Form-specifikus típusok áthelyezése `types/forms.ts`-be (vagy zod sémákból generálás)
-- [ ] Esemény típusok egységesítése: `CuttingEvent` vs `SessionEvent` — közös `BaseEvent` interface ha van átfedés
-- [ ] Dátumkezelés típusainak dokumentálása (mikor ISO string, mikor Timestamp, mikor ms)
+- [x] Form-specifikus típusok áthelyezése `types/forms.ts`-be (vagy zod sémákból generálás)
+- [x] Esemény típusok egységesítése: `CuttingEvent` vs `SessionEvent` — közös `BaseEvent` interface ha van átfedés
+- [x] Dátumkezelés típusainak dokumentálása (mikor ISO string, mikor Timestamp, mikor ms)
 
 **QA:**
-- [ ] `grep -r "interface.*Form" src/components/` — 0 találat (típusok kiemelve)
-- [ ] Minden típus importálva van a `types/` mappából, nincs lokális duplikáció
+- [x] `grep -r "interface.*Form" src/components/` — 0 találat (típusok kiemelve)
+- [x] Minden típus importálva van a `types/` mappából, nincs lokális duplikáció
 
 ---
 

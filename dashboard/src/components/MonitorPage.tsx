@@ -119,6 +119,10 @@ export function MonitorPage({ theme, isAdmin }: MonitorPageProps) {
     isArchiving: archivingSession,
     createSession,
     archiveSession,
+    createSessionError,
+    archiveSessionError,
+    resetCreateSessionError,
+    resetArchiveSessionError,
   } = useSessionsQuery(effectiveDeviceId);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null | undefined>(
     initialMonitorState.selectedSessionId,
@@ -169,6 +173,12 @@ export function MonitorPage({ theme, isAdmin }: MonitorPageProps) {
     createEvent,
     updateEvent,
     deleteEvent,
+    createError: sessionEventCreateError,
+    updateError: sessionEventUpdateError,
+    deleteError: sessionEventDeleteError,
+    resetCreateError: resetSessionEventCreateError,
+    resetUpdateError: resetSessionEventUpdateError,
+    resetDeleteError: resetSessionEventDeleteError,
   } = useSessionEventsQuery(effectiveDeviceId, effectiveSessionId);
   const isDark = theme === 'dark';
 
@@ -425,6 +435,10 @@ export function MonitorPage({ theme, isAdmin }: MonitorPageProps) {
           onArchiveSession={archiveSession}
           creating={creatingSession}
           archiving={archivingSession}
+          createError={createSessionError}
+          archiveError={archiveSessionError}
+          onClearCreateError={resetCreateSessionError}
+          onClearArchiveError={resetArchiveSessionError}
         />
       )}
 
@@ -443,6 +457,12 @@ export function MonitorPage({ theme, isAdmin }: MonitorPageProps) {
           createPending={sessionEventCreating}
           updatePending={sessionEventUpdating}
           deletePending={sessionEventDeleting}
+          createError={sessionEventCreateError}
+          updateError={sessionEventUpdateError}
+          deleteError={sessionEventDeleteError}
+          onClearCreateError={resetSessionEventCreateError}
+          onClearUpdateError={resetSessionEventUpdateError}
+          onClearDeleteError={resetSessionEventDeleteError}
           onOpenEvent={setSelectedEvent}
           quickCreateRequest={quickCreateEventRequest}
           onQuickCreateHandled={() => setQuickCreateEventRequest(null)}

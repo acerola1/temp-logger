@@ -11,6 +11,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import type { SessionEventInput } from '../types/events';
 import type { SessionEvent } from '../types/sensor';
 import { useFirestoreCollection } from './useFirestoreSubscription';
 
@@ -26,16 +27,6 @@ interface FirestoreSessionEvent {
   imageHeight?: number | null;
   createdAt?: string;
   updatedAt?: string;
-}
-
-interface SessionEventInput {
-  title: string;
-  description: string;
-  occurredAt: string;
-  imageUrl?: string | null;
-  imageStoragePath?: string | null;
-  imageWidth?: number | null;
-  imageHeight?: number | null;
 }
 
 export function useSessionEvents(deviceId: string | null, sessionId: string | null) {

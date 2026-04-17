@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { indexSessionEvents } from '../lib/sessionEventSequence';
+import { getErrorMessage } from '../lib/errorMessage';
+import type { SessionEventInput } from '../types/events';
 import type { Session, SessionEvent } from '../types/sensor';
-import { SessionEventForm, type SessionEventInput } from './SessionEventForm';
+import { SessionEventForm } from './SessionEventForm';
 import { SessionEventList } from './SessionEventList';
 
 interface SessionEventsDialogProps {
@@ -19,6 +21,12 @@ interface SessionEventsDialogProps {
   createPending: boolean;
   updatePending: boolean;
   deletePending: boolean;
+  createError: unknown;
+  updateError: unknown;
+  deleteError: unknown;
+  onClearCreateError: () => void;
+  onClearUpdateError: () => void;
+  onClearDeleteError: () => void;
   onOpenEvent: (event: SessionEvent) => void;
   quickCreateRequest: { occurredAt: string; nonce: number } | null;
   onQuickCreateHandled: () => void;
@@ -38,6 +46,12 @@ export function SessionEventsDialog({
   createPending,
   updatePending,
   deletePending,
+  createError,
+  updateError,
+  deleteError,
+  onClearCreateError,
+  onClearUpdateError,
+  onClearDeleteError,
   onOpenEvent,
   quickCreateRequest,
   onQuickCreateHandled,
@@ -50,13 +64,17 @@ export function SessionEventsDialog({
     .sort((l, r) => new Date(r.occurredAt).getTime() - new Date(l.occurredAt).getTime());
 
   useEffect(() => {
-    setShowCreateForm(false);
-    setEditEventId(null);
+    queueMicrotask(() => {
+      setShowCreateForm(false);
+      setEditEventId(null);
+    });
   }, [session.id]);
 
   useEffect(() => {
     if (!quickCreateRequest || !isAdmin) return;
-    setShowCreateForm(true);
+    queueMicrotask(() => {
+      setShowCreateForm(true);
+    });
     onQuickCreateHandled();
   }, [isAdmin, onQuickCreateHandled, quickCreateRequest]);
 
@@ -85,7 +103,10 @@ export function SessionEventsDialog({
               <div />
               <button
                 type="button"
-                onClick={() => setShowCreateForm((current) => !current)}
+                onClick={() => {
+                  setShowCreateForm((current) => !current);
+                  onClearCreateError();
+                }}
                 className="inline-flex items-center gap-2 rounded-xl bg-vine-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-vine-700"
               >
                 {!showCreateForm && <Plus className="h-4 w-4" />}
@@ -106,8 +127,14 @@ export function SessionEventsDialog({
                   await onCreateEvent(input);
                   setShowCreateForm(false);
                 }}
-                onCancel={() => setShowCreateForm(false)}
+                onCancel={() => {
+                  setShowCreateForm(false);
+                  onClearCreateError();
+                }}
                 defaultOccurredAt={quickCreateRequest?.occurredAt}
+                submitError={
+                  createError ? getErrorMessage(createError, 'Nem sikerült menteni az eseményt.') : null
+                }
               />
             </div>
           )}
@@ -127,6 +154,14 @@ export function SessionEventsDialog({
             onDeleteEvent={onDeleteEvent}
             updatePending={updatePending}
             deletePending={deletePending}
+            updateErrorMessage={
+              updateError ? getErrorMessage(updateError, 'Nem sikerült menteni az eseményt.') : null
+            }
+            deleteErrorMessage={
+              deleteError ? getErrorMessage(deleteError, 'Nem sikerült törölni az eseményt.') : null
+            }
+            onClearUpdateError={onClearUpdateError}
+            onClearDeleteError={onClearDeleteError}
           />
         </div>
       </div>

@@ -192,9 +192,17 @@ export function useCuttingsQuery() {
     error,
     isCreating: createCuttingMutation.isPending,
     isUpdating: updateCuttingMutation.isPending,
-    createCutting: async (cuttingId: string, input: CreateCuttingInput) =>
-      createCuttingMutation.mutateAsync({ cuttingId, input }),
-    updateCutting: async (cuttingId: string, updates: Partial<Omit<Cutting, 'id'>>) =>
-      updateCuttingMutation.mutateAsync({ cuttingId, updates }),
+    createError: createCuttingMutation.error,
+    updateError: updateCuttingMutation.error,
+    resetCreateError: createCuttingMutation.reset,
+    resetUpdateError: updateCuttingMutation.reset,
+    createCutting: async (cuttingId: string, input: CreateCuttingInput) => {
+      createCuttingMutation.reset();
+      return createCuttingMutation.mutateAsync({ cuttingId, input });
+    },
+    updateCutting: async (cuttingId: string, updates: Partial<Omit<Cutting, 'id'>>) => {
+      updateCuttingMutation.reset();
+      return updateCuttingMutation.mutateAsync({ cuttingId, updates });
+    },
   };
 }

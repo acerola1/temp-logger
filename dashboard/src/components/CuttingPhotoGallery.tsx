@@ -24,10 +24,17 @@ interface CuttingPhotoGalleryProps {
   cutting: Cutting;
   isAdmin: boolean;
   onUpdateCutting: (cuttingId: string, updates: Partial<Omit<Cutting, 'id'>>) => Promise<void>;
+  updateErrorMessage: string | null;
+  onClearUpdateError: () => void;
 }
 
-export function CuttingPhotoGallery({ cutting, isAdmin, onUpdateCutting }: CuttingPhotoGalleryProps) {
-  const [photoActionError, setPhotoActionError] = useState<string | null>(null);
+export function CuttingPhotoGallery({
+  cutting,
+  isAdmin,
+  onUpdateCutting,
+  updateErrorMessage,
+  onClearUpdateError,
+}: CuttingPhotoGalleryProps) {
   const [photoDeletingId, setPhotoDeletingId] = useState<string | null>(null);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
@@ -38,7 +45,11 @@ export function CuttingPhotoGallery({ cutting, isAdmin, onUpdateCutting }: Cutti
   const detailFileInputRef = useRef<HTMLInputElement>(null);
   const latestPhotosRef = useRef(cutting.photos);
   const { isMobileDevice, openPicker } = usePhotoPicker();
-  const { upload: uploadPhotos, uploading: photoUploading } = usePhotoUpload();
+  const {
+    upload: uploadPhotos,
+    uploading: photoUploading,
+    error: photoUploadError,
+  } = usePhotoUpload();
 
   const activePhoto =
     cutting.photos.find((photo) => photo.id === activePhotoId) ?? cutting.photos.at(-1) ?? null;
@@ -154,8 +165,7 @@ export function CuttingPhotoGallery({ cutting, isAdmin, onUpdateCutting }: Cutti
     if (!files || !isAdmin) {
       return;
     }
-
-    setPhotoActionError(null);
+    onClearUpdateError();
 
     try {
       const uploads = await uploadPhotos({
@@ -175,7 +185,6 @@ export function CuttingPhotoGallery({ cutting, isAdmin, onUpdateCutting }: Cutti
       });
     } catch (error) {
       console.error('Cutting photo add error:', error);
-      setPhotoActionError(error instanceof Error ? error.message : 'Nem sikerült feltölteni a fotókat.');
     }
   };
 
@@ -190,7 +199,7 @@ export function CuttingPhotoGallery({ cutting, isAdmin, onUpdateCutting }: Cutti
     }
 
     setPhotoDeletingId(activePhoto.id);
-    setPhotoActionError(null);
+    onClearUpdateError();
 
     try {
       if (activePhoto.storagePath) {
@@ -204,7 +213,6 @@ export function CuttingPhotoGallery({ cutting, isAdmin, onUpdateCutting }: Cutti
       setActivePhotoId(remainingPhotos.at(-1)?.id ?? null);
     } catch (error) {
       console.error('Cutting photo delete error:', error);
-      setPhotoActionError(error instanceof Error ? error.message : 'Nem sikerült törölni a fotót.');
     } finally {
       setPhotoDeletingId(null);
     }
@@ -266,9 +274,9 @@ export function CuttingPhotoGallery({ cutting, isAdmin, onUpdateCutting }: Cutti
         )}
       </div>
 
-      {photoActionError && (
+      {(photoUploadError || updateErrorMessage) && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-          {photoActionError}
+          {photoUploadError ?? updateErrorMessage}
         </div>
       )}
 

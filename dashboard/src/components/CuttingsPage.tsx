@@ -6,8 +6,9 @@ import { CuttingForm } from './CuttingForm';
 import { getCuttingIdFromPath, getCuttingPath, toCuttingPhotos } from './cuttingsViewUtils';
 import { usePhotoUpload } from '../hooks/usePhotoUpload';
 import { useCuttingsQuery } from '../hooks/queries/useCuttingsQuery';
+import { getErrorMessage } from '../lib/errorMessage';
 import type { CreateCuttingInput } from '../types/cutting';
-import type { CuttingFormValues } from '../lib/schemas';
+import type { CuttingFormValues } from '../types/forms';
 
 interface CuttingsPageProps {
   isAdmin: boolean;
@@ -27,8 +28,18 @@ function isMobileLayoutWidth() {
 }
 
 export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
-  const { data: cuttings, loading, error, createCutting, updateCutting, isCreating, isUpdating } =
-    useCuttingsQuery();
+  const {
+    data: cuttings,
+    loading,
+    error,
+    createCutting,
+    updateCutting,
+    isCreating,
+    isUpdating,
+    createError,
+    updateError,
+    resetUpdateError,
+  } = useCuttingsQuery();
   const { upload: uploadPhotos } = usePhotoUpload();
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     getCuttingIdFromPath(window.location.pathname),
@@ -169,6 +180,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
           helperText="Esemény napló a részletes nézetben adható hozzá."
           showPhotoUpload
           onSubmit={handleCreate}
+          submitError={
+            createError ? getErrorMessage(createError, 'Nem sikerült menteni a dugványt.') : null
+          }
         />
       )}
 
@@ -208,6 +222,12 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
             isUpdating={isUpdating}
             onCloseSelectedCutting={handleCloseSelectedCutting}
             onUpdateCutting={updateCutting}
+            updateErrorMessage={
+              updateError
+                ? getErrorMessage(updateError, 'Nem sikerült menteni a módosításokat.')
+                : null
+            }
+            onClearUpdateError={resetUpdateError}
           />
         </div>
       )}

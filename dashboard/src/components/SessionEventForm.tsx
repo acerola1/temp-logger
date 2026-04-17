@@ -7,20 +7,12 @@ import { storage } from '../lib/firebase';
 import { toDateTimeLocalValue } from '../lib/dateFormat';
 import { usePhotoPicker } from '../hooks/usePhotoPicker';
 import { usePhotoUpload } from '../hooks/usePhotoUpload';
-import { sessionEventSchema, type SessionEventValues } from '../lib/schemas';
+import { sessionEventSchema } from '../lib/schemas';
+import type { SessionEventInput } from '../types/events';
+import type { SessionEventValues } from '../types/forms';
 import type { SessionEvent } from '../types/sensor';
 
-export interface SessionEventInput {
-  title: string;
-  description: string;
-  occurredAt: string;
-  imageUrl?: string | null;
-  imageStoragePath?: string | null;
-  imageWidth?: number | null;
-  imageHeight?: number | null;
-}
-
-interface SessionEventFormProps {
+interface SessionEventEditorProps {
   mode: 'create' | 'edit';
   deviceId: string;
   sessionId: string;
@@ -29,6 +21,7 @@ interface SessionEventFormProps {
   onSubmit: (input: SessionEventInput) => Promise<void>;
   onCancel?: () => void;
   defaultOccurredAt?: string;
+  submitError?: string | null;
 }
 
 function makeCreateDefaults(occurredAt?: string): SessionEventValues {
@@ -52,10 +45,10 @@ export function SessionEventForm({
   onSubmit,
   onCancel,
   defaultOccurredAt,
-}: SessionEventFormProps) {
+  submitError,
+}: SessionEventEditorProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { isMobileDevice, openPicker } = usePhotoPicker();
   const { upload: uploadPhotos, uploading: uploadingPhoto, error: photoUploadError } = usePhotoUpload();
@@ -71,7 +64,6 @@ export function SessionEventForm({
   });
 
   const handleCreate = async (values: SessionEventValues) => {
-    setSubmitError(null);
     let uploadedImage: { imageUrl: string; imageStoragePath: string; imageWidth: number; imageHeight: number } | null =
       null;
 
@@ -99,13 +91,11 @@ export function SessionEventForm({
       setSelectedFile(null);
     } catch (err) {
       console.error('Session event create error:', err);
-      setSubmitError(err instanceof Error ? err.message : 'Nem sikerült menteni az eseményt.');
     }
   };
 
   const handleEdit = async (values: SessionEventValues) => {
     if (!event) return;
-    setSubmitError(null);
 
     let nextImageUrl = event.imageUrl;
     let nextImageStoragePath = event.imageStoragePath;
@@ -144,7 +134,6 @@ export function SessionEventForm({
       });
     } catch (err) {
       console.error('Session event update error:', err);
-      setSubmitError(err instanceof Error ? err.message : 'Nem sikerült menteni az eseményt.');
     }
   };
 

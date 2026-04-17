@@ -11,8 +11,9 @@ import {
   toDateInputValue,
 } from './cuttingsViewUtils';
 import { formatDate, formatDateTime, toDateTimeLocalValue } from '../lib/dateFormat';
-import { wateringLogSchema, type CuttingFormValues, type WateringLogValues } from '../lib/schemas';
+import { wateringLogSchema } from '../lib/schemas';
 import type { Cutting } from '../types/cutting';
+import type { CuttingFormValues, WateringLogValues } from '../types/forms';
 
 interface CuttingDetailProps {
   cuttings: Cutting[];
@@ -23,6 +24,8 @@ interface CuttingDetailProps {
   isUpdating: boolean;
   onCloseSelectedCutting: () => void;
   onUpdateCutting: (cuttingId: string, updates: Partial<Omit<Cutting, 'id'>>) => Promise<void>;
+  updateErrorMessage: string | null;
+  onClearUpdateError: () => void;
 }
 
 const DEFAULT_WATERING_LOG_VALUES = (): WateringLogValues => ({
@@ -48,20 +51,21 @@ export function CuttingDetail({
   isUpdating,
   onCloseSelectedCutting,
   onUpdateCutting,
+  updateErrorMessage,
+  onClearUpdateError,
 }: CuttingDetailProps) {
   const [editMode, setEditMode] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-  const [eventError, setEventError] = useState<string | null>(null);
   const [isAddEventFormOpen, setIsAddEventFormOpen] = useState(false);
   const [eventDeletingId, setEventDeletingId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
-  const [editingEventError, setEditingEventError] = useState<string | null>(null);
   const [targetCuttingIds, setTargetCuttingIds] = useState<string[]>([]);
 
   const {
     register: registerAddEvent,
     handleSubmit: handleAddEventSubmit,
     reset: resetAddEventForm,
+    setError: setAddEventError,
+    clearErrors: clearAddEventErrors,
     formState: { errors: addEventFormErrors },
   } = useForm<WateringLogValues>({
     resolver: zodResolver(wateringLogSchema),
@@ -81,24 +85,18 @@ export function CuttingDetail({
   useEffect(() => {
     if (!selectedCutting) {
       setEditMode(false);
-      setEditError(null);
       setEditingEventId(null);
-      setEditingEventError(null);
       setTargetCuttingIds([]);
       setIsAddEventFormOpen(false);
-      setEventError(null);
       resetAddEventForm(DEFAULT_WATERING_LOG_VALUES());
       resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
       return;
     }
 
     setEditMode(false);
-    setEditError(null);
     setEditingEventId(null);
-    setEditingEventError(null);
     setTargetCuttingIds([selectedCutting.id]);
     setIsAddEventFormOpen(false);
-    setEventError(null);
     resetAddEventForm(DEFAULT_WATERING_LOG_VALUES());
     resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
   }, [resetAddEventForm, resetEditEventForm, selectedCutting]);
@@ -118,8 +116,6 @@ export function CuttingDetail({
       return;
     }
 
-    setEditError(null);
-
     try {
       await onUpdateCutting(selectedCutting.id, {
         variety: values.variety.trim(),
@@ -131,7 +127,6 @@ export function CuttingDetail({
       setEditMode(false);
     } catch (error) {
       console.error('Cutting edit error:', error);
-      setEditError(error instanceof Error ? error.message : 'Nem sikerült menteni a módosításokat.');
     }
   };
 
@@ -141,11 +136,11 @@ export function CuttingDetail({
     }
 
     if (targetCuttingIds.length === 0) {
-      setEventError('Válassz legalább egy dugványt.');
+      setAddEventError('root', { message: 'Válassz legalább egy dugványt.' });
       return;
     }
 
-    setEventError(null);
+    clearAddEventErrors('root');
 
     try {
       const sharedEvent = {
@@ -167,10 +162,8 @@ export function CuttingDetail({
       resetAddEventForm(DEFAULT_WATERING_LOG_VALUES());
       setTargetCuttingIds([selectedCutting.id]);
       setIsAddEventFormOpen(false);
-      setEventError(null);
     } catch (error) {
       console.error('Cutting event add error:', error);
-      setEventError(error instanceof Error ? error.message : 'Nem sikerült menteni az eseményt.');
     }
   };
 
@@ -181,7 +174,6 @@ export function CuttingDetail({
       title: eventItem.title,
       notes: eventItem.notes,
     });
-    setEditingEventError(null);
   };
 
   const handleDeleteEvent = async (eventId: string) => {
@@ -195,8 +187,6 @@ export function CuttingDetail({
     }
 
     setEventDeletingId(eventId);
-    setEventError(null);
-    setEditingEventError(null);
 
     try {
       await onUpdateCutting(selectedCutting.id, {
@@ -209,7 +199,6 @@ export function CuttingDetail({
       }
     } catch (error) {
       console.error('Cutting event delete error:', error);
-      setEventError(error instanceof Error ? error.message : 'Nem sikerült törölni az esemény bejegyzést.');
     } finally {
       setEventDeletingId(null);
     }
@@ -219,8 +208,6 @@ export function CuttingDetail({
     if (!selectedCutting || !isAdmin || !editingEventId) {
       return;
     }
-
-    setEditingEventError(null);
 
     try {
       await onUpdateCutting(selectedCutting.id, {
@@ -239,7 +226,6 @@ export function CuttingDetail({
       resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
     } catch (error) {
       console.error('Cutting event edit error:', error);
-      setEditingEventError(error instanceof Error ? error.message : 'Nem sikerült menteni az esemény bejegyzést.');
     }
   };
 
@@ -332,15 +318,16 @@ export function CuttingDetail({
                 onSubmit={async (values) => handleEditSubmit(values)}
                 onCancel={() => {
                   setEditMode(false);
-                  setEditError(null);
+                  onClearUpdateError();
                 }}
                 className="rounded-2xl border border-vine-200 bg-vine-50/80 p-4 dark:border-vine-700 dark:bg-vine-800/40"
+                submitError={editMode ? updateErrorMessage : null}
               />
             )}
 
-            {editError && (
+            {editMode && updateErrorMessage && (
               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                {editError}
+                {updateErrorMessage}
               </div>
             )}
 
@@ -354,6 +341,8 @@ export function CuttingDetail({
               cutting={selectedCutting}
               isAdmin={isAdmin}
               onUpdateCutting={onUpdateCutting}
+              updateErrorMessage={updateErrorMessage}
+              onClearUpdateError={onClearUpdateError}
             />
 
             <section className="space-y-3">
@@ -367,7 +356,8 @@ export function CuttingDetail({
                     type="button"
                     onClick={() => {
                       setIsAddEventFormOpen((current) => !current);
-                      setEventError(null);
+                      onClearUpdateError();
+                      clearAddEventErrors('root');
                     }}
                     className="inline-flex items-center gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
                   >
@@ -416,14 +406,20 @@ export function CuttingDetail({
                       <div className="flex items-center gap-2 text-xs">
                         <button
                           type="button"
-                          onClick={() => setTargetCuttingIds(cuttings.map((cutting) => cutting.id))}
+                          onClick={() => {
+                            setTargetCuttingIds(cuttings.map((cutting) => cutting.id));
+                            clearAddEventErrors('root');
+                          }}
                           className="rounded-lg border border-vine-200 bg-white px-2 py-1 text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
                         >
                           Mind
                         </button>
                         <button
                           type="button"
-                          onClick={() => setTargetCuttingIds([])}
+                          onClick={() => {
+                            setTargetCuttingIds([]);
+                            clearAddEventErrors('root');
+                          }}
                           className="rounded-lg border border-vine-200 bg-white px-2 py-1 text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
                         >
                           Törlés
@@ -461,9 +457,13 @@ export function CuttingDetail({
                     <span className="text-xs text-vine-500 dark:text-vine-300">Tömeges mentés több dugványra.</span>
                   </div>
 
-                  {(addEventFormErrors.occurredAt?.message || eventError) && (
+                  {(addEventFormErrors.occurredAt?.message ||
+                    addEventFormErrors.root?.message ||
+                    updateErrorMessage) && (
                     <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                      {addEventFormErrors.occurredAt?.message ?? eventError}
+                      {addEventFormErrors.occurredAt?.message ??
+                        addEventFormErrors.root?.message ??
+                        updateErrorMessage}
                     </div>
                   )}
                 </form>
@@ -515,9 +515,9 @@ export function CuttingDetail({
                               </label>
                             </div>
 
-                            {(editEventFormErrors.occurredAt?.message || editingEventError) && (
+                            {(editEventFormErrors.occurredAt?.message || updateErrorMessage) && (
                               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                                {editEventFormErrors.occurredAt?.message ?? editingEventError}
+                                {editEventFormErrors.occurredAt?.message ?? updateErrorMessage}
                               </div>
                             )}
 
@@ -535,7 +535,7 @@ export function CuttingDetail({
                                 onClick={() => {
                                   setEditingEventId(null);
                                   resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
-                                  setEditingEventError(null);
+                                  onClearUpdateError();
                                 }}
                                 className="rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
                               >

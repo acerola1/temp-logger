@@ -1,9 +1,12 @@
+import type { BaseEvent } from './events';
+import type { IsoDateTimeString } from './datetime';
+
 export interface SensorReading {
   id: string;
   deviceId: string;
   temperatureC: number;
   humidity: number;
-  recordedAt: string;
+  recordedAt: IsoDateTimeString;
   sessionId?: string;
 }
 
@@ -15,23 +18,21 @@ export interface Session {
   name: string;
   sessionTypeId: string;
   status: 'active' | 'archived';
-  startDate: string;
-  endDate: string | null;
+  startDate: IsoDateTimeString;
+  endDate: IsoDateTimeString | null;
 }
 
-export interface SessionEvent {
+export interface SessionEvent extends BaseEvent {
   id: string;
   deviceId: string;
   sessionId: string;
-  title: string;
   description: string;
-  occurredAt: string;
   imageUrl: string | null;
   imageStoragePath: string | null;
   imageWidth: number | null;
   imageHeight: number | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: IsoDateTimeString;
+  updatedAt: IsoDateTimeString;
 }
 
 export interface Device {

@@ -12,6 +12,7 @@ import {
   type QuerySnapshot,
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import type { SessionEventInput } from '../../types/events';
 import type { SessionEvent } from '../../types/sensor';
 import { useFirestoreRealtimeQuery } from './firestoreRealtime';
 
@@ -27,16 +28,6 @@ interface FirestoreSessionEvent {
   imageHeight?: number | null;
   createdAt?: string;
   updatedAt?: string;
-}
-
-interface SessionEventInput {
-  title: string;
-  description: string;
-  occurredAt: string;
-  imageUrl?: string | null;
-  imageStoragePath?: string | null;
-  imageWidth?: number | null;
-  imageHeight?: number | null;
 }
 
 export function useSessionEventsQuery(deviceId: string | null, sessionId: string | null) {
@@ -152,9 +143,23 @@ export function useSessionEventsQuery(deviceId: string | null, sessionId: string
     isCreating: createEventMutation.isPending,
     isUpdating: updateEventMutation.isPending,
     isDeleting: deleteEventMutation.isPending,
-    createEvent: async (input: SessionEventInput) => createEventMutation.mutateAsync(input),
-    updateEvent: async (eventId: string, input: SessionEventInput) =>
-      updateEventMutation.mutateAsync({ eventId, input }),
-    deleteEvent: async (eventId: string) => deleteEventMutation.mutateAsync(eventId),
+    createError: createEventMutation.error,
+    updateError: updateEventMutation.error,
+    deleteError: deleteEventMutation.error,
+    resetCreateError: createEventMutation.reset,
+    resetUpdateError: updateEventMutation.reset,
+    resetDeleteError: deleteEventMutation.reset,
+    createEvent: async (input: SessionEventInput) => {
+      createEventMutation.reset();
+      return createEventMutation.mutateAsync(input);
+    },
+    updateEvent: async (eventId: string, input: SessionEventInput) => {
+      updateEventMutation.reset();
+      return updateEventMutation.mutateAsync({ eventId, input });
+    },
+    deleteEvent: async (eventId: string) => {
+      deleteEventMutation.reset();
+      return deleteEventMutation.mutateAsync(eventId);
+    },
   };
 }

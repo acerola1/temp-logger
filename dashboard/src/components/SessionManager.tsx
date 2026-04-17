@@ -2,8 +2,10 @@ import { useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { X, Plus, Archive } from 'lucide-react';
-import { sessionCreateSchema, type SessionCreateValues } from '../lib/schemas';
+import { sessionCreateSchema } from '../lib/schemas';
+import { getErrorMessage } from '../lib/errorMessage';
 import type { Session, SessionType } from '../types/sensor';
+import type { SessionCreateValues } from '../types/forms';
 
 interface SessionManagerProps {
   sessions: Session[];
@@ -15,6 +17,10 @@ interface SessionManagerProps {
   onClose: () => void;
   onCreateSession: (name: string, sessionTypeId: string) => Promise<void>;
   onArchiveSession: (id: string) => Promise<void>;
+  createError: unknown;
+  archiveError: unknown;
+  onClearCreateError: () => void;
+  onClearArchiveError: () => void;
 }
 
 export function SessionManager({
@@ -27,6 +33,10 @@ export function SessionManager({
   onClose,
   onCreateSession,
   onArchiveSession,
+  createError,
+  archiveError,
+  onClearCreateError,
+  onClearArchiveError,
 }: SessionManagerProps) {
   const activeSession = sessions.find((s) => s.status === 'active');
   const fallbackSessionTypeId = useMemo(
@@ -57,11 +67,13 @@ export function SessionManager({
     if (activeSession) {
       return;
     }
+    onClearCreateError();
     await onCreateSession(values.name.trim(), values.sessionTypeId);
     reset({ name: '', sessionTypeId: values.sessionTypeId });
   };
 
   const handleArchive = async (id: string) => {
+    onClearArchiveError();
     await onArchiveSession(id);
   };
 
@@ -133,6 +145,12 @@ export function SessionManager({
                   {errors.name?.message ?? errors.sessionTypeId?.message}
                 </p>
               )}
+
+              {Boolean(createError) && (
+                <p className="text-xs text-red-600 dark:text-red-300">
+                  {getErrorMessage(createError, 'Nem sikerült létrehozni a sessiont.')}
+                </p>
+              )}
             </form>
           </div>
 
@@ -173,6 +191,12 @@ export function SessionManager({
               </ul>
             )}
           </div>
+
+          {Boolean(archiveError) && (
+            <p className="text-xs text-red-600 dark:text-red-300">
+              {getErrorMessage(archiveError, 'Nem sikerült lezárni a sessiont.')}
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -3,9 +3,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Camera, ImagePlus, Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { usePhotoPicker } from '../hooks/usePhotoPicker';
-import { cuttingFormSchema, type CuttingFormValues } from '../lib/schemas';
+import { cuttingFormSchema } from '../lib/schemas';
+import type { CuttingFormValues } from '../types/forms';
 
-interface CuttingFormProps {
+interface CuttingEditorProps {
   serialNumber: number;
   defaultValues: CuttingFormValues;
   knownVarieties: string[];
@@ -16,6 +17,7 @@ interface CuttingFormProps {
   onSubmit: (values: CuttingFormValues, files: FileList | null) => Promise<void>;
   onCancel?: () => void;
   className?: string;
+  submitError?: string | null;
 }
 
 export function CuttingForm({
@@ -29,9 +31,9 @@ export function CuttingForm({
   onSubmit,
   onCancel,
   className,
-}: CuttingFormProps) {
+  submitError,
+}: CuttingEditorProps) {
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { isMobileDevice, openPicker } = usePhotoPicker();
   const {
@@ -46,19 +48,15 @@ export function CuttingForm({
 
   useEffect(() => {
     reset(defaultValues);
-    setSelectedFiles(null);
-    setSubmitError(null);
   }, [defaultValues, reset]);
 
   const handleFormSubmit = async (values: CuttingFormValues) => {
-    setSubmitError(null);
-
     try {
       await onSubmit(values, showPhotoUpload ? selectedFiles : null);
       reset(defaultValues);
       setSelectedFiles(null);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Nem sikerült menteni a dugványt.');
+      console.error('Cutting form submit error:', error);
     }
   };
 

@@ -101,8 +101,17 @@ export function useSessionsQuery(deviceId: string | null) {
     error,
     isCreating: createSessionMutation.isPending,
     isArchiving: archiveSessionMutation.isPending,
-    createSession: async (name: string, sessionTypeId: string) =>
-      createSessionMutation.mutateAsync({ name, sessionTypeId }),
-    archiveSession: async (sessionId: string) => archiveSessionMutation.mutateAsync(sessionId),
+    createSessionError: createSessionMutation.error,
+    archiveSessionError: archiveSessionMutation.error,
+    resetCreateSessionError: createSessionMutation.reset,
+    resetArchiveSessionError: archiveSessionMutation.reset,
+    createSession: async (name: string, sessionTypeId: string) => {
+      createSessionMutation.reset();
+      return createSessionMutation.mutateAsync({ name, sessionTypeId });
+    },
+    archiveSession: async (sessionId: string) => {
+      archiveSessionMutation.reset();
+      return archiveSessionMutation.mutateAsync(sessionId);
+    },
   };
 }

@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { deleteObject, ref } from 'firebase/storage';
 import { CalendarClock, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { storage } from '../lib/firebase';
 import { formatDateTime } from '../lib/dateFormat';
 import type { IndexedSessionEvent } from '../lib/sessionEventSequence';
+import { getErrorMessage } from '../lib/errorMessage';
+import type { SessionEventInput } from '../types/events';
 import type { SessionEvent } from '../types/sensor';
-import { SessionEventForm, type SessionEventInput } from './SessionEventForm';
+import { SessionEventForm } from './SessionEventForm';
 
 interface SessionEventListProps {
   sortedEvents: IndexedSessionEvent[];
@@ -21,6 +24,10 @@ interface SessionEventListProps {
   onDeleteEvent: (eventId: string) => Promise<void>;
   updatePending: boolean;
   deletePending: boolean;
+  updateErrorMessage: string | null;
+  deleteErrorMessage: string | null;
+  onClearUpdateError: () => void;
+  onClearDeleteError: () => void;
 }
 
 export function SessionEventList({
@@ -38,10 +45,19 @@ export function SessionEventList({
   onDeleteEvent,
   updatePending,
   deletePending,
+  updateErrorMessage,
+  deleteErrorMessage,
+  onClearUpdateError,
+  onClearDeleteError,
 }: SessionEventListProps) {
+  const [storageActionError, setStorageActionError] = useState<string | null>(null);
+
   const handleDelete = async (eventItem: IndexedSessionEvent) => {
     const confirmed = window.confirm('Biztosan törlöd ezt a session eseményt?');
     if (!confirmed) return;
+
+    setStorageActionError(null);
+    onClearDeleteError();
 
     try {
       if (eventItem.imageStoragePath) {
@@ -53,6 +69,7 @@ export function SessionEventList({
       }
     } catch (err) {
       console.error('Session event delete error:', err);
+      setStorageActionError(getErrorMessage(err, 'Nem sikerült törölni az eseményt.'));
     }
   };
 
@@ -83,6 +100,12 @@ export function SessionEventList({
 
   return (
     <div className="space-y-3">
+      {(storageActionError || deleteErrorMessage) && (
+        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+          {storageActionError ?? deleteErrorMessage}
+        </div>
+      )}
+
       {sortedEvents.map((eventItem) => {
         const isEditing = editEventId === eventItem.id;
 
@@ -99,7 +122,11 @@ export function SessionEventList({
                 event={eventItem}
                 isPending={updatePending}
                 onSubmit={(input) => onUpdateEvent(eventItem.id, input)}
-                onCancel={onCancelEdit}
+                onCancel={() => {
+                  onCancelEdit();
+                  onClearUpdateError();
+                }}
+                submitError={isEditing ? updateErrorMessage : null}
               />
             ) : (
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -128,7 +155,10 @@ export function SessionEventList({
                   <div className="flex shrink-0 items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => onStartEdit(eventItem)}
+                      onClick={() => {
+                        onStartEdit(eventItem);
+                        onClearUpdateError();
+                      }}
                       className="inline-flex items-center gap-1 rounded-lg border border-vine-200 bg-white px-2.5 py-1.5 text-xs font-medium text-vine-700 transition-colors hover:bg-vine-100 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
                     >
                       <Pencil className="h-3.5 w-3.5" />
