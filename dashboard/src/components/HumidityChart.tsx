@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -6,7 +6,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
   ReferenceArea,
 } from 'recharts';
 import { chartColors } from '../constants/chartColors';
@@ -40,7 +39,7 @@ interface HumidityChartProps {
   eventErrorMessage?: string | null;
 }
 
-interface PinnedTooltipPoint {
+interface TooltipPoint {
   recordedAtMs: number;
   value: number;
 }
@@ -75,7 +74,8 @@ export function HumidityChart({
   eventErrorMessage = null,
 }: HumidityChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const [pinnedPoint, setPinnedPoint] = useState<PinnedTooltipPoint | null>(null);
+  const [pinnedPoint, setPinnedPoint] = useState<TooltipPoint | null>(null);
+  const [hoveredPoint, setHoveredPoint] = useState<TooltipPoint | null>(null);
   const chartWidth = useElementWidth(chartRef);
   const filteredReadings =
     timeRange === '30d'
@@ -90,50 +90,74 @@ export function HumidityChart({
   const plotWidth = Math.max(0, chartWidth - chartYAxisWidth - chartMargin.right);
   const eventLineHeight = chartHeight - chartMargin.top - chartMargin.bottom;
 
-  const handleChartClick = (state: unknown) => {
-    const nextState = state as {
+  const extractPoint = (state: unknown): TooltipPoint | null => {
+    const s = state as {
       activeLabel?: number;
       activePayload?: Array<{ payload?: { recordedAtMs?: number; humidity?: number | null } }>;
     };
-    const payload = nextState.activePayload?.[0]?.payload;
-    const maybeRecordedAtMs =
+    const payload = s.activePayload?.[0]?.payload;
+    const ms =
       typeof payload?.recordedAtMs === 'number'
         ? payload.recordedAtMs
-        : typeof nextState.activeLabel === 'number'
-          ? nextState.activeLabel
+        : typeof s.activeLabel === 'number'
+          ? s.activeLabel
           : null;
-
-    if (maybeRecordedAtMs === null) {
-      setPinnedPoint(null);
-      return;
-    }
-
+    if (ms === null) return null;
     const point = data.find(
-      (item) => item.recordedAtMs === maybeRecordedAtMs && typeof item.humidity === 'number',
+      (item) => item.recordedAtMs === ms && typeof item.humidity === 'number',
     );
-    if (!point || typeof point.humidity !== 'number') {
+    if (!point || typeof point.humidity !== 'number') return null;
+    return { recordedAtMs: point.recordedAtMs, value: point.humidity };
+  };
+
+  const handleMouseMove = (state: unknown) => {
+    if (pinnedPoint) return;
+    setHoveredPoint(extractPoint(state));
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredPoint(null);
+  };
+
+  const handleChartClick = (state: unknown) => {
+    const point = extractPoint(state);
+    if (!point) {
       setPinnedPoint(null);
       return;
     }
-    const recordedAtMs = point.recordedAtMs;
-    const value = point.humidity;
-
     setPinnedPoint((current) =>
-      current?.recordedAtMs === recordedAtMs
-        ? null
-        : {
-            recordedAtMs,
-            value,
-          },
+      current?.recordedAtMs === point.recordedAtMs ? null : point,
     );
   };
+
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pinnedPoint) return;
+    const handler = (e: MouseEvent) => {
+      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
+        setPinnedPoint(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [pinnedPoint]);
+
+  const activeTooltip = pinnedPoint ?? hoveredPoint;
+  const isPinned = pinnedPoint !== null;
 
   return (
     <div className="bg-white/70 dark:bg-vine-800/70 backdrop-blur-sm rounded-2xl border border-vine-200 dark:border-vine-700 p-4 shadow-sm mb-4">
       <h2 className="mb-3 text-base font-semibold text-vine-900 dark:text-vine-50">Páratartalom</h2>
-      <div ref={chartRef} className="relative">
+      <div ref={chartRef} className="relative [&_*]:outline-none">
         <ResponsiveContainer width="100%" height={chartHeight}>
-          <LineChart data={data} margin={chartMargin} onClick={handleChartClick}>
+          <LineChart
+            data={data}
+            margin={chartMargin}
+            onClick={handleChartClick}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
           {sessionType && (
             <ReferenceArea
@@ -167,18 +191,6 @@ export function HumidityChart({
             stroke={gridColor}
             width={chartYAxisWidth}
           />
-          <Tooltip
-            active={pinnedPoint ? false : undefined}
-            contentStyle={{
-              backgroundColor: isDark ? '#2a3518' : '#fff',
-              border: `1px solid ${isDark ? '#3a4820' : '#e8e3d6'}`,
-              borderRadius: '12px',
-              fontSize: 13,
-              color: isDark ? '#f4f1ea' : '#18211b',
-            }}
-            labelFormatter={(label) => formatDateShort(Number(label))}
-            formatter={(value) => [`${Number(value).toFixed(1)}%`, 'Páratartalom']}
-          />
           <Line
             type="monotone"
             dataKey="humidity"
@@ -191,32 +203,40 @@ export function HumidityChart({
           />
           </LineChart>
         </ResponsiveContainer>
-        {pinnedPoint && (
+        {activeTooltip && (
           <div
-            className="absolute z-20 max-w-64 -translate-x-1/2 rounded-xl border px-3 py-2 text-left text-xs shadow-lg"
+            ref={tooltipRef}
+            className="pointer-events-none absolute z-20 max-w-64 -translate-x-1/2 rounded-xl border px-3 py-2.5 text-left text-[13px] shadow-lg transition-opacity"
             style={{
-              left: scaleX(pinnedPoint.recordedAtMs, timeDomain, chartYAxisWidth, plotWidth),
+              left: scaleX(activeTooltip.recordedAtMs, timeDomain, chartYAxisWidth, plotWidth),
               top: chartMargin.top + 8,
               transform: 'translate(-50%, -100%)',
               backgroundColor: isDark ? '#2a3518' : '#fff',
               borderColor: isDark ? '#3a4820' : '#e8e3d6',
               color: isDark ? '#f4f1ea' : '#18211b',
+              ...(isPinned ? { pointerEvents: 'auto' as const } : {}),
             }}
           >
-            <button
-              type="button"
-              onClick={() => setPinnedPoint(null)}
-              className="absolute right-1 top-1 rounded p-0.5 opacity-70 transition-opacity hover:opacity-100"
-              aria-label="Kijelölés bezárása"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-            <div className="pr-4 opacity-80">{formatDateShort(pinnedPoint.recordedAtMs)}</div>
-            <div className="mt-1">{pinnedPoint.value.toFixed(1)}%</div>
-            {canQuickCreateEvent && onQuickCreateAt && (
+            {isPinned && (
               <button
                 type="button"
-                onClick={() => onQuickCreateAt(new Date(pinnedPoint.recordedAtMs).toISOString())}
+                onClick={() => setPinnedPoint(null)}
+                className="absolute right-1 top-1 rounded p-0.5 opacity-70 transition-opacity hover:opacity-100"
+                aria-label="Kijelölés bezárása"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <div className={isPinned ? 'pr-4' : ''}>{formatDateShort(activeTooltip.recordedAtMs)}</div>
+            <hr className="my-1.5 border-current opacity-15" />
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: chartColors.humidity.line }} />
+              <span>Páratartalom : {activeTooltip.value.toFixed(1)}%</span>
+            </div>
+            {isPinned && canQuickCreateEvent && onQuickCreateAt && (
+              <button
+                type="button"
+                onClick={() => onQuickCreateAt(new Date(activeTooltip.recordedAtMs).toISOString())}
                 className="mt-2 inline-flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-700 transition-colors hover:bg-sky-100 dark:border-sky-700 dark:bg-vine-700 dark:text-sky-200 dark:hover:bg-vine-600"
               >
                 <Plus className="h-3.5 w-3.5" />
