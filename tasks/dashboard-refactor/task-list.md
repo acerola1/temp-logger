@@ -223,19 +223,19 @@ Ez a legnagyobb és legkockázatosabb feladat, a form refaktor után érdemes cs
 
 A SensorChart tooltip + spring-damper animáció logikája önálló hookként tisztább.
 
-- [ ] `hooks/useChartTooltip.ts` létrehozása:
+- [x] `hooks/useChartTooltip.ts` létrehozása:
   - Kezeli: `pinnedPoint`, `hoveredPoint`, `activeTooltip`, `isPinned`
   - Tartalmazza: `extractPoint`, `handleMouseMove`, `handleMouseLeave`, `handleChartClick`
   - Tartalmazza: spring-damper animáció (targetX/Y, currentX/Y, velocity, rAF loop)
   - Tartalmazza: globális mousedown dismiss listener
-- [ ] SensorChart egyszerűsítése a hook használatával
+- [x] SensorChart egyszerűsítése a hook használatával
 
 **QA:**
-- [ ] SensorChart.tsx renderelési logika + hook import, 150 sor alatt
-- [ ] Tooltip hover: sima követés, spring-damper fizikával
-- [ ] Tooltip kattintás: rögzül, X gombbal és félrekattintással bezárható
-- [ ] Tooltip "Új esemény" gomb működik pinned módban
-- [ ] Hőmérséklet és páratartalom chart tooltip egyformán viselkedik
+- [x] SensorChart.tsx renderelési logika + hook import, 150 sor alatt (135 sor)
+- [x] Tooltip hover: sima követés, spring-damper fizikával  ← monitor.spec.ts lefedi
+- [x] Tooltip kattintás: rögzül, X gombbal és félrekattintással bezárható  ← monitor.spec.ts lefedi
+- [ ] Tooltip "Új esemény" gomb működik pinned módban  ← manuális ellenőrzés
+- [x] Hőmérséklet és páratartalom chart tooltip egyformán viselkedik  ← ugyanaz a hook/komponens
 
 ## 8. TanStack Query (react-query) bevezetése
 

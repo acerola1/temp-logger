@@ -7,7 +7,8 @@
       "Bash(wc -l /home/pambruzs/projects/esp32/dashboard/src/lib/*.ts*)",
       "Bash(grep -n \"function scaleX\" /home/pambruzs/projects/esp32/dashboard/src/components/*.tsx)",
       "Bash(grep -n \"class\\\\|extends\\\\|implements\" /home/pambruzs/projects/esp32/dashboard/src/components/*.tsx /home/pambruzs/projects/esp32/dashboard/src/lib/*.ts*)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(npm run *)"
     ]
   }
 }
