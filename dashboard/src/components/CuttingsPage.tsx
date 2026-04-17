@@ -48,6 +48,11 @@ function isMobileUserAgent() {
   );
 }
 
+function isMobileLayoutWidth() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(max-width: 1023px)').matches;
+}
+
 function toDateTimeLocalValue(value: string | Date = new Date()): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   const offsetMs = date.getTimezoneOffset() * 60_000;
@@ -155,6 +160,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   const [eventAt, setEventAt] = useState(toDateTimeLocalValue());
   const [eventSaving, setEventSaving] = useState(false);
   const [eventError, setEventError] = useState<string | null>(null);
+  const [isAddEventFormOpen, setIsAddEventFormOpen] = useState(false);
   const [eventDeletingId, setEventDeletingId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editingEventTitle, setEditingEventTitle] = useState('');
@@ -175,11 +181,14 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   const [photoViewerDragStart, setPhotoViewerDragStart] = useState({ x: 0, y: 0 });
   const createFileInputRef = useRef<HTMLInputElement>(null);
   const detailFileInputRef = useRef<HTMLInputElement>(null);
-  const isMobile = useMemo(() => isMobileUserAgent(), []);
+  const isMobileDevice = useMemo(() => isMobileUserAgent(), []);
+  const [isMobileLayout, setIsMobileLayout] = useState(() => isMobileLayoutWidth());
 
   const selectedCutting = useMemo(
-    () => cuttings.find((cutting) => cutting.id === selectedId) ?? cuttings[0] ?? null,
-    [cuttings, selectedId],
+    () =>
+      cuttings.find((cutting) => cutting.id === selectedId) ??
+      (isMobileLayout ? null : cuttings[0] ?? null),
+    [cuttings, isMobileLayout, selectedId],
   );
   const nextSerialNumber = useMemo(
     () => cuttings.reduce((maxValue, cutting) => Math.max(maxValue, cutting.serialNumber), 0) + 1,
@@ -205,6 +214,14 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
       ? selectedCutting.photos.findIndex((photo) => photo.id === activePhoto.id)
       : -1;
   const totalPhotos = selectedCutting?.photos.length ?? 0;
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 1023px)');
+    const handleChange = () => setIsMobileLayout(mediaQuery.matches);
+    handleChange();
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -240,6 +257,8 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     setEditingEventId(null);
     setEditingEventError(null);
     setTargetCuttingIds([selectedCutting.id]);
+    setIsAddEventFormOpen(false);
+    setEventError(null);
   }, [nextSerialNumber, selectedCutting]);
 
   useEffect(() => {
@@ -251,6 +270,13 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     }
 
     if (!selectedCutting) {
+      if (isMobileLayout) {
+        if (window.location.pathname !== '/dugvanyok') {
+          window.history.replaceState({}, '', '/dugvanyok');
+        }
+        return;
+      }
+
       const fallbackCutting = cuttings[0];
       setSelectedId(fallbackCutting.id);
       window.history.replaceState({}, '', getCuttingPath(fallbackCutting.id));
@@ -261,7 +287,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     if (window.location.pathname !== expectedPath) {
       window.history.replaceState({}, '', expectedPath);
     }
-  }, [cuttings, selectedCutting]);
+  }, [cuttings, isMobileLayout, selectedCutting]);
 
   useEffect(() => {
     if (!showCreateForm) {
@@ -528,6 +554,8 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
       setEventTitle('');
       setEventNotes('');
       setTargetCuttingIds(selectedCutting ? [selectedCutting.id] : []);
+      setIsAddEventFormOpen(false);
+      setEventError(null);
     } catch (nextError) {
       console.error('Cutting event add error:', nextError);
       setEventError(
@@ -642,6 +670,16 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
       window.history.pushState({}, '', nextPath);
     }
     setSelectedId(cuttingId);
+  };
+
+  const handleCloseSelectedCutting = () => {
+    if (window.location.pathname !== '/dugvanyok') {
+      window.history.pushState({}, '', '/dugvanyok');
+    }
+    setSelectedId(null);
+    setEditMode(false);
+    setIsPhotoViewerOpen(false);
+    resetPhotoViewerTransform();
   };
 
   const handleEditSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -802,7 +840,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
               onChange={(event) => setSelectedFiles(event.target.files)}
               className="hidden"
             />
-            {isMobile ? (
+            {isMobileDevice ? (
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -952,12 +990,42 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
             })}
           </aside>
 
-          <div className="rounded-3xl border border-vine-200 bg-white/80 p-5 shadow-sm dark:border-vine-700 dark:bg-vine-900/40">
-            {!selectedCutting ? (
-              <div className="flex min-h-72 items-center justify-center text-sm text-vine-500 dark:text-vine-300">
-                Válassz egy dugványt a listából.
-              </div>
-            ) : (
+          <div
+            className={
+              isMobileLayout
+                ? `fixed inset-0 z-[110] bg-black/65 p-3 ${selectedCutting ? 'block' : 'hidden'}`
+                : 'rounded-3xl border border-vine-200 bg-white/80 p-5 shadow-sm dark:border-vine-700 dark:bg-vine-900/40'
+            }
+            onClick={isMobileLayout ? handleCloseSelectedCutting : undefined}
+          >
+            <div
+              className={
+                isMobileLayout
+                  ? 'h-full overflow-y-auto rounded-3xl border border-vine-200 bg-white/95 p-4 shadow-xl dark:border-vine-700 dark:bg-vine-900/95'
+                  : ''
+              }
+              onClick={isMobileLayout ? (event) => event.stopPropagation() : undefined}
+            >
+              {isMobileLayout && selectedCutting && (
+                <div className="mb-3 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={handleCloseSelectedCutting}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-vine-200 bg-white text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
+                    aria-label="Részletek bezárása"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              {!selectedCutting ? (
+                !isMobileLayout && (
+                  <div className="flex min-h-72 items-center justify-center text-sm text-vine-500 dark:text-vine-300">
+                    Válassz egy dugványt a listából.
+                  </div>
+                )
+              ) : (
               <div className="space-y-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
@@ -1149,7 +1217,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                           onChange={(event) => void handleAddPhotos(event.target.files)}
                           className="hidden"
                         />
-                        {isMobile ? (
+                        {isMobileDevice ? (
                           <>
                             <button
                               type="button"
@@ -1457,12 +1525,26 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                 )}
 
                 <section className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-vine-700 dark:text-vine-200">
-                    <CalendarDays className="h-4 w-4" />
-                    Esemény napló
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-vine-700 dark:text-vine-200">
+                      <CalendarDays className="h-4 w-4" />
+                      Esemény napló
+                    </div>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddEventFormOpen((current) => !current);
+                          setEventError(null);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
+                      >
+                        {isAddEventFormOpen ? 'Új esemény bezárása' : 'Új esemény'}
+                      </button>
+                    )}
                   </div>
 
-                  {isAdmin && (
+                  {isAdmin && isAddEventFormOpen && (
                     <form
                       onSubmit={handleAddEvent}
                       className="rounded-2xl border border-vine-200 bg-vine-50/80 p-4 dark:border-vine-700 dark:bg-vine-800/40"
@@ -1701,7 +1783,8 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                   )}
                 </section>
               </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
