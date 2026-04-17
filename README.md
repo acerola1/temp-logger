@@ -26,7 +26,7 @@ A rendszer fő részei:
 - session típusokhoz tartozó célzónák megjelenítése a grafikonokon
 - session események kezelése időponthoz kötve, opcionális képpel
 - eseményjelölők a grafikon alatti idővonalon, sorszámozott markerekkel
-- régi és új adatstruktúra párhuzamos megjelenítése migrációs átmenethez
+- új adatstruktúra alapú monitor nézet (legacy adatfolyam UI nélkül)
 - külön dugványkövető oldal fotókkal és öntözési naplóval
 - admin-only szerkesztés, képfeltöltés és naplózás
 

@@ -15,7 +15,6 @@ import { CuttingsPage } from './components/CuttingsPage';
 import { useTheme } from './hooks/useTheme';
 import { useReadings } from './hooks/useReadings';
 import { useFirestoreReadings } from './hooks/useFirestoreReadings';
-import { useLegacyReadings } from './hooks/useLegacyReadings';
 import { useIsAdmin } from './hooks/useIsAdmin';
 import { useSessions } from './hooks/useSessions';
 import { useAllSessions } from './hooks/useAllSessions';
@@ -27,11 +26,9 @@ import { formatDateTime } from './lib/dateFormat';
 import type { SessionEvent, TimeRange } from './types/sensor';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
-type DataSourceMode = 'devices' | 'legacy';
 type DashboardView = 'monitor' | 'cuttings';
 
 interface MonitorUrlState {
-  dataSourceMode: DataSourceMode;
   timeRange: TimeRange;
   selectedDeviceId: string | null;
   selectedSessionId: string | null | undefined;
@@ -57,16 +54,11 @@ function parseTimeRange(value: string | null): TimeRange {
   return value === '7d' || value === '30d' ? value : '24h';
 }
 
-function parseDataSourceMode(value: string | null): DataSourceMode {
-  return value === 'legacy' ? 'legacy' : 'devices';
-}
-
 function getMonitorStateFromUrl(search: string): MonitorUrlState {
   const params = new URLSearchParams(search);
   const sessionParam = params.get('session');
 
   return {
-    dataSourceMode: parseDataSourceMode(params.get('source')),
     timeRange: parseTimeRange(params.get('range')),
     selectedDeviceId: params.get('device'),
     selectedSessionId:
@@ -77,24 +69,18 @@ function getMonitorStateFromUrl(search: string): MonitorUrlState {
 function buildMonitorUrl(state: MonitorUrlState): string {
   const params = new URLSearchParams();
 
-  if (state.dataSourceMode !== 'devices') {
-    params.set('source', state.dataSourceMode);
-  }
-
   if (state.timeRange !== '24h') {
     params.set('range', state.timeRange);
   }
 
-  if (state.dataSourceMode === 'devices' && state.selectedDeviceId) {
+  if (state.selectedDeviceId) {
     params.set('device', state.selectedDeviceId);
   }
 
-  if (state.dataSourceMode === 'devices') {
-    if (state.selectedSessionId === null) {
-      params.set('session', 'all');
-    } else if (typeof state.selectedSessionId === 'string' && state.selectedSessionId.length > 0) {
-      params.set('session', state.selectedSessionId);
-    }
+  if (state.selectedSessionId === null) {
+    params.set('session', 'all');
+  } else if (typeof state.selectedSessionId === 'string' && state.selectedSessionId.length > 0) {
+    params.set('session', state.selectedSessionId);
   }
 
   const query = params.toString();
@@ -160,9 +146,6 @@ function Dashboard() {
   const [currentView, setCurrentView] = useState<DashboardView>(() =>
     getViewFromPath(window.location.pathname),
   );
-  const [dataSourceMode, setDataSourceMode] = useState<DataSourceMode>(
-    initialMonitorState.dataSourceMode,
-  );
   const { data: devices, loading: devicesLoading, error: devicesError } = useDevices();
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(
     initialMonitorState.selectedDeviceId,
@@ -198,21 +181,12 @@ function Dashboard() {
     effectiveDeviceId,
     effectiveSessionId,
   );
-  const {
-    readings: legacyReadings,
-    loading: legacyLoading,
-    error: legacyError,
-  } = useLegacyReadings();
-  const currentSourceReadings = dataSourceMode === 'legacy' ? legacyReadings : allReadings;
-  const currentLoading =
-    dataSourceMode === 'legacy' ? legacyLoading : devicesLoading || loading;
-  const currentError = dataSourceMode === 'legacy' ? legacyError : devicesError || error;
+  const currentSourceReadings = allReadings;
+  const currentLoading = devicesLoading || loading;
+  const currentError = devicesError || error;
   const rangeDurationMs = getRangeDurationMs(timeRange);
   const selectedSession = sessions.find((s) => s.id === effectiveSessionId);
-  const isSessionPagingView =
-    currentView === 'monitor' &&
-    dataSourceMode === 'devices' &&
-    typeof effectiveSessionId === 'string';
+  const isSessionPagingView = currentView === 'monitor' && typeof effectiveSessionId === 'string';
   const latestReadingMs = getLatestReadingMs(currentSourceReadings);
   const sessionReferenceEndMs =
     selectedSession?.status === 'archived'
@@ -236,29 +210,21 @@ function Dashboard() {
     updateEvent,
     deleteEvent,
   } = useSessionEvents(
-    dataSourceMode === 'devices' ? effectiveDeviceId : null,
-    dataSourceMode === 'devices' ? effectiveSessionId : null,
+    effectiveDeviceId,
+    effectiveSessionId,
   );
   const { isAdmin } = useIsAdmin();
   const isDark = theme === 'dark';
 
   const selectedDevice = devices.find((device) => device.id === effectiveDeviceId) ?? null;
-  const callusingSessionType = sessionTypes.find((type) => type.id === 'callusing') ?? null;
   const selectedSessionType =
-    dataSourceMode === 'legacy'
-      ? callusingSessionType
-      : sessionTypes.find((type) => type.id === selectedSession?.sessionTypeId) ??
-        sessionTypes.find((type) => type.id === activeSession?.sessionTypeId) ??
-        null;
+    sessionTypes.find((type) => type.id === selectedSession?.sessionTypeId) ??
+    sessionTypes.find((type) => type.id === activeSession?.sessionTypeId) ??
+    null;
 
   const handleDeleteReading = async (readingId: string) => {
     if (!isAdmin) {
       throw new Error('Csak admin törölhet mérést.');
-    }
-
-    if (dataSourceMode === 'legacy') {
-      await deleteDoc(doc(db, 'sensorReadings', readingId));
-      return;
     }
 
     if (!effectiveDeviceId) {
@@ -274,7 +240,6 @@ function Dashboard() {
 
       if (getViewFromPath(window.location.pathname) === 'monitor') {
         const nextMonitorState = getMonitorStateFromUrl(window.location.search);
-        setDataSourceMode(nextMonitorState.dataSourceMode);
         setTimeRange(nextMonitorState.timeRange);
         setSelectedDeviceId(nextMonitorState.selectedDeviceId);
         setSelectedSessionId(nextMonitorState.selectedSessionId);
@@ -289,11 +254,11 @@ function Dashboard() {
     setSelectedEvent(null);
     setSessionEventsDialogOpen(false);
     setQuickCreateEventRequest(null);
-  }, [effectiveDeviceId, effectiveSessionId, dataSourceMode]);
+  }, [effectiveDeviceId, effectiveSessionId]);
 
   useEffect(() => {
     setArchivedPageOffset(0);
-  }, [currentView, dataSourceMode, effectiveDeviceId, effectiveSessionId, timeRange]);
+  }, [currentView, effectiveDeviceId, effectiveSessionId, timeRange]);
 
   const handleQuickCreateEventNow = () => {
     setSessionEventsDialogOpen(true);
@@ -336,7 +301,6 @@ function Dashboard() {
 
   const pushMonitorUrl = (nextState: Partial<MonitorUrlState>) => {
     const url = buildMonitorUrl({
-      dataSourceMode,
       timeRange,
       selectedDeviceId,
       selectedSessionId,
@@ -352,7 +316,7 @@ function Dashboard() {
     const nextPath =
       view === 'cuttings'
         ? '/dugvanyok'
-        : buildMonitorUrl({ dataSourceMode, timeRange, selectedDeviceId, selectedSessionId });
+        : buildMonitorUrl({ timeRange, selectedDeviceId, selectedSessionId });
     if (window.location.pathname + window.location.search !== nextPath) {
       window.history.pushState({}, '', nextPath);
     }
@@ -362,7 +326,6 @@ function Dashboard() {
   useEffect(() => {
     if (
       currentView !== 'monitor' ||
-      dataSourceMode !== 'devices' ||
       selectedDeviceId !== null ||
       !effectiveDeviceId
     ) {
@@ -370,7 +333,6 @@ function Dashboard() {
     }
 
     const nextUrl = buildMonitorUrl({
-      dataSourceMode,
       timeRange,
       selectedDeviceId: effectiveDeviceId,
       selectedSessionId,
@@ -379,7 +341,7 @@ function Dashboard() {
     if (window.location.pathname + window.location.search !== nextUrl) {
       window.history.replaceState({}, '', nextUrl);
     }
-  }, [currentView, dataSourceMode, effectiveDeviceId, selectedDeviceId, selectedSessionId, timeRange]);
+  }, [currentView, effectiveDeviceId, selectedDeviceId, selectedSessionId, timeRange]);
 
   return (
     <div className="min-h-dvh bg-vine-50 dark:bg-vine-900 transition-colors">
@@ -416,41 +378,7 @@ function Dashboard() {
 
         {currentView === 'cuttings' && <CuttingsPage isAdmin={isAdmin} />}
 
-        {currentView === 'monitor' && (
-          <div className="flex items-center gap-2 mb-4">
-          <button
-            onClick={() => {
-              setDataSourceMode('devices');
-              pushMonitorUrl({ dataSourceMode: 'devices' });
-            }}
-            className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              dataSourceMode === 'devices'
-                ? 'bg-vine-600 text-white'
-                : 'bg-white/70 text-vine-700 border border-vine-200 dark:bg-vine-800/70 dark:text-vine-200 dark:border-vine-700'
-            }`}
-          >
-            Új adatok
-          </button>
-          <button
-            onClick={() => {
-              setDataSourceMode('legacy');
-              pushMonitorUrl({
-                dataSourceMode: 'legacy',
-                selectedSessionId: undefined,
-              });
-            }}
-            className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              dataSourceMode === 'legacy'
-                ? 'bg-vine-600 text-white'
-                : 'bg-white/70 text-vine-700 border border-vine-200 dark:bg-vine-800/70 dark:text-vine-200 dark:border-vine-700'
-            }`}
-          >
-            Régi adatok
-          </button>
-          </div>
-        )}
-
-        {currentView === 'monitor' && dataSourceMode === 'devices' && !devicesLoading && devices.length > 0 && (
+        {currentView === 'monitor' && !devicesLoading && devices.length > 0 && (
           <DeviceSessionSelector
             devices={devices}
             sessions={allSessions}
@@ -464,16 +392,9 @@ function Dashboard() {
           />
         )}
 
-        {currentView === 'monitor' && dataSourceMode === 'devices' && selectedSessionType && (
+        {currentView === 'monitor' && selectedSessionType && (
           <div className="mb-4 text-sm text-vine-500 dark:text-vine-400">
             {selectedSessionType.name}
-          </div>
-        )}
-
-        {currentView === 'monitor' && dataSourceMode === 'legacy' && (
-          <div className="mb-4 text-sm text-vine-500 dark:text-vine-400">
-            Régi `sensorReadings` adatfolyam. Átmeneti nézet a migráció idejére.
-            {selectedSessionType && ` · ${selectedSessionType.name}`}
           </div>
         )}
 
@@ -530,7 +451,7 @@ function Dashboard() {
         {currentView === 'monitor' &&
           !currentLoading &&
           !currentError &&
-          ((dataSourceMode === 'devices' && effectiveDeviceId) || dataSourceMode === 'legacy') && (
+          !!effectiveDeviceId && (
           <>
             <SummaryCards latest={latest} stats={stats} />
             <TemperatureChart
@@ -544,11 +465,9 @@ function Dashboard() {
               canQuickCreateEvent={isAdmin && !!selectedSession}
               onQuickCreateNow={handleQuickCreateEventNow}
               onQuickCreateAt={handleQuickCreateEventAt}
-              eventCountLabel={
-                dataSourceMode === 'devices' && selectedSession ? `${sessionEvents.length} esemény` : null
-              }
+              eventCountLabel={selectedSession ? `${sessionEvents.length} esemény` : null}
               onOpenEventList={
-                dataSourceMode === 'devices' && selectedSession
+                selectedSession
                   ? () => {
                       setQuickCreateEventRequest(null);
                       setSessionEventsDialogOpen(true);
@@ -567,20 +486,16 @@ function Dashboard() {
               canQuickCreateEvent={isAdmin && !!selectedSession}
               onQuickCreateNow={handleQuickCreateEventNow}
               onQuickCreateAt={handleQuickCreateEventAt}
-              eventCountLabel={
-                dataSourceMode === 'devices' && selectedSession ? `${sessionEvents.length} esemény` : null
-              }
+              eventCountLabel={selectedSession ? `${sessionEvents.length} esemény` : null}
               onOpenEventList={
-                dataSourceMode === 'devices' && selectedSession
+                selectedSession
                   ? () => {
                       setQuickCreateEventRequest(null);
                       setSessionEventsDialogOpen(true);
                     }
                   : undefined
               }
-              eventErrorMessage={
-                dataSourceMode === 'devices' && selectedSession ? sessionEventsError : null
-              }
+              eventErrorMessage={selectedSession ? sessionEventsError : null}
             />
             <ReadingsTable
               readings={readings}
@@ -590,7 +505,7 @@ function Dashboard() {
           </>
         )}
 
-        {currentView === 'monitor' && dataSourceMode === 'devices' && sessionManagerOpen && (
+        {currentView === 'monitor' && sessionManagerOpen && (
           <SessionManager
             sessions={sessions}
             deviceName={selectedDevice?.name ?? effectiveDeviceId}
@@ -602,7 +517,7 @@ function Dashboard() {
           />
         )}
 
-        {sessionEventsDialogOpen && dataSourceMode === 'devices' && selectedSession && effectiveDeviceId && (
+        {sessionEventsDialogOpen && selectedSession && effectiveDeviceId && (
           <SessionEventsDialog
             deviceId={effectiveDeviceId}
             session={selectedSession}

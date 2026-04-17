@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { CalendarDays, Camera, ImagePlus, Loader2, Plus, Sprout, Trash2 } from 'lucide-react';
+import {
+  CalendarDays,
+  Camera,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  ImagePlus,
+  Loader2,
+  Plus,
+  Search,
+  SearchX,
+  Sprout,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { storage } from '../lib/firebase';
 import { prepareImageUpload } from '../lib/imageUpload';
 import { formatDate, formatDateTime, formatMonthDay } from '../lib/dateFormat';
@@ -154,6 +168,11 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
+  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
+  const [photoViewerZoom, setPhotoViewerZoom] = useState(1);
+  const [photoViewerOffset, setPhotoViewerOffset] = useState({ x: 0, y: 0 });
+  const [isPhotoViewerDragging, setIsPhotoViewerDragging] = useState(false);
+  const [photoViewerDragStart, setPhotoViewerDragStart] = useState({ x: 0, y: 0 });
   const createFileInputRef = useRef<HTMLInputElement>(null);
   const detailFileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useMemo(() => isMobileUserAgent(), []);
@@ -181,6 +200,11 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     selectedCutting?.photos.find((photo) => photo.id === activePhotoId) ??
     selectedCutting?.photos.at(-1) ??
     null;
+  const activePhotoIndex =
+    selectedCutting && activePhoto
+      ? selectedCutting.photos.findIndex((photo) => photo.id === activePhoto.id)
+      : -1;
+  const totalPhotos = selectedCutting?.photos.length ?? 0;
 
   useEffect(() => {
     const handlePopState = () => {
@@ -367,6 +391,101 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
       setPhotoDeletingId(null);
     }
   };
+
+  const goToPreviousPhoto = () => {
+    if (!selectedCutting || totalPhotos <= 1 || activePhotoIndex < 0) {
+      return;
+    }
+
+    const previousIndex = (activePhotoIndex - 1 + totalPhotos) % totalPhotos;
+    setActivePhotoId(selectedCutting.photos[previousIndex]?.id ?? null);
+  };
+
+  const goToNextPhoto = () => {
+    if (!selectedCutting || totalPhotos <= 1 || activePhotoIndex < 0) {
+      return;
+    }
+
+    const nextIndex = (activePhotoIndex + 1) % totalPhotos;
+    setActivePhotoId(selectedCutting.photos[nextIndex]?.id ?? null);
+  };
+
+  const clampPhotoViewerZoom = (value: number) => Math.max(1, Math.min(6, value));
+
+  const resetPhotoViewerTransform = () => {
+    setPhotoViewerZoom(1);
+    setPhotoViewerOffset({ x: 0, y: 0 });
+    setIsPhotoViewerDragging(false);
+  };
+
+  const setPhotoViewerZoomWithReset = (nextZoom: number) => {
+    const clampedZoom = clampPhotoViewerZoom(nextZoom);
+    setPhotoViewerZoom(clampedZoom);
+    if (clampedZoom <= 1) {
+      setPhotoViewerOffset({ x: 0, y: 0 });
+      setIsPhotoViewerDragging(false);
+    }
+  };
+
+  const zoomInPhotoViewer = () => {
+    setPhotoViewerZoomWithReset(photoViewerZoom + 0.25);
+  };
+
+  const zoomOutPhotoViewer = () => {
+    setPhotoViewerZoomWithReset(photoViewerZoom - 0.25);
+  };
+
+  useEffect(() => {
+    if (!isPhotoViewerOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsPhotoViewerOpen(false);
+        return;
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        goToPreviousPhoto();
+        return;
+      }
+
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        goToNextPhoto();
+        return;
+      }
+
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault();
+        zoomInPhotoViewer();
+        return;
+      }
+
+      if (event.key === '-') {
+        event.preventDefault();
+        zoomOutPhotoViewer();
+        return;
+      }
+
+      if (event.key === '0') {
+        event.preventDefault();
+        resetPhotoViewerTransform();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [goToNextPhoto, goToPreviousPhoto, isPhotoViewerOpen, photoViewerZoom]);
+
+  useEffect(() => {
+    if (!isPhotoViewerOpen) {
+      return;
+    }
+    resetPhotoViewerTransform();
+  }, [activePhoto?.id, isPhotoViewerOpen]);
 
   const handleAddEvent = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1090,22 +1209,52 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                     <div className="space-y-3">
                       {activePhoto && (
                         <div className="overflow-hidden rounded-3xl border border-vine-200 bg-vine-50 dark:border-vine-700 dark:bg-vine-800/50">
-                          <a
-                            href={activePhoto.downloadUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="group block"
-                          >
-                            <img
-                              src={activePhoto.downloadUrl}
-                              alt={selectedCutting.variety}
-                              className="h-72 w-full object-cover transition-transform duration-200 group-hover:scale-[1.01] sm:h-80"
-                            />
-                          </a>
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsPhotoViewerOpen(true);
+                                resetPhotoViewerTransform();
+                              }}
+                              className="group block w-full text-left"
+                              title="Teljes képernyős nézet"
+                            >
+                              <img
+                                src={activePhoto.downloadUrl}
+                                alt={selectedCutting.variety}
+                                className="h-72 w-full object-cover transition-transform duration-200 group-hover:scale-[1.01] sm:h-80"
+                              />
+                            </button>
+
+                            {totalPhotos > 1 && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={goToPreviousPhoto}
+                                  className="absolute left-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-black/45 text-white transition-colors hover:bg-black/60"
+                                  aria-label="Előző kép"
+                                >
+                                  <ChevronLeft className="h-5 w-5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={goToNextPhoto}
+                                  className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-black/45 text-white transition-colors hover:bg-black/60"
+                                  aria-label="Következő kép"
+                                >
+                                  <ChevronRight className="h-5 w-5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                           <div className="flex items-center justify-between gap-3 px-4 py-3 text-xs text-vine-500 dark:text-vine-300">
                             <div className="flex items-center gap-3">
-                              <span>Aktív kép</span>
-                              <span>Feltöltve: {formatDateTime(activePhoto.uploadedAt)}</span>
+                              <span>
+                                Kép {activePhotoIndex + 1}/{totalPhotos}
+                              </span>
+                              <span>
+                                Dátum: {formatDateTime(activePhoto.capturedAt ?? activePhoto.uploadedAt)}
+                              </span>
                             </div>
                             {isAdmin && (
                               <button
@@ -1156,6 +1305,156 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                     </div>
                   )}
                 </section>
+
+                {isPhotoViewerOpen && activePhoto && (
+                  <div
+                    className="fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-4"
+                    onClick={() => setIsPhotoViewerOpen(false)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPhotoViewerOpen(false);
+                        resetPhotoViewerTransform();
+                      }}
+                      className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
+                      aria-label="Bezárás"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+
+                    <a
+                      href={activePhoto.downloadUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(event) => event.stopPropagation()}
+                      className="absolute right-16 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
+                      aria-label="Megnyitás új lapon"
+                      title="Megnyitás új lapon"
+                    >
+                      <ExternalLink className="h-5 w-5" />
+                    </a>
+
+                    <div className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-xl border border-white/30 bg-black/40 p-1 text-white">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          zoomOutPhotoViewer();
+                        }}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-white/10"
+                        aria-label="Kicsinyítés"
+                        title="Kicsinyítés"
+                      >
+                        <SearchX className="h-4 w-4" />
+                      </button>
+                      <span className="px-2 text-xs tabular-nums">{Math.round(photoViewerZoom * 100)}%</span>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          zoomInPhotoViewer();
+                        }}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-white/10"
+                        aria-label="Nagyítás"
+                        title="Nagyítás"
+                      >
+                        <Search className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          resetPhotoViewerTransform();
+                        }}
+                        className="rounded-lg px-2 py-1 text-xs transition-colors hover:bg-white/10"
+                        aria-label="Nagyítás visszaállítása"
+                        title="Nagyítás visszaállítása"
+                      >
+                        Reset
+                      </button>
+                    </div>
+
+                    {totalPhotos > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            goToPreviousPhoto();
+                          }}
+                          className="absolute left-4 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
+                          aria-label="Előző kép"
+                        >
+                          <ChevronLeft className="h-6 w-6" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            goToNextPhoto();
+                          }}
+                          className="absolute right-4 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
+                          aria-label="Következő kép"
+                        >
+                          <ChevronRight className="h-6 w-6" />
+                        </button>
+                      </>
+                    )}
+
+                    <div
+                      className="flex h-[calc(100vh-96px)] w-[calc(100vw-80px)] cursor-default items-center justify-center overflow-hidden"
+                      onClick={(event) => event.stopPropagation()}
+                      onWheel={(event) => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        const direction = event.deltaY > 0 ? -0.15 : 0.15;
+                        setPhotoViewerZoomWithReset(photoViewerZoom + direction);
+                      }}
+                      onMouseDown={(event) => {
+                        if (photoViewerZoom <= 1) {
+                          return;
+                        }
+                        event.preventDefault();
+                        setIsPhotoViewerDragging(true);
+                        setPhotoViewerDragStart({
+                          x: event.clientX - photoViewerOffset.x,
+                          y: event.clientY - photoViewerOffset.y,
+                        });
+                      }}
+                      onMouseMove={(event) => {
+                        if (!isPhotoViewerDragging || photoViewerZoom <= 1) {
+                          return;
+                        }
+                        setPhotoViewerOffset({
+                          x: event.clientX - photoViewerDragStart.x,
+                          y: event.clientY - photoViewerDragStart.y,
+                        });
+                      }}
+                      onMouseUp={() => setIsPhotoViewerDragging(false)}
+                      onMouseLeave={() => setIsPhotoViewerDragging(false)}
+                    >
+                      <img
+                        src={activePhoto.downloadUrl}
+                        alt={selectedCutting.variety}
+                        className={`max-h-full max-w-full rounded-2xl object-contain ${
+                          photoViewerZoom > 1 ? 'cursor-grab' : ''
+                        } ${isPhotoViewerDragging ? 'cursor-grabbing' : ''}`}
+                        style={{
+                          transform: `translate(${photoViewerOffset.x}px, ${photoViewerOffset.y}px) scale(${photoViewerZoom})`,
+                          transformOrigin: 'center center',
+                          transition: isPhotoViewerDragging ? 'none' : 'transform 160ms ease-out',
+                        }}
+                        draggable={false}
+                      />
+                    </div>
+
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-xl border border-white/20 bg-black/45 px-4 py-2 text-xs text-white">
+                      Kép {activePhotoIndex + 1}/{totalPhotos} • Dátum:{' '}
+                      {formatDateTime(activePhoto.capturedAt ?? activePhoto.uploadedAt)}
+                    </div>
+                  </div>
+                )}
 
                 <section className="space-y-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-vine-700 dark:text-vine-200">
