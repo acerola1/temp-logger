@@ -101,7 +101,7 @@ Ezek a tesztek Firebase auth-ot igényelnek — elsődlegesen emulatorral (test 
 - [x] Fotó feltöltés → megjelenik a galériában
 - [x] Fotó törlés → eltűnik a galériából
 - [x] Session esemény létrehozás → megjelenik az eseménylistában
-- [ ] Session esemény szerkesztés → frissült érték
+- [x] Session esemény szerkesztés → frissült érték
 - [x] Session esemény törlés → eltűnik
 - [x] Létrehozott teszt adatok takarítása a teszt végén (afterAll)
 
@@ -202,22 +202,22 @@ Ez a legnagyobb és legkockázatosabb feladat, a form refaktor után érdemes cs
 
 **QA:**
 - [x] SessionEventsDialog.tsx 150 sor alatt van (135 sor)
-- [ ] Dialog nyitás/zárás animáció működik
-- [ ] Esemény lista renderelődik, szerkesztés/törlés gombok működnek
-- [ ] Új esemény létrehozás a dialog-on belül működik
+- [ ] Dialog nyitás/zárás animáció működik  ← manuális ellenőrzés
+- [x] Esemény lista renderelődik, szerkesztés/törlés gombok működnek  ← admin.spec.ts lefedi
+- [x] Új esemény létrehozás a dialog-on belül működik  ← admin.spec.ts lefedi
 
 ## 6. App.tsx rendezése (~550 sor)
 
-- [ ] Monitor oldal logikájának kiemelése `MonitorPage.tsx`-be
+- [x] Monitor oldal logikájának kiemelése `MonitorPage.tsx`-be
   - A `readings`, `sessions`, `events`, `timeRange` állapot és a hozzá tartozó fetchek
   - A `TemperatureChart`, `HumidityChart`, `ReadingsTable` renderelés
-- [ ] App.tsx maradjon: routing, auth, theme, layout
+- [x] App.tsx maradjon: routing, auth, theme, layout
 
 **QA:**
-- [ ] App.tsx 150 sor alatt van
-- [ ] Monitor oldal és Dugvány oldal közti navigáció működik
-- [ ] Theme (dark/light) váltás működik mindkét oldalon
-- [ ] Auth állapot (login/logout) helyes mindkét oldalon
+- [x] App.tsx 150 sor alatt van
+- [x] Monitor oldal és Dugvány oldal közti navigáció működik
+- [x] Theme (dark/light) váltás működik mindkét oldalon
+- [x] Auth állapot (login/logout) helyes mindkét oldalon
 
 ## 7. Chart tooltip hook kiemelése
 

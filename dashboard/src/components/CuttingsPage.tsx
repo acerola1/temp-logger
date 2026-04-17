@@ -37,10 +37,8 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   const [isMobileLayout, setIsMobileLayout] = useState(() => isMobileLayoutWidth());
 
   const selectedCutting = useMemo(
-    () =>
-      cuttings.find((cutting) => cutting.id === selectedId) ??
-      (isMobileLayout ? null : cuttings[0] ?? null),
-    [cuttings, isMobileLayout, selectedId],
+    () => cuttings.find((cutting) => cutting.id === selectedId) ?? null,
+    [cuttings, selectedId],
   );
   const nextSerialNumber = useMemo(
     () => cuttings.reduce((maxValue, cutting) => Math.max(maxValue, cutting.serialNumber), 0) + 1,
@@ -84,16 +82,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     }
 
     if (!selectedCutting) {
-      if (isMobileLayout) {
-        if (window.location.pathname !== '/dugvanyok') {
-          window.history.replaceState({}, '', '/dugvanyok');
-        }
-        return;
+      if (window.location.pathname !== '/dugvanyok') {
+        window.history.replaceState({}, '', '/dugvanyok');
       }
-
-      const fallbackCutting = cuttings[0];
-      setSelectedId(fallbackCutting.id);
-      window.history.replaceState({}, '', getCuttingPath(fallbackCutting.id));
       return;
     }
 
@@ -101,7 +92,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     if (window.location.pathname !== expectedPath) {
       window.history.replaceState({}, '', expectedPath);
     }
-  }, [cuttings, isMobileLayout, selectedCutting]);
+  }, [cuttings, selectedCutting]);
 
   const handleCreate = async (values: CuttingFormValues, files: FileList | null) => {
     if (!isAdmin) {

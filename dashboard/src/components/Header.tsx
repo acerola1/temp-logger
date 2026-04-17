@@ -5,11 +5,18 @@ import { useAuth } from '../hooks/useAuth';
 interface HeaderProps {
   theme: 'light' | 'dark';
   isAdmin: boolean;
+  canManageSessions?: boolean;
   onToggleTheme: () => void;
   onOpenSessionManager: () => void;
 }
 
-export function Header({ theme, isAdmin, onToggleTheme, onOpenSessionManager }: HeaderProps) {
+export function Header({
+  theme,
+  isAdmin,
+  canManageSessions = true,
+  onToggleTheme,
+  onOpenSessionManager,
+}: HeaderProps) {
   const { user, signInWithGoogle, signInWithTestAdmin, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const isEmulatorMode = import.meta.env.VITE_USE_EMULATORS === 'true';
@@ -90,9 +97,12 @@ export function Header({ theme, isAdmin, onToggleTheme, onOpenSessionManager }: 
                     </p>
                     <p className="text-xs text-vine-400 truncate">{user.email}</p>
                   </div>
-                  {isAdmin && (
+                  {isAdmin && canManageSessions && (
                     <button
-                      onClick={() => { setMenuOpen(false); onOpenSessionManager(); }}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onOpenSessionManager();
+                      }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-vine-700 dark:text-vine-200 hover:bg-vine-50 dark:hover:bg-vine-700 transition-colors"
                     >
                       <Settings className="w-4 h-4" />
@@ -100,7 +110,10 @@ export function Header({ theme, isAdmin, onToggleTheme, onOpenSessionManager }: 
                     </button>
                   )}
                   <button
-                    onClick={() => { setMenuOpen(false); signOut(); }}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      signOut();
+                    }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-vine-700 dark:text-vine-200 hover:bg-vine-50 dark:hover:bg-vine-700 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
