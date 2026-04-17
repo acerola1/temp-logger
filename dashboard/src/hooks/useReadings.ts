@@ -32,7 +32,14 @@ export function useReadings(
   options: UseReadingsOptions = {},
 ): ReadingsResult {
   return useMemo(() => {
-    const windowEndMs = options.windowEndMs ?? Date.now();
+    const latestRecordedAtMs = allReadings.reduce((latest, reading) => {
+      const recordedAtMs = new Date(reading.recordedAt).getTime();
+      if (!Number.isFinite(recordedAtMs)) {
+        return latest;
+      }
+      return Math.max(latest, recordedAtMs);
+    }, 0);
+    const windowEndMs = options.windowEndMs ?? latestRecordedAtMs;
     const cutoff = windowEndMs - rangeMs[timeRange];
     const readings = allReadings
       .filter((r) => {

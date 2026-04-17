@@ -29,17 +29,12 @@ export function useFirestoreCollection<T>(
   const [data, setData] = useState<T>(initialData);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
+  const isEnabled = enabled && !!queryRef;
 
   useEffect(() => {
-    if (!enabled || !queryRef) {
-      setData(initialData);
-      setLoading(false);
-      setError(null);
+    if (!isEnabled || !queryRef) {
       return;
     }
-
-    setLoading(true);
-    setError(null);
 
     const unsubscribe = onSnapshot(
       queryRef,
@@ -57,7 +52,11 @@ export function useFirestoreCollection<T>(
     );
 
     return unsubscribe;
-  }, [enabled, initialData, mapSnapshot, onErrorMessage, queryRef]);
+  }, [initialData, isEnabled, mapSnapshot, onErrorMessage, queryRef]);
+
+  if (!isEnabled || !queryRef) {
+    return { data: initialData, loading: false, error: null };
+  }
 
   return { data, loading, error };
 }
@@ -71,17 +70,12 @@ export function useFirestoreDocument<T>(
   const [data, setData] = useState<T>(initialData);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
+  const isEnabled = enabled && !!docRef;
 
   useEffect(() => {
-    if (!enabled || !docRef) {
-      setData(initialData);
-      setLoading(false);
-      setError(null);
+    if (!isEnabled || !docRef) {
       return;
     }
-
-    setLoading(true);
-    setError(null);
 
     const unsubscribe = onSnapshot(
       docRef,
@@ -99,7 +93,11 @@ export function useFirestoreDocument<T>(
     );
 
     return unsubscribe;
-  }, [docRef, enabled, initialData, mapSnapshot, onErrorMessage]);
+  }, [docRef, initialData, isEnabled, mapSnapshot, onErrorMessage]);
+
+  if (!isEnabled || !docRef) {
+    return { data: initialData, loading: false, error: null };
+  }
 
   return { data, loading, error };
 }

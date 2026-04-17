@@ -1,4 +1,4 @@
-import { createContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -8,16 +8,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { auth } from './firebase';
-
-export interface AuthContextValue {
-  user: User | null;
-  loading: boolean;
-  signInWithGoogle: () => Promise<void>;
-  signInWithTestAdmin: () => Promise<void>;
-  signOut: () => Promise<void>;
-}
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
+import { AuthContext } from './auth-context';
 
 const googleProvider = new GoogleAuthProvider();
 const isEmulatorMode = import.meta.env.VITE_USE_EMULATORS === 'true';

@@ -190,6 +190,8 @@ export function useCuttingsQuery() {
     data,
     loading,
     error,
+    isCreating: createCuttingMutation.isPending,
+    isUpdating: updateCuttingMutation.isPending,
     createCutting: async (cuttingId: string, input: CreateCuttingInput) =>
       createCuttingMutation.mutateAsync({ cuttingId, input }),
     updateCutting: async (cuttingId: string, updates: Partial<Omit<Cutting, 'id'>>) =>

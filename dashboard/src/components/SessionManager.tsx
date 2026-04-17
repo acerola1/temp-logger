@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { X, Plus, Archive } from 'lucide-react';
@@ -10,6 +10,8 @@ interface SessionManagerProps {
   deviceName: string | null;
   sessionTypes: SessionType[];
   defaultSessionTypeId: string | null;
+  creating: boolean;
+  archiving: boolean;
   onClose: () => void;
   onCreateSession: (name: string, sessionTypeId: string) => Promise<void>;
   onArchiveSession: (id: string) => Promise<void>;
@@ -20,13 +22,12 @@ export function SessionManager({
   deviceName,
   sessionTypes,
   defaultSessionTypeId,
+  creating,
+  archiving,
   onClose,
   onCreateSession,
   onArchiveSession,
 }: SessionManagerProps) {
-  const [creating, setCreating] = useState(false);
-  const [archiving, setArchiving] = useState<string | null>(null);
-
   const activeSession = sessions.find((s) => s.status === 'active');
   const fallbackSessionTypeId = useMemo(
     () => defaultSessionTypeId ?? sessionTypes[0]?.id ?? '',
@@ -38,10 +39,10 @@ export function SessionManager({
     handleSubmit,
     reset,
     setValue,
-    watch,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<SessionCreateValues>({
     resolver: zodResolver(sessionCreateSchema),
+    mode: 'onChange',
     defaultValues: {
       name: '',
       sessionTypeId: fallbackSessionTypeId,
@@ -52,30 +53,16 @@ export function SessionManager({
     setValue('sessionTypeId', fallbackSessionTypeId);
   }, [fallbackSessionTypeId, setValue]);
 
-  const sessionName = watch('name');
-  const sessionTypeId = watch('sessionTypeId');
-
   const handleCreate = async (values: SessionCreateValues) => {
     if (activeSession) {
       return;
     }
-
-    setCreating(true);
-    try {
-      await onCreateSession(values.name.trim(), values.sessionTypeId);
-      reset({ name: '', sessionTypeId: values.sessionTypeId });
-    } finally {
-      setCreating(false);
-    }
+    await onCreateSession(values.name.trim(), values.sessionTypeId);
+    reset({ name: '', sessionTypeId: values.sessionTypeId });
   };
 
   const handleArchive = async (id: string) => {
-    setArchiving(id);
-    try {
-      await onArchiveSession(id);
-    } finally {
-      setArchiving(null);
-    }
+    await onArchiveSession(id);
   };
 
   return (
@@ -133,7 +120,7 @@ export function SessionManager({
                 />
                 <button
                   type="submit"
-                  disabled={!sessionName?.trim() || !sessionTypeId || !!activeSession || creating}
+                  disabled={!isValid || !!activeSession || creating}
                   className="flex items-center gap-1 rounded-lg bg-vine-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-vine-700 disabled:opacity-50 disabled:hover:bg-vine-600"
                 >
                   <Plus className="h-4 w-4" />
@@ -173,7 +160,7 @@ export function SessionManager({
                     {session.status === 'active' && (
                       <button
                         onClick={() => void handleArchive(session.id)}
-                        disabled={archiving === session.id}
+                        disabled={archiving}
                         className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-vine-600 transition-colors hover:bg-vine-100 disabled:opacity-50 dark:text-vine-300 dark:hover:bg-vine-700"
                         title="Session lezárása"
                       >

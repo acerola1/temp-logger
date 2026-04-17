@@ -84,6 +84,7 @@ export function SensorChart({
   const tooltipTargetY = useRef(0);
   const tooltipVelocityY = useRef(0);
   const tooltipRafId = useRef(0);
+  const animateTooltipRef = useRef<() => void>(() => {});
   const chartWidth = useElementWidth(chartRef);
   const filteredReadings = sampleReadingsForChart(readings, timeRange);
   const data = buildChartSeries(filteredReadings);
@@ -197,8 +198,12 @@ export function SensorChart({
     if (tooltipRef.current) {
       tooltipRef.current.style.transform = `translate(${tooltipCurrentX.current}px, ${tooltipCurrentY.current}px) translate(-50%, -100%)`;
     }
-    tooltipRafId.current = requestAnimationFrame(animateTooltip);
+    tooltipRafId.current = requestAnimationFrame(animateTooltipRef.current);
   }, []);
+
+  useEffect(() => {
+    animateTooltipRef.current = animateTooltip;
+  }, [animateTooltip]);
 
   useEffect(() => {
     if (!activeTooltip) {
@@ -212,9 +217,9 @@ export function SensorChart({
       tooltipTargetY.current = tooltipCurrentY.current;
     }
     if (!tooltipRafId.current) {
-      tooltipRafId.current = requestAnimationFrame(animateTooltip);
+      tooltipRafId.current = requestAnimationFrame(animateTooltipRef.current);
     }
-  }, [activeTooltip, timeDomain, plotWidth, isPinned, animateTooltip]);
+  }, [activeTooltip, animateTooltip, timeDomain, plotWidth, isPinned]);
 
   useEffect(() => {
     return () => cancelAnimationFrame(tooltipRafId.current);
@@ -285,7 +290,7 @@ export function SensorChart({
           style={{
             left: 0,
             top: 0,
-            transform: `translate(${tooltipCurrentX.current}px, ${tooltipCurrentY.current}px) translate(-50%, -100%)`,
+            transform: 'translate(0px, 0px) translate(-50%, -100%)',
             backgroundColor: isDark ? '#2a3518' : '#fff',
             borderColor: isDark ? '#3a4820' : '#e8e3d6',
             color: isDark ? '#f4f1ea' : '#18211b',

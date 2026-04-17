@@ -49,7 +49,6 @@ export function useFirestoreRealtimeQuery<T>({
 
   useEffect(() => {
     if (!enabled || !queryRef) {
-      setSubscriptionError(null);
       return;
     }
 
@@ -68,7 +67,10 @@ export function useFirestoreRealtimeQuery<T>({
     return unsubscribe;
   }, [enabled, mapSnapshot, onErrorMessage, queryClient, queryKey, queryRef]);
 
-  const error = subscriptionError ?? (queryResult.error ? queryResult.error.message : null);
+  const error =
+    enabled && queryRef
+      ? subscriptionError ?? (queryResult.error ? queryResult.error.message : null)
+      : null;
 
   return {
     data: queryResult.data ?? initialData,

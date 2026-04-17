@@ -1,5 +1,9 @@
 const MAX_IMAGE_SIDE = 1000;
 
+interface PrepareImageUploadOptions {
+  maxImageSide?: number;
+}
+
 function loadImage(file: File): Promise<{
   width: number;
   height: number;
@@ -35,13 +39,17 @@ export interface PreparedImageUpload {
 }
 
 // A tasteroom példájához igazodva a hosszabbik oldalt 1000 px-re korlátozzuk.
-export async function prepareImageUpload(file: File): Promise<PreparedImageUpload> {
+export async function prepareImageUpload(
+  file: File,
+  options: PrepareImageUploadOptions = {},
+): Promise<PreparedImageUpload> {
+  const maxImageSide = options.maxImageSide ?? MAX_IMAGE_SIDE;
   const { width, height, image } = await loadImage(file);
   const longestSide = Math.max(width, height);
   const contentType =
     file.type === 'image/webp' || file.type === 'image/png' ? file.type : 'image/jpeg';
 
-  if (longestSide <= MAX_IMAGE_SIDE) {
+  if (longestSide <= maxImageSide) {
     return {
       blob: file,
       width,
@@ -50,7 +58,7 @@ export async function prepareImageUpload(file: File): Promise<PreparedImageUploa
     };
   }
 
-  const scale = MAX_IMAGE_SIDE / longestSide;
+  const scale = maxImageSide / longestSide;
   const targetWidth = Math.max(1, Math.round(width * scale));
   const targetHeight = Math.max(1, Math.round(height * scale));
   const canvas = document.createElement('canvas');

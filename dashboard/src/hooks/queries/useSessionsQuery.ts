@@ -99,6 +99,8 @@ export function useSessionsQuery(deviceId: string | null) {
     activeSession,
     loading,
     error,
+    isCreating: createSessionMutation.isPending,
+    isArchiving: archiveSessionMutation.isPending,
     createSession: async (name: string, sessionTypeId: string) =>
       createSessionMutation.mutateAsync({ name, sessionTypeId }),
     archiveSession: async (sessionId: string) => archiveSessionMutation.mutateAsync(sessionId),

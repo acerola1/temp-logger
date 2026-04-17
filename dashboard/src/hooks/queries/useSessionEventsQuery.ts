@@ -149,6 +149,9 @@ export function useSessionEventsQuery(deviceId: string | null, sessionId: string
     data,
     loading,
     error,
+    isCreating: createEventMutation.isPending,
+    isUpdating: updateEventMutation.isPending,
+    isDeleting: deleteEventMutation.isPending,
     createEvent: async (input: SessionEventInput) => createEventMutation.mutateAsync(input),
     updateEvent: async (eventId: string, input: SessionEventInput) =>
       updateEventMutation.mutateAsync({ eventId, input }),

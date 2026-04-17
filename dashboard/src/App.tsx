@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { AuthProvider } from './lib/auth';
 import { Header } from './components/Header';
@@ -146,7 +146,7 @@ function Dashboard() {
     initialMonitorState.selectedDeviceId,
   );
   const { sessions: allSessions } = useAllSessions(devices);
-  const firstActiveSessionInList = useMemo(() => {
+  const firstActiveSessionInList = (() => {
     for (const device of devices) {
       const deviceSessions = allSessions
         .filter((session) => session.deviceId === device.id)
@@ -157,10 +157,17 @@ function Dashboard() {
       }
     }
     return null;
-  }, [allSessions, devices]);
+  })();
   const effectiveDeviceId =
     selectedDeviceId ?? firstActiveSessionInList?.deviceId ?? devices[0]?.id ?? null;
-  const { sessions, activeSession, createSession, archiveSession } = useSessionsQuery(effectiveDeviceId);
+  const {
+    sessions,
+    activeSession,
+    isCreating: creatingSession,
+    isArchiving: archivingSession,
+    createSession,
+    archiveSession,
+  } = useSessionsQuery(effectiveDeviceId);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null | undefined>(
     initialMonitorState.selectedSessionId,
   );
@@ -183,12 +190,17 @@ function Dashboard() {
   const selectedSession = sessions.find((s) => s.id === effectiveSessionId);
   const isSessionPagingView = currentView === 'monitor' && typeof effectiveSessionId === 'string';
   const latestReadingMs = getLatestReadingMs(currentSourceReadings);
+  const fallbackWindowEndMs =
+    latestReadingMs ??
+    toValidTimeMs(selectedSession?.endDate) ??
+    toValidTimeMs(selectedSession?.startDate) ??
+    rangeDurationMs;
   const sessionReferenceEndMs =
     selectedSession?.status === 'archived'
       ? selectedSession?.endDate
         ? (toValidTimeMs(selectedSession.endDate) ?? latestReadingMs)
         : latestReadingMs
-      : latestReadingMs ?? Date.now();
+      : fallbackWindowEndMs;
   const pagedWindowEndMs =
     isSessionPagingView && sessionReferenceEndMs !== null && Number.isFinite(sessionReferenceEndMs)
       ? sessionReferenceEndMs - archivedPageOffset * rangeDurationMs
@@ -201,6 +213,9 @@ function Dashboard() {
     data: sessionEvents,
     loading: sessionEventsLoading,
     error: sessionEventsError,
+    isCreating: sessionEventCreating,
+    isUpdating: sessionEventUpdating,
+    isDeleting: sessionEventDeleting,
     createEvent,
     updateEvent,
     deleteEvent,
@@ -246,13 +261,17 @@ function Dashboard() {
   }, []);
 
   useEffect(() => {
-    setSelectedEvent(null);
-    setSessionEventsDialogOpen(false);
-    setQuickCreateEventRequest(null);
+    queueMicrotask(() => {
+      setSelectedEvent(null);
+      setSessionEventsDialogOpen(false);
+      setQuickCreateEventRequest(null);
+    });
   }, [effectiveDeviceId, effectiveSessionId]);
 
   useEffect(() => {
-    setArchivedPageOffset(0);
+    queueMicrotask(() => {
+      setArchivedPageOffset(0);
+    });
   }, [currentView, effectiveDeviceId, effectiveSessionId, timeRange]);
 
   const handleQuickCreateEventNow = () => {
@@ -288,7 +307,9 @@ function Dashboard() {
     oldestReadingMs < pagedWindowStartMs;
   const hasNewerArchivedPage = isSessionPagingView && archivedPageOffset > 0;
   const effectiveWindowEndMs =
-    pagedWindowEndMs !== null && Number.isFinite(pagedWindowEndMs) ? pagedWindowEndMs : Date.now();
+    pagedWindowEndMs !== null && Number.isFinite(pagedWindowEndMs)
+      ? pagedWindowEndMs
+      : fallbackWindowEndMs;
   const effectiveWindowDomain: [number, number] = [
     effectiveWindowEndMs - rangeDurationMs,
     effectiveWindowEndMs,
@@ -509,6 +530,8 @@ function Dashboard() {
             onClose={() => setSessionManagerOpen(false)}
             onCreateSession={(name, sessionTypeId) => createSession(name, sessionTypeId)}
             onArchiveSession={archiveSession}
+            creating={creatingSession}
+            archiving={archivingSession}
           />
         )}
 
@@ -524,6 +547,9 @@ function Dashboard() {
             onCreateEvent={createEvent}
             onUpdateEvent={updateEvent}
             onDeleteEvent={deleteEvent}
+            createPending={sessionEventCreating}
+            updatePending={sessionEventUpdating}
+            deletePending={sessionEventDeleting}
             onOpenEvent={setSelectedEvent}
             quickCreateRequest={quickCreateEventRequest}
             onQuickCreateHandled={() => setQuickCreateEventRequest(null)}

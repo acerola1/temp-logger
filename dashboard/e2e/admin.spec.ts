@@ -49,10 +49,12 @@ test('admin CRUD: uj dugvany + foto + ontozesi log + session esemeny', async ({ 
   await page.getByPlaceholder('pl. Kékfrankos').fill(unique)
   await page.getByRole('button', { name: 'Mentés' }).first().click()
 
-  const createdCard = page.getByRole('button', { name: new RegExp(unique) }).first()
-  await expect(createdCard).toBeVisible()
-  await createdCard.click()
-  await expect(page.getByRole('heading', { name: unique }).nth(1)).toBeVisible()
+  await expect(page).toHaveURL(/\/dugvanyok\/[^/?#]+/)
+  const detailPanel = page
+    .getByRole('button', { name: 'Alapadatok szerkesztése' })
+    .locator('xpath=ancestor::div[contains(@class,"space-y-6")]')
+    .first()
+  await expect(detailPanel).toBeVisible()
   const createdId = page.url().split('/dugvanyok/')[1]?.split('?')[0]
   if (createdId) {
     createdCuttingIds.push(createdId)
@@ -72,16 +74,35 @@ test('admin CRUD: uj dugvany + foto + ontozesi log + session esemeny', async ({ 
     .first()
     .getByRole('button', { name: 'Mentés' })
     .click()
-  await expect(page.getByRole('heading', { name: updated }).nth(1)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Alapadatok szerkesztése' })).toBeVisible()
 
   await page
     .locator('label:has-text("Fotó hozzáadása") input[type="file"]')
     .first()
-    .setInputFiles({
-      name: 'upload.png',
-      mimeType: 'image/png',
-      buffer: onePixelPng,
-    })
+    .setInputFiles([
+      {
+        name: 'upload.png',
+        mimeType: 'image/png',
+        buffer: onePixelPng,
+      },
+      {
+        name: 'upload-2.png',
+        mimeType: 'image/png',
+        buffer: onePixelPng,
+      },
+    ])
+  await expect(page.getByText(/Kép 2\/2/)).toBeVisible()
+  await page.getByTitle('Teljes képernyős nézet').click()
+  const photoViewer = page
+    .getByRole('button', { name: 'Bezárás' })
+    .locator('xpath=ancestor::div[contains(@class,"fixed")]')
+    .first()
+  await expect(photoViewer).toBeVisible()
+  await expect(photoViewer.getByRole('button', { name: 'Következő kép' })).toBeVisible()
+  await photoViewer.getByRole('button', { name: 'Következő kép' }).click()
+  await photoViewer.getByRole('button', { name: 'Bezárás' }).click()
+  await expect(page.getByText(/Kép 1\/2/)).toBeVisible()
+  await page.getByRole('button', { name: 'Törlés', exact: true }).first().click()
   await expect(page.getByText(/Kép 1\/1/)).toBeVisible()
   await page.getByRole('button', { name: 'Törlés', exact: true }).first().click()
   await expect(page.getByText('Ehhez a dugványhoz még nincs feltöltött kép.')).toBeVisible()
