@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatDateShort } from '../lib/dateFormat';
+import { scaleX } from '../lib/chartTransform';
 import { buildTimeTicks, type ChartTick } from '../lib/chartTicks';
 import type { TimeRange } from '../types/sensor';
 
@@ -22,22 +23,6 @@ const ANIMATION_DURATION_MS = 420;
 
 function sameDomain(a: [number, number], b: [number, number]): boolean {
   return a[0] === b[0] && a[1] === b[1];
-}
-
-function scaleX(
-  value: number,
-  domain: [number, number],
-  plotLeft: number,
-  plotWidth: number,
-): number {
-  const span = domain[1] - domain[0];
-
-  if (span <= 0 || plotWidth <= 0) {
-    return plotLeft;
-  }
-
-  const ratio = (value - domain[0]) / span;
-  return plotLeft + ratio * plotWidth;
 }
 
 function renderTicks(

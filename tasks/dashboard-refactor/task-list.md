@@ -20,8 +20,8 @@ npx eslint . 2>&1 | tail -3
 # 3. Build — sikeresen lefut
 npm run build
 
-# 4. Playwright e2e tesztek — mind zöld
-npx playwright test
+# 4. Playwright e2e tesztek (emulátorral) — mind zöld
+npm run test:e2e
 ```
 
 ### Feladat-specifikus ellenőrzések
@@ -118,20 +118,20 @@ Ezek a tesztek Firebase auth-ot igényelnek — elsődlegesen emulatorral (test 
 
 Gyors nyerések, minimális kockázat.
 
-- [ ] `toDateTimeLocalValue()` kiemelése `lib/dateFormat.ts`-be
+- [x] `toDateTimeLocalValue()` kiemelése `lib/dateFormat.ts`-be
   - Jelenleg 3 helyen definiálva: `App.tsx:42`, `CuttingsPage.tsx:56`, `SessionEventsDialog.tsx:48`
   - Mindhárom helyen törölni a lokális definíciót és importálni
-- [ ] `getFileExtension()` kiemelése `lib/fileUtils.ts`-be
+- [x] `getFileExtension()` kiemelése `lib/fileUtils.ts`-be
   - Jelenleg 2 helyen: `CuttingsPage.tsx:66`, `SessionEventsDialog.tsx:54`
-- [ ] `scaleX()` kiemelése `lib/chartTransform.ts`-be
+- [x] `scaleX()` kiemelése `lib/chartTransform.ts`-be
   - Jelenleg 3 helyen: `SensorChart.tsx:54`, `AnimatedTimeAxis.tsx:27`, `EventTimelineRow.tsx:57`
   - Mindhárom komponensben importra cserélni
 
 **QA:**
-- [ ] `grep -r "function toDateTimeLocalValue" src/` — pontosan 1 találat (a lib-ben)
-- [ ] `grep -r "function getFileExtension" src/` — pontosan 1 találat
-- [ ] `grep -r "function scaleX" src/` — pontosan 1 találat
-- [ ] A három utility importálva van minden korábbi használati helyen
+- [x] `grep -r "function toDateTimeLocalValue" src/` — pontosan 1 találat (a lib-ben)
+- [x] `grep -r "function getFileExtension" src/` — pontosan 1 találat
+- [x] `grep -r "function scaleX" src/` — pontosan 1 találat
+- [x] A három utility importálva van minden korábbi használati helyen
 
 ## 2. Form kezelés egységesítése — react-hook-form + zod bevezetése
 

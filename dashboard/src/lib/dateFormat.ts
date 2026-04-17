@@ -51,3 +51,9 @@ export function formatRelative(iso: string, now = Date.now()): string {
   const days = Math.floor(hours / 24);
   return `${days} napja`;
 }
+
+export function toDateTimeLocalValue(value: DateInput = new Date()): string {
+  const date = toDate(value);
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}

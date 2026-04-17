@@ -3,7 +3,8 @@ import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage
 import { CalendarClock, ImagePlus, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { storage } from '../lib/firebase';
 import { prepareImageUpload } from '../lib/imageUpload';
-import { formatDateTime } from '../lib/dateFormat';
+import { formatDateTime, toDateTimeLocalValue } from '../lib/dateFormat';
+import { getFileExtension } from '../lib/fileUtils';
 import { indexSessionEvents } from '../lib/sessionEventSequence';
 import type { Session, SessionEvent } from '../types/sensor';
 
@@ -44,18 +45,6 @@ const DEFAULT_FORM_STATE = (): EventFormState => ({
   description: '',
   occurredAt: toDateTimeLocalValue(),
 });
-
-function toDateTimeLocalValue(value: string | Date = new Date()): string {
-  const date = typeof value === 'string' ? new Date(value) : value;
-  const offsetMs = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
-}
-
-function getFileExtension(contentType: string): string {
-  if (contentType === 'image/png') return 'png';
-  if (contentType === 'image/webp') return 'webp';
-  return 'jpg';
-}
 
 async function uploadEventImage(deviceId: string, sessionId: string, file: File, eventId: string) {
   const prepared = await prepareImageUpload(file);

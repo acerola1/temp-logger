@@ -22,7 +22,7 @@ import { useSessionEvents } from './hooks/useSessionEvents';
 import { useDevices } from './hooks/useDevices';
 import { useSessionTypes } from './hooks/useSessionTypes';
 import { db } from './lib/firebase';
-import { formatDateTime } from './lib/dateFormat';
+import { formatDateTime, toDateTimeLocalValue } from './lib/dateFormat';
 import type { SessionEvent, TimeRange } from './types/sensor';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
@@ -37,11 +37,6 @@ interface MonitorUrlState {
 interface QuickCreateEventRequest {
   occurredAt: string;
   nonce: number;
-}
-
-function toDateTimeLocalValue(value: Date = new Date()): string {
-  const offsetMs = value.getTimezoneOffset() * 60_000;
-  return new Date(value.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
 function getViewFromPath(pathname: string): DashboardView {

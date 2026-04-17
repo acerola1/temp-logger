@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 import { storage } from '../lib/firebase';
 import { prepareImageUpload } from '../lib/imageUpload';
-import { formatDate, formatDateTime, formatMonthDay } from '../lib/dateFormat';
+import { formatDate, formatDateTime, formatMonthDay, toDateTimeLocalValue } from '../lib/dateFormat';
+import { getFileExtension } from '../lib/fileUtils';
 import { useCuttings } from '../hooks/useCuttings';
 import type { CreateCuttingInput, Cutting, CuttingPhoto, CuttingStatus } from '../types/cutting';
 
@@ -53,20 +54,8 @@ function isMobileLayoutWidth() {
   return window.matchMedia('(max-width: 1023px)').matches;
 }
 
-function toDateTimeLocalValue(value: string | Date = new Date()): string {
-  const date = typeof value === 'string' ? new Date(value) : value;
-  const offsetMs = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
-}
-
 function toDateInputValue(value: string): string {
   return toDateTimeLocalValue(value).slice(0, 10);
-}
-
-function getFileExtension(contentType: string): string {
-  if (contentType === 'image/png') return 'png';
-  if (contentType === 'image/webp') return 'webp';
-  return 'jpg';
 }
 
 function getCuttingPath(cuttingId: string | null): string {

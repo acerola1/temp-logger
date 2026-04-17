@@ -20,6 +20,7 @@ import { formatDateShort } from '../lib/dateFormat';
 import { buildChartSeries, type TimeSeriesPoint } from '../lib/chartSeries';
 import { sampleReadingsForChart } from '../lib/chartSampling';
 import { getTimeDomain } from '../lib/chartTime';
+import { scaleX } from '../lib/chartTransform';
 import { useElementWidth } from '../hooks/useElementWidth';
 import type { SensorReading, SessionEvent, SessionType, TimeRange } from '../types/sensor';
 import { Plus, X } from 'lucide-react';
@@ -49,20 +50,6 @@ export interface SensorChartProps {
 interface TooltipPoint {
   recordedAtMs: number;
   value: number;
-}
-
-function scaleX(
-  value: number,
-  domain: [number, number],
-  plotLeft: number,
-  plotWidth: number,
-): number {
-  const span = domain[1] - domain[0];
-  if (span <= 0 || plotWidth <= 0) {
-    return plotLeft;
-  }
-  const ratio = (value - domain[0]) / span;
-  return plotLeft + ratio * plotWidth;
 }
 
 export function SensorChart({
