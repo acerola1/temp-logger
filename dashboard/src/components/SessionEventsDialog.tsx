@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { CalendarClock, ImagePlus, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { storage } from '../lib/firebase';
@@ -6,6 +8,7 @@ import { prepareImageUpload } from '../lib/imageUpload';
 import { formatDateTime, toDateTimeLocalValue } from '../lib/dateFormat';
 import { getFileExtension } from '../lib/fileUtils';
 import { indexSessionEvents } from '../lib/sessionEventSequence';
+import { sessionEventSchema, type SessionEventValues } from '../lib/schemas';
 import type { Session, SessionEvent } from '../types/sensor';
 
 interface SessionEventsDialogProps {
@@ -34,13 +37,7 @@ interface SessionEventInput {
   imageHeight?: number | null;
 }
 
-interface EventFormState {
-  title: string;
-  description: string;
-  occurredAt: string;
-}
-
-const DEFAULT_FORM_STATE = (): EventFormState => ({
+const DEFAULT_FORM_VALUES = (): SessionEventValues => ({
   title: '',
   description: '',
   occurredAt: toDateTimeLocalValue(),
@@ -82,42 +79,15 @@ export function SessionEventsDialog({
   onQuickCreateHandled,
 }: SessionEventsDialogProps) {
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [createState, setCreateState] = useState<EventFormState>(DEFAULT_FORM_STATE);
   const [editEventId, setEditEventId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EventFormState>(DEFAULT_FORM_STATE);
   const [selectedCreateFile, setSelectedCreateFile] = useState<File | null>(null);
   const [selectedEditFile, setSelectedEditFile] = useState<File | null>(null);
   const [removeEditImage, setRemoveEditImage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const createFileRef = useRef<HTMLInputElement>(null);
   const editFileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setShowCreateForm(false);
-    setCreateState(DEFAULT_FORM_STATE());
-    setEditEventId(null);
-    setEditState(DEFAULT_FORM_STATE());
-    setSelectedCreateFile(null);
-    setSelectedEditFile(null);
-    setRemoveEditImage(false);
-    setFormError(null);
-  }, [session.id]);
-
-  useEffect(() => {
-    if (!quickCreateRequest || !isAdmin) {
-      return;
-    }
-
-    setShowCreateForm(true);
-    setCreateState((current) => ({
-      ...current,
-      occurredAt: quickCreateRequest.occurredAt,
-    }));
-    setFormError(null);
-    onQuickCreateHandled();
-  }, [isAdmin, onQuickCreateHandled, quickCreateRequest]);
 
   const sortedEvents = indexSessionEvents(events)
     .slice()
@@ -125,33 +95,57 @@ export function SessionEventsDialog({
 
   const editingEvent = sortedEvents.find((event) => event.id === editEventId) ?? null;
 
-  const validateForm = (state: EventFormState) => {
-    if (!state.title.trim()) {
-      return 'A cím megadása kötelező.';
-    }
+  const {
+    register: registerCreate,
+    handleSubmit: handleCreateSubmit,
+    reset: resetCreate,
+    setValue: setCreateValue,
+    formState: { errors: createErrors },
+  } = useForm<SessionEventValues>({
+    resolver: zodResolver(sessionEventSchema),
+    defaultValues: DEFAULT_FORM_VALUES(),
+  });
 
-    if (!state.occurredAt) {
-      return 'Az időpont megadása kötelező.';
-    }
+  const {
+    register: registerEdit,
+    handleSubmit: handleEditSubmit,
+    reset: resetEdit,
+    formState: { errors: editErrors },
+  } = useForm<SessionEventValues>({
+    resolver: zodResolver(sessionEventSchema),
+    defaultValues: DEFAULT_FORM_VALUES(),
+  });
 
-    return null;
-  };
+  useEffect(() => {
+    setShowCreateForm(false);
+    setEditEventId(null);
+    setSelectedCreateFile(null);
+    setSelectedEditFile(null);
+    setRemoveEditImage(false);
+    setSubmitError(null);
+    resetCreate(DEFAULT_FORM_VALUES());
+    resetEdit(DEFAULT_FORM_VALUES());
+  }, [resetCreate, resetEdit, session.id]);
 
-  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!isAdmin) {
-      setFormError('Csak admin hozhat létre eseményt.');
+  useEffect(() => {
+    if (!quickCreateRequest || !isAdmin) {
       return;
     }
 
-    const validationError = validateForm(createState);
-    if (validationError) {
-      setFormError(validationError);
+    setShowCreateForm(true);
+    setCreateValue('occurredAt', quickCreateRequest.occurredAt, { shouldValidate: true });
+    setSubmitError(null);
+    onQuickCreateHandled();
+  }, [isAdmin, onQuickCreateHandled, quickCreateRequest, setCreateValue]);
+
+  const handleCreate = async (values: SessionEventValues) => {
+    if (!isAdmin) {
+      setSubmitError('Csak admin hozhat létre eseményt.');
       return;
     }
 
     setSaving(true);
-    setFormError(null);
+    setSubmitError(null);
 
     let uploadedImage:
       | { imageUrl: string; imageStoragePath: string; imageWidth: number; imageHeight: number }
@@ -164,18 +158,18 @@ export function SessionEventsDialog({
       }
 
       await onCreateEvent({
-        title: createState.title,
-        description: createState.description,
-        occurredAt: new Date(createState.occurredAt).toISOString(),
+        title: values.title.trim(),
+        description: values.description.trim(),
+        occurredAt: new Date(values.occurredAt).toISOString(),
         ...uploadedImage,
       });
 
-      setCreateState(DEFAULT_FORM_STATE());
+      resetCreate(DEFAULT_FORM_VALUES());
       setSelectedCreateFile(null);
       setShowCreateForm(false);
     } catch (nextError) {
       console.error('Session event create error:', nextError);
-      setFormError(nextError instanceof Error ? nextError.message : 'Nem sikerült menteni az eseményt.');
+      setSubmitError(nextError instanceof Error ? nextError.message : 'Nem sikerült menteni az eseményt.');
     } finally {
       setSaving(false);
     }
@@ -183,20 +177,19 @@ export function SessionEventsDialog({
 
   const handleStartEdit = (eventItem: SessionEvent) => {
     setEditEventId(eventItem.id);
-    setEditState({
+    resetEdit({
       title: eventItem.title,
       description: eventItem.description,
       occurredAt: toDateTimeLocalValue(eventItem.occurredAt),
     });
     setSelectedEditFile(null);
     setRemoveEditImage(false);
-    setFormError(null);
+    setSubmitError(null);
   };
 
-  const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleUpdate = async (values: SessionEventValues) => {
     if (!isAdmin) {
-      setFormError('Csak admin szerkeszthet eseményt.');
+      setSubmitError('Csak admin szerkeszthet eseményt.');
       return;
     }
 
@@ -204,14 +197,8 @@ export function SessionEventsDialog({
       return;
     }
 
-    const validationError = validateForm(editState);
-    if (validationError) {
-      setFormError(validationError);
-      return;
-    }
-
     setSaving(true);
-    setFormError(null);
+    setSubmitError(null);
 
     let nextImageUrl = editingEvent.imageUrl;
     let nextImageStoragePath = editingEvent.imageStoragePath;
@@ -236,9 +223,9 @@ export function SessionEventsDialog({
       }
 
       await onUpdateEvent(editingEvent.id, {
-        title: editState.title,
-        description: editState.description,
-        occurredAt: new Date(editState.occurredAt).toISOString(),
+        title: values.title.trim(),
+        description: values.description.trim(),
+        occurredAt: new Date(values.occurredAt).toISOString(),
         imageUrl: nextImageUrl,
         imageStoragePath: nextImageStoragePath,
         imageWidth: nextImageWidth,
@@ -248,9 +235,10 @@ export function SessionEventsDialog({
       setEditEventId(null);
       setSelectedEditFile(null);
       setRemoveEditImage(false);
+      resetEdit(DEFAULT_FORM_VALUES());
     } catch (nextError) {
       console.error('Session event update error:', nextError);
-      setFormError(nextError instanceof Error ? nextError.message : 'Nem sikerült menteni az eseményt.');
+      setSubmitError(nextError instanceof Error ? nextError.message : 'Nem sikerült menteni az eseményt.');
     } finally {
       setSaving(false);
     }
@@ -258,7 +246,7 @@ export function SessionEventsDialog({
 
   const handleDelete = async (eventItem: SessionEvent) => {
     if (!isAdmin) {
-      setFormError('Csak admin törölhet eseményt.');
+      setSubmitError('Csak admin törölhet eseményt.');
       return;
     }
     const confirmed = window.confirm('Biztosan törlöd ezt a session eseményt?');
@@ -267,7 +255,7 @@ export function SessionEventsDialog({
     }
 
     setDeletingEventId(eventItem.id);
-    setFormError(null);
+    setSubmitError(null);
 
     try {
       if (eventItem.imageStoragePath) {
@@ -280,14 +268,25 @@ export function SessionEventsDialog({
         setEditEventId(null);
         setSelectedEditFile(null);
         setRemoveEditImage(false);
+        resetEdit(DEFAULT_FORM_VALUES());
       }
     } catch (nextError) {
       console.error('Session event delete error:', nextError);
-      setFormError(nextError instanceof Error ? nextError.message : 'Nem sikerült törölni az eseményt.');
+      setSubmitError(nextError instanceof Error ? nextError.message : 'Nem sikerült törölni az eseményt.');
     } finally {
       setDeletingEventId(null);
     }
   };
+
+  const createFormError =
+    (createErrors.title?.message as string | undefined) ||
+    (createErrors.occurredAt?.message as string | undefined) ||
+    submitError;
+
+  const editFormError =
+    (editErrors.title?.message as string | undefined) ||
+    (editErrors.occurredAt?.message as string | undefined) ||
+    submitError;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
@@ -316,7 +315,7 @@ export function SessionEventsDialog({
                 type="button"
                 onClick={() => {
                   setShowCreateForm((current) => !current);
-                  setFormError(null);
+                  setSubmitError(null);
                 }}
                 className="inline-flex items-center gap-2 rounded-xl bg-vine-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-vine-700"
               >
@@ -327,16 +326,16 @@ export function SessionEventsDialog({
           )}
 
           {isAdmin && showCreateForm && (
-            <form onSubmit={handleCreate} className="mb-4 space-y-3 rounded-2xl bg-vine-50/80 p-4 dark:bg-vine-900/40">
+            <form
+              onSubmit={handleCreateSubmit((values) => void handleCreate(values))}
+              className="mb-4 space-y-3 rounded-2xl bg-vine-50/80 p-4 dark:bg-vine-900/40"
+            >
               <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
                 <label className="space-y-1">
                   <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Időpont</span>
                   <input
                     type="datetime-local"
-                    value={createState.occurredAt}
-                    onChange={(nextEvent) =>
-                      setCreateState((current) => ({ ...current, occurredAt: nextEvent.target.value }))
-                    }
+                    {...registerCreate('occurredAt')}
                     className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                   />
                 </label>
@@ -344,10 +343,7 @@ export function SessionEventsDialog({
                 <label className="space-y-1">
                   <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Cím</span>
                   <input
-                    value={createState.title}
-                    onChange={(nextEvent) =>
-                      setCreateState((current) => ({ ...current, title: nextEvent.target.value }))
-                    }
+                    {...registerCreate('title')}
                     placeholder="pl. Átrakva a másik sátorba"
                     className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                   />
@@ -357,10 +353,7 @@ export function SessionEventsDialog({
               <label className="block space-y-1">
                 <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Leírás</span>
                 <textarea
-                  value={createState.description}
-                  onChange={(nextEvent) =>
-                    setCreateState((current) => ({ ...current, description: nextEvent.target.value }))
-                  }
+                  {...registerCreate('description')}
                   rows={3}
                   className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                 />
@@ -386,9 +379,9 @@ export function SessionEventsDialog({
                 </div>
               </div>
 
-              {formError && (
+              {createFormError && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                  {formError}
+                  {createFormError}
                 </div>
               )}
 
@@ -429,16 +422,13 @@ export function SessionEventsDialog({
                     className="rounded-2xl border border-vine-200 bg-vine-50/70 px-4 py-3 dark:border-vine-700 dark:bg-vine-900/40"
                   >
                     {isEditing ? (
-                      <form onSubmit={handleUpdate} className="space-y-3">
+                      <form onSubmit={handleEditSubmit((values) => void handleUpdate(values))} className="space-y-3">
                         <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
                           <label className="space-y-1">
                             <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Időpont</span>
                             <input
                               type="datetime-local"
-                              value={editState.occurredAt}
-                              onChange={(nextEvent) =>
-                                setEditState((current) => ({ ...current, occurredAt: nextEvent.target.value }))
-                              }
+                              {...registerEdit('occurredAt')}
                               className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                             />
                           </label>
@@ -446,10 +436,7 @@ export function SessionEventsDialog({
                           <label className="space-y-1">
                             <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Cím</span>
                             <input
-                              value={editState.title}
-                              onChange={(nextEvent) =>
-                                setEditState((current) => ({ ...current, title: nextEvent.target.value }))
-                              }
+                              {...registerEdit('title')}
                               className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                             />
                           </label>
@@ -458,10 +445,7 @@ export function SessionEventsDialog({
                         <label className="block space-y-1">
                           <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Leírás</span>
                           <textarea
-                            value={editState.description}
-                            onChange={(nextEvent) =>
-                              setEditState((current) => ({ ...current, description: nextEvent.target.value }))
-                            }
+                            {...registerEdit('description')}
                             rows={3}
                             className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                           />
@@ -502,9 +486,9 @@ export function SessionEventsDialog({
                           </div>
                         </div>
 
-                        {formError && (
+                        {editFormError && (
                           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                            {formError}
+                            {editFormError}
                           </div>
                         )}
 
@@ -523,7 +507,8 @@ export function SessionEventsDialog({
                               setEditEventId(null);
                               setSelectedEditFile(null);
                               setRemoveEditImage(false);
-                              setFormError(null);
+                              setSubmitError(null);
+                              resetEdit(DEFAULT_FORM_VALUES());
                             }}
                             className="rounded-xl border border-vine-200 bg-white px-4 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-100 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
                           >

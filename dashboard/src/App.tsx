@@ -14,13 +14,13 @@ import { SessionEventDialog } from './components/SessionEventDialog';
 import { CuttingsPage } from './components/CuttingsPage';
 import { useTheme } from './hooks/useTheme';
 import { useReadings } from './hooks/useReadings';
-import { useFirestoreReadings } from './hooks/useFirestoreReadings';
 import { useIsAdmin } from './hooks/useIsAdmin';
-import { useSessions } from './hooks/useSessions';
 import { useAllSessions } from './hooks/useAllSessions';
-import { useSessionEvents } from './hooks/useSessionEvents';
 import { useDevices } from './hooks/useDevices';
 import { useSessionTypes } from './hooks/useSessionTypes';
+import { useReadingsQuery } from './hooks/queries/useReadingsQuery';
+import { useSessionEventsQuery } from './hooks/queries/useSessionEventsQuery';
+import { useSessionsQuery } from './hooks/queries/useSessionsQuery';
 import { db } from './lib/firebase';
 import { formatDateTime, toDateTimeLocalValue } from './lib/dateFormat';
 import type { SessionEvent, TimeRange } from './types/sensor';
@@ -160,7 +160,7 @@ function Dashboard() {
   }, [allSessions, devices]);
   const effectiveDeviceId =
     selectedDeviceId ?? firstActiveSessionInList?.deviceId ?? devices[0]?.id ?? null;
-  const { sessions, activeSession, createSession, archiveSession } = useSessions(effectiveDeviceId);
+  const { sessions, activeSession, createSession, archiveSession } = useSessionsQuery(effectiveDeviceId);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null | undefined>(
     initialMonitorState.selectedSessionId,
   );
@@ -172,7 +172,7 @@ function Dashboard() {
       ? sessions.find((session) => session.status === 'active')?.id ?? null
       : selectedSessionId;
 
-  const { readings: allReadings, loading, error } = useFirestoreReadings(
+  const { readings: allReadings, loading, error } = useReadingsQuery(
     effectiveDeviceId,
     effectiveSessionId,
   );
@@ -204,7 +204,7 @@ function Dashboard() {
     createEvent,
     updateEvent,
     deleteEvent,
-  } = useSessionEvents(
+  } = useSessionEventsQuery(
     effectiveDeviceId,
     effectiveSessionId,
   );

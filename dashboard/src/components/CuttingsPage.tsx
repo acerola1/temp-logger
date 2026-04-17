@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { useForm } from 'react-hook-form';
 import {
   CalendarDays,
   Camera,
@@ -19,28 +21,32 @@ import { storage } from '../lib/firebase';
 import { prepareImageUpload } from '../lib/imageUpload';
 import { formatDate, formatDateTime, formatMonthDay, toDateTimeLocalValue } from '../lib/dateFormat';
 import { getFileExtension } from '../lib/fileUtils';
-import { useCuttings } from '../hooks/useCuttings';
+import {
+  cuttingFormSchema,
+  wateringLogSchema,
+  type CuttingFormValues,
+  type WateringLogValues,
+} from '../lib/schemas';
+import { useCuttingsQuery } from '../hooks/queries/useCuttingsQuery';
 import type { CreateCuttingInput, Cutting, CuttingPhoto, CuttingStatus } from '../types/cutting';
 
 interface CuttingsPageProps {
   isAdmin: boolean;
 }
 
-type CreateFormState = {
-  variety: string;
-  plantType: 'graft' | 'cutting';
-  plantedAt: string;
-  status: CuttingStatus;
-  notes: string;
-};
-
-const DEFAULT_FORM_STATE: CreateFormState = {
+const DEFAULT_FORM_VALUES = (): CuttingFormValues => ({
   variety: '',
   plantType: 'cutting',
   plantedAt: new Date().toISOString().slice(0, 10),
   status: 'active',
   notes: '',
-};
+});
+
+const DEFAULT_WATERING_LOG_VALUES = (): WateringLogValues => ({
+  occurredAt: toDateTimeLocalValue(),
+  title: '',
+  notes: '',
+});
 
 function isMobileUserAgent() {
   if (typeof navigator === 'undefined') return false;
@@ -132,11 +138,10 @@ async function uploadCuttingPhotos(cuttingId: string, files: FileList): Promise<
 }
 
 export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
-  const { data: cuttings, loading, error, createCutting, updateCutting } = useCuttings();
+  const { data: cuttings, loading, error, createCutting, updateCutting } = useCuttingsQuery();
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     getCuttingIdFromPath(window.location.pathname),
   );
-  const [formState, setFormState] = useState<CreateFormState>(DEFAULT_FORM_STATE);
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -144,21 +149,14 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   const [photoActionError, setPhotoActionError] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoDeletingId, setPhotoDeletingId] = useState<string | null>(null);
-  const [eventNotes, setEventNotes] = useState('');
-  const [eventTitle, setEventTitle] = useState('');
-  const [eventAt, setEventAt] = useState(toDateTimeLocalValue());
   const [eventSaving, setEventSaving] = useState(false);
   const [eventError, setEventError] = useState<string | null>(null);
   const [isAddEventFormOpen, setIsAddEventFormOpen] = useState(false);
   const [eventDeletingId, setEventDeletingId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
-  const [editingEventTitle, setEditingEventTitle] = useState('');
-  const [editingEventAt, setEditingEventAt] = useState(toDateTimeLocalValue());
-  const [editingEventNotes, setEditingEventNotes] = useState('');
   const [editingEventSaving, setEditingEventSaving] = useState(false);
   const [editingEventError, setEditingEventError] = useState<string | null>(null);
   const [targetCuttingIds, setTargetCuttingIds] = useState<string[]>([]);
-  const [editState, setEditState] = useState<CreateFormState>(DEFAULT_FORM_STATE);
   const [editMode, setEditMode] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -172,6 +170,42 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   const detailFileInputRef = useRef<HTMLInputElement>(null);
   const isMobileDevice = useMemo(() => isMobileUserAgent(), []);
   const [isMobileLayout, setIsMobileLayout] = useState(() => isMobileLayoutWidth());
+  const {
+    register: registerCreate,
+    handleSubmit: handleCreateSubmit,
+    reset: resetCreateForm,
+    formState: { errors: createFormErrors },
+  } = useForm<CuttingFormValues>({
+    resolver: zodResolver(cuttingFormSchema),
+    defaultValues: DEFAULT_FORM_VALUES(),
+  });
+  const {
+    register: registerEdit,
+    handleSubmit: handleEditFormSubmit,
+    reset: resetEditForm,
+    formState: { errors: editFormErrors },
+  } = useForm<CuttingFormValues>({
+    resolver: zodResolver(cuttingFormSchema),
+    defaultValues: DEFAULT_FORM_VALUES(),
+  });
+  const {
+    register: registerAddEvent,
+    handleSubmit: handleAddEventSubmit,
+    reset: resetAddEventForm,
+    formState: { errors: addEventFormErrors },
+  } = useForm<WateringLogValues>({
+    resolver: zodResolver(wateringLogSchema),
+    defaultValues: DEFAULT_WATERING_LOG_VALUES(),
+  });
+  const {
+    register: registerEditEvent,
+    handleSubmit: handleEditEventSubmit,
+    reset: resetEditEventForm,
+    formState: { errors: editEventFormErrors },
+  } = useForm<WateringLogValues>({
+    resolver: zodResolver(wateringLogSchema),
+    defaultValues: DEFAULT_WATERING_LOG_VALUES(),
+  });
 
   const selectedCutting = useMemo(
     () =>
@@ -223,7 +257,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
 
   useEffect(() => {
     if (!selectedCutting) {
-      setEditState(DEFAULT_FORM_STATE);
+      resetEditForm(DEFAULT_FORM_VALUES());
+      resetAddEventForm(DEFAULT_WATERING_LOG_VALUES());
+      resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
       setEditMode(false);
       setEditError(null);
       setActivePhotoId(null);
@@ -233,7 +269,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
       return;
     }
 
-    setEditState({
+    resetEditForm({
       variety: selectedCutting.variety,
       plantType: selectedCutting.plantType,
       plantedAt: toDateInputValue(selectedCutting.plantedAt),
@@ -245,10 +281,18 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     setActivePhotoId(selectedCutting.photos.at(-1)?.id ?? null);
     setEditingEventId(null);
     setEditingEventError(null);
+    resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
+    resetAddEventForm(DEFAULT_WATERING_LOG_VALUES());
     setTargetCuttingIds([selectedCutting.id]);
     setIsAddEventFormOpen(false);
     setEventError(null);
-  }, [nextSerialNumber, selectedCutting]);
+  }, [
+    nextSerialNumber,
+    resetAddEventForm,
+    resetEditEventForm,
+    resetEditForm,
+    selectedCutting,
+  ]);
 
   useEffect(() => {
     if (cuttings.length === 0) {
@@ -284,21 +328,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     }
   }, [nextSerialNumber, showCreateForm]);
 
-  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
+  const handleCreate = async (values: CuttingFormValues) => {
     if (!isAdmin) {
       setFormError('Csak admin tud új dugványt létrehozni.');
-      return;
-    }
-
-    if (!formState.variety.trim()) {
-      setFormError('A fajta megadása kötelező.');
-      return;
-    }
-
-    if (!formState.plantedAt) {
-      setFormError('Az ültetés dátuma kötelező.');
       return;
     }
 
@@ -310,18 +342,18 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
       const photos = selectedFiles ? await uploadCuttingPhotos(cuttingId, selectedFiles) : [];
       const payload: CreateCuttingInput = {
         serialNumber: nextSerialNumber,
-        variety: formState.variety,
-        plantType: formState.plantType,
-        plantedAt: formState.plantedAt,
-        status: formState.status,
-        notes: formState.notes,
+        variety: values.variety.trim(),
+        plantType: values.plantType,
+        plantedAt: values.plantedAt,
+        status: values.status,
+        notes: values.notes.trim(),
         photos,
       };
 
       await createCutting(cuttingId, payload);
       window.history.pushState({}, '', getCuttingPath(cuttingId));
       setSelectedId(cuttingId);
-      setFormState(DEFAULT_FORM_STATE);
+      resetCreateForm(DEFAULT_FORM_VALUES());
       setSelectedFiles(null);
       setShowCreateForm(false);
     } catch (nextError) {
@@ -502,15 +534,8 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     resetPhotoViewerTransform();
   }, [activePhoto?.id, isPhotoViewerOpen]);
 
-  const handleAddEvent = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
+  const handleAddEvent = async (values: WateringLogValues) => {
     if (!isAdmin) {
-      return;
-    }
-
-    if (!eventAt) {
-      setEventError('Az esemény időpontja kötelező.');
       return;
     }
 
@@ -525,9 +550,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     try {
       const sharedEvent = {
         id: crypto.randomUUID(),
-        occurredAt: new Date(eventAt).toISOString(),
-        title: eventTitle.trim() || 'Esemény',
-        notes: eventNotes.trim(),
+        occurredAt: new Date(values.occurredAt).toISOString(),
+        title: values.title.trim() || 'Esemény',
+        notes: values.notes.trim(),
       };
       const targetCuttings = cuttings.filter((cutting) => targetCuttingIds.includes(cutting.id));
 
@@ -539,9 +564,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
         ),
       );
 
-      setEventAt(toDateTimeLocalValue());
-      setEventTitle('');
-      setEventNotes('');
+      resetAddEventForm(DEFAULT_WATERING_LOG_VALUES());
       setTargetCuttingIds(selectedCutting ? [selectedCutting.id] : []);
       setIsAddEventFormOpen(false);
       setEventError(null);
@@ -557,9 +580,11 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
 
   const startEditingEvent = (log: { id: string; occurredAt: string; title: string; notes: string }) => {
     setEditingEventId(log.id);
-    setEditingEventAt(toDateTimeLocalValue(log.occurredAt));
-    setEditingEventTitle(log.title);
-    setEditingEventNotes(log.notes);
+    resetEditEventForm({
+      occurredAt: toDateTimeLocalValue(log.occurredAt),
+      title: log.title,
+      notes: log.notes,
+    });
     setEditingEventError(null);
   };
 
@@ -584,9 +609,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
 
       if (editingEventId === eventId) {
         setEditingEventId(null);
-        setEditingEventTitle('');
-        setEditingEventNotes('');
-        setEditingEventAt(toDateTimeLocalValue());
+        resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
       }
     } catch (nextError) {
       console.error('Cutting event delete error:', nextError);
@@ -600,15 +623,8 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     }
   };
 
-  const handleEditEvent = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
+  const handleEditEvent = async (values: WateringLogValues) => {
     if (!selectedCutting || !isAdmin || !editingEventId) {
-      return;
-    }
-
-    if (!editingEventAt) {
-      setEditingEventError('Az esemény időpontja kötelező.');
       return;
     }
 
@@ -621,18 +637,16 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
           log.id === editingEventId
             ? {
                 ...log,
-                occurredAt: new Date(editingEventAt).toISOString(),
-                title: editingEventTitle.trim() || 'Esemény',
-                notes: editingEventNotes.trim(),
+                occurredAt: new Date(values.occurredAt).toISOString(),
+                title: values.title.trim() || 'Esemény',
+                notes: values.notes.trim(),
               }
             : log,
         ),
       });
 
       setEditingEventId(null);
-      setEditingEventTitle('');
-      setEditingEventNotes('');
-      setEditingEventAt(toDateTimeLocalValue());
+      resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
     } catch (nextError) {
       console.error('Cutting event edit error:', nextError);
       setEditingEventError(
@@ -671,20 +685,8 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     resetPhotoViewerTransform();
   };
 
-  const handleEditSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
+  const handleEditSubmit = async (values: CuttingFormValues) => {
     if (!selectedCutting || !isAdmin) {
-      return;
-    }
-
-    if (!editState.variety.trim()) {
-      setEditError('A fajta megadása kötelező.');
-      return;
-    }
-
-    if (!editState.plantedAt) {
-      setEditError('Az ültetés dátuma kötelező.');
       return;
     }
 
@@ -693,11 +695,11 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
 
     try {
       await updateCutting(selectedCutting.id, {
-        variety: editState.variety.trim(),
-        plantType: editState.plantType,
-        plantedAt: editState.plantedAt,
-        status: editState.status,
-        notes: editState.notes.trim(),
+        variety: values.variety.trim(),
+        plantType: values.plantType,
+        plantedAt: values.plantedAt,
+        status: values.status,
+        notes: values.notes.trim(),
       });
       setEditMode(false);
     } catch (nextError) {
@@ -733,7 +735,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
 
       {showCreateForm && isAdmin && (
         <form
-          onSubmit={handleCreate}
+          onSubmit={handleCreateSubmit((values) => void handleCreate(values))}
           className="rounded-3xl border border-vine-200 bg-white/80 p-5 shadow-sm dark:border-vine-700 dark:bg-vine-800/60"
         >
           <div className="grid gap-4 md:grid-cols-2">
@@ -748,10 +750,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
               <span className="text-sm font-medium text-vine-700 dark:text-vine-200">Fajta</span>
               <input
                 list="known-grape-varieties"
-                value={formState.variety}
-                onChange={(event) =>
-                  setFormState((current) => ({ ...current, variety: event.target.value }))
-                }
+                {...registerCreate('variety')}
                 className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                 placeholder="pl. Kékfrankos"
               />
@@ -760,13 +759,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
             <label className="space-y-1">
               <span className="text-sm font-medium text-vine-700 dark:text-vine-200">Típus</span>
               <select
-                value={formState.plantType}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    plantType: event.target.value as CreateFormState['plantType'],
-                  }))
-                }
+                {...registerCreate('plantType')}
                 className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
               >
                 <option value="cutting">Dugvány</option>
@@ -778,10 +771,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
               <span className="text-sm font-medium text-vine-700 dark:text-vine-200">Ültetés dátuma</span>
               <input
                 type="date"
-                value={formState.plantedAt}
-                onChange={(event) =>
-                  setFormState((current) => ({ ...current, plantedAt: event.target.value }))
-                }
+                {...registerCreate('plantedAt')}
                 className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
               />
             </label>
@@ -789,13 +779,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
             <label className="space-y-1">
               <span className="text-sm font-medium text-vine-700 dark:text-vine-200">Állapot</span>
               <select
-                value={formState.status}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    status: event.target.value as CuttingStatus,
-                  }))
-                }
+                {...registerCreate('status')}
                 className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
               >
                 <option value="active">Aktív</option>
@@ -809,10 +793,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
           <label className="mt-4 block space-y-1">
             <span className="text-sm font-medium text-vine-700 dark:text-vine-200">Jegyzet</span>
             <textarea
-              value={formState.notes}
-              onChange={(event) =>
-                setFormState((current) => ({ ...current, notes: event.target.value }))
-              }
+              {...registerCreate('notes')}
               rows={3}
               className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
               placeholder="Rövid megjegyzés a dugvány állapotáról"
@@ -867,9 +848,11 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
             </p>
           </label>
 
-          {formError && (
+          {(createFormErrors.variety?.message || createFormErrors.plantedAt?.message || formError) && (
             <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-              {formError}
+              {createFormErrors.variety?.message ??
+                createFormErrors.plantedAt?.message ??
+                formError}
             </div>
           )}
 
@@ -1051,7 +1034,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
 
                 {editMode && isAdmin && (
                   <form
-                    onSubmit={handleEditSubmit}
+                    onSubmit={handleEditFormSubmit((values) => void handleEditSubmit(values))}
                     className="rounded-2xl border border-vine-200 bg-vine-50/80 p-4 dark:border-vine-700 dark:bg-vine-800/40"
                   >
                     <div className="grid gap-4 md:grid-cols-2">
@@ -1070,10 +1053,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                         </span>
                         <input
                           list="known-grape-varieties"
-                          value={editState.variety}
-                          onChange={(event) =>
-                            setEditState((current) => ({ ...current, variety: event.target.value }))
-                          }
+                          {...registerEdit('variety')}
                           className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                         />
                       </label>
@@ -1083,13 +1063,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                           Típus
                         </span>
                         <select
-                          value={editState.plantType}
-                          onChange={(event) =>
-                            setEditState((current) => ({
-                              ...current,
-                              plantType: event.target.value as CreateFormState['plantType'],
-                            }))
-                          }
+                          {...registerEdit('plantType')}
                           className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                         >
                           <option value="cutting">Dugvány</option>
@@ -1103,10 +1077,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                         </span>
                         <input
                           type="date"
-                          value={editState.plantedAt}
-                          onChange={(event) =>
-                            setEditState((current) => ({ ...current, plantedAt: event.target.value }))
-                          }
+                          {...registerEdit('plantedAt')}
                           className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                         />
                       </label>
@@ -1116,13 +1087,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                           Állapot
                         </span>
                         <select
-                          value={editState.status}
-                          onChange={(event) =>
-                            setEditState((current) => ({
-                              ...current,
-                              status: event.target.value as CuttingStatus,
-                            }))
-                          }
+                          {...registerEdit('status')}
                           className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                         >
                           <option value="active">Aktív</option>
@@ -1138,18 +1103,17 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                         Jegyzet
                       </span>
                       <textarea
-                        value={editState.notes}
-                        onChange={(event) =>
-                          setEditState((current) => ({ ...current, notes: event.target.value }))
-                        }
+                        {...registerEdit('notes')}
                         rows={3}
                         className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                       />
                     </label>
 
-                    {editError && (
+                    {(editFormErrors.variety?.message || editFormErrors.plantedAt?.message || editError) && (
                       <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                        {editError}
+                        {editFormErrors.variety?.message ??
+                          editFormErrors.plantedAt?.message ??
+                          editError}
                       </div>
                     )}
 
@@ -1167,7 +1131,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                         onClick={() => {
                           setEditMode(false);
                           setEditError(null);
-                          setEditState({
+                          resetEditForm({
                             variety: selectedCutting.variety,
                             plantType: selectedCutting.plantType,
                             plantedAt: toDateInputValue(selectedCutting.plantedAt),
@@ -1535,7 +1499,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
 
                   {isAdmin && isAddEventFormOpen && (
                     <form
-                      onSubmit={handleAddEvent}
+                      onSubmit={handleAddEventSubmit((values) => void handleAddEvent(values))}
                       className="rounded-2xl border border-vine-200 bg-vine-50/80 p-4 dark:border-vine-700 dark:bg-vine-800/40"
                     >
                       <div className="grid gap-3 md:grid-cols-[220px_220px_minmax(0,1fr)]">
@@ -1545,8 +1509,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                           </span>
                           <input
                             type="datetime-local"
-                            value={eventAt}
-                            onChange={(event) => setEventAt(event.target.value)}
+                            {...registerAddEvent('occurredAt')}
                             className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                           />
                         </label>
@@ -1556,8 +1519,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                             Cím
                           </span>
                           <input
-                            value={eventTitle}
-                            onChange={(event) => setEventTitle(event.target.value)}
+                            {...registerAddEvent('title')}
                             placeholder="pl. Permetezés"
                             className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                           />
@@ -1568,8 +1530,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                             Jegyzet
                           </span>
                           <input
-                            value={eventNotes}
-                            onChange={(event) => setEventNotes(event.target.value)}
+                            {...registerAddEvent('notes')}
                             placeholder="pl. lombtrágya kijuttatva"
                             className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                           />
@@ -1633,9 +1594,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                         </span>
                       </div>
 
-                      {eventError && (
+                      {(addEventFormErrors.occurredAt?.message || eventError) && (
                         <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                          {eventError}
+                          {addEventFormErrors.occurredAt?.message ?? eventError}
                         </div>
                       )}
                     </form>
@@ -1658,7 +1619,10 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                               className="rounded-2xl bg-vine-50 px-4 py-3 text-sm text-vine-700 dark:bg-vine-800/50 dark:text-vine-100"
                             >
                               {isEditing && isAdmin ? (
-                                <form onSubmit={handleEditEvent} className="space-y-3">
+                                <form
+                                  onSubmit={handleEditEventSubmit((values) => void handleEditEvent(values))}
+                                  className="space-y-3"
+                                >
                                   <div className="grid gap-3 md:grid-cols-[220px_220px_minmax(0,1fr)]">
                                     <label className="space-y-1">
                                       <span className="text-xs font-medium text-vine-700 dark:text-vine-200">
@@ -1666,8 +1630,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                                       </span>
                                       <input
                                         type="datetime-local"
-                                        value={editingEventAt}
-                                        onChange={(event) => setEditingEventAt(event.target.value)}
+                                        {...registerEditEvent('occurredAt')}
                                         className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                                       />
                                     </label>
@@ -1677,8 +1640,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                                         Cím
                                       </span>
                                       <input
-                                        value={editingEventTitle}
-                                        onChange={(event) => setEditingEventTitle(event.target.value)}
+                                        {...registerEditEvent('title')}
                                         className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                                       />
                                     </label>
@@ -1688,16 +1650,15 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                                         Jegyzet
                                       </span>
                                       <input
-                                        value={editingEventNotes}
-                                        onChange={(event) => setEditingEventNotes(event.target.value)}
+                                        {...registerEditEvent('notes')}
                                         className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                                       />
                                     </label>
                                   </div>
 
-                                  {editingEventError && (
+                                  {(editEventFormErrors.occurredAt?.message || editingEventError) && (
                                     <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-                                      {editingEventError}
+                                      {editEventFormErrors.occurredAt?.message ?? editingEventError}
                                     </div>
                                   )}
 
@@ -1716,7 +1677,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                                       type="button"
                                       onClick={() => {
                                         setEditingEventId(null);
-                                        setEditingEventTitle('');
+                                        resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
                                         setEditingEventError(null);
                                       }}
                                       className="rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"

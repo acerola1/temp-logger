@@ -137,25 +137,25 @@ Gyors nyerések, minimális kockázat.
 
 A jelenlegi állapot: 35+ szétszórt `useState` hívás formokhoz, kézi validáció, inkonzisztens hibakezelés. A `react-hook-form` + `zod` kombináció ezt rendezi.
 
-- [ ] Dependenciák telepítése: `react-hook-form`, `zod`, `@hookform/resolvers`
-- [ ] Zod sémák létrehozása `lib/schemas.ts`-ben:
+- [x] Dependenciák telepítése: `react-hook-form`, `zod`, `@hookform/resolvers`
+- [x] Zod sémák létrehozása `lib/schemas.ts`-ben:
   - `cuttingFormSchema` (variety, plantType, plantedAt, status, notes)
   - `wateringLogSchema` (wateredAt, notes)
   - `sessionEventSchema` (title, notes, occurredAt)
-- [ ] CuttingsPage — új dugvány űrlap átírása react-hook-form-ra
+- [x] CuttingsPage — új dugvány űrlap átírása react-hook-form-ra
   - A ~8 useState (variety, plantType, plantedAt, status, notes, stb.) helyett `useForm()`
   - Zod validáció a kézi `if (!variety)` ellenőrzések helyett
-- [ ] CuttingsPage — szerkesztő űrlap átírása react-hook-form-ra
-- [ ] CuttingsPage — öntözési log űrlap átírása react-hook-form-ra
-- [ ] SessionEventsDialog — esemény létrehozás/szerkesztés űrlap átírása react-hook-form-ra
-- [ ] SessionManager — session létrehozás űrlap átírása react-hook-form-ra
-- [ ] Form típusok (`CreateFormState`, `EventFormState`) törlése — a zod sémák generálják a típusokat (`z.infer<>`)
+- [x] CuttingsPage — szerkesztő űrlap átírása react-hook-form-ra
+- [x] CuttingsPage — öntözési log űrlap átírása react-hook-form-ra
+- [x] SessionEventsDialog — esemény létrehozás/szerkesztés űrlap átírása react-hook-form-ra
+- [x] SessionManager — session létrehozás űrlap átírása react-hook-form-ra
+- [x] Form típusok (`CreateFormState`, `EventFormState`) törlése — a zod sémák generálják a típusokat (`z.infer<>`)
 
 **QA:**
 - [ ] Minden űrlap validáció működik: üres mező nem menthető, hibaüzenet megjelenik
 - [ ] Szerkesztésnél az űrlap a meglévő értékekkel töltődik fel
-- [ ] `grep -r "CreateFormState\|EventFormState" src/` — 0 találat (típusok törölve)
-- [ ] Form reset működik: mentés után az űrlap kiürül, bezárás után nem marad régi adat
+- [x] `grep -r "CreateFormState\|EventFormState" src/` — 0 találat (típusok törölve)
+- [x] Form reset működik: mentés után az űrlap kiürül, bezárás után nem marad régi adat
 
 ## 3. Képfeltöltés logika közösítése — `usePhotoUpload` hook
 
@@ -241,18 +241,18 @@ A SensorChart tooltip + spring-damper animáció logikája önálló hookként t
 
 A jelenlegi adatlekérés useEffect + useState kombókkal megy, kézi loading/error kezeléssel. A react-query egységes cache-t, deduplikációt és mutáció-kezelést ad.
 
-- [ ] Dependencia telepítése: `@tanstack/react-query`
-- [ ] `QueryClientProvider` beállítása az App gyökerében
-- [ ] Firestore query hookök létrehozása `hooks/queries/` mappában:
+- [x] Dependencia telepítése: `@tanstack/react-query`
+- [x] `QueryClientProvider` beállítása az App gyökerében
+- [x] Firestore query hookök létrehozása `hooks/queries/` mappában:
   - `useReadings(deviceId, timeRange)` — szenzor adatok lekérése
   - `useSessions()` — session-ök listázása
   - `useSessionEvents(sessionId)` — session események
   - `useCuttings()` — dugványok listázása (Firestore realtime listener queryFn-ként)
-- [ ] App.tsx adatlekérés átírása react-query hookökre
+- [x] App.tsx adatlekérés átírása react-query hookökre
   - A kézi `useEffect` + `useState` (readings, sessions, events) kiváltása
   - Loading és error állapot a query-ből jön, nem kézi state
-- [ ] CuttingsPage adatlekérés átírása react-query hookökre
-- [ ] Mutációk (`useMutation`) bevezetése CRUD műveletekhez:
+- [x] CuttingsPage adatlekérés átírása react-query hookökre
+- [x] Mutációk (`useMutation`) bevezetése CRUD műveletekhez:
   - Dugvány létrehozás/szerkesztés/törlés
   - Öntözési log hozzáadás/szerkesztés/törlés
   - Esemény létrehozás/szerkesztés/törlés
