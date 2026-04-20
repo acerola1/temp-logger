@@ -27,6 +27,45 @@ interface SensorLineChartProps {
   onMouseLeave: () => void;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function startOfLocalDay(timestampMs: number): number {
+  const date = new Date(timestampMs);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+function buildDayBands(timeDomain: [number, number]) {
+  const [domainStart, domainEnd] = timeDomain;
+  if (!Number.isFinite(domainStart) || !Number.isFinite(domainEnd) || domainEnd <= domainStart) {
+    return [];
+  }
+
+  const bands: Array<{ x1: number; x2: number; key: string; isAlternate: boolean }> = [];
+  let dayStart = startOfLocalDay(domainStart);
+  let dayIndex = 0;
+
+  while (dayStart < domainEnd) {
+    const dayEnd = dayStart + DAY_MS;
+    const x1 = Math.max(dayStart, domainStart);
+    const x2 = Math.min(dayEnd, domainEnd);
+
+    if (x2 > x1) {
+      bands.push({
+        x1,
+        x2,
+        key: `day-band-${dayStart}`,
+        isAlternate: dayIndex % 2 === 1,
+      });
+    }
+
+    dayStart = dayEnd;
+    dayIndex += 1;
+  }
+
+  return bands;
+}
+
 export function SensorLineChart({
   data,
   dataKey,
@@ -42,9 +81,24 @@ export function SensorLineChart({
   onMouseMove,
   onMouseLeave,
 }: SensorLineChartProps) {
+  const dayBands = buildDayBands(timeDomain);
+  const primaryDayFill = isDark ? '#1f2937' : '#ffffff';
+  const alternateDayFill = isDark ? '#273449' : '#f3f4f6';
+
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
       <LineChart data={data} margin={chartMargin} onClick={onClick} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}>
+        {dayBands.map((band) => (
+          <ReferenceArea
+            key={band.key}
+            x1={band.x1}
+            x2={band.x2}
+            ifOverflow="extendDomain"
+            fill={band.isAlternate ? alternateDayFill : primaryDayFill}
+            fillOpacity={0.3}
+            strokeOpacity={0}
+          />
+        ))}
         <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
         {bounds && sessionType && (
           <ReferenceArea
