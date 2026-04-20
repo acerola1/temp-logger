@@ -7,14 +7,20 @@ interface CuttingsListProps {
   cuttings: Cutting[];
   selectedCuttingId: string | null;
   onSelectCutting: (cuttingId: string) => void;
+  emptyMessage?: string;
 }
 
-export function CuttingsList({ cuttings, selectedCuttingId, onSelectCutting }: CuttingsListProps) {
+export function CuttingsList({
+  cuttings,
+  selectedCuttingId,
+  onSelectCutting,
+  emptyMessage = 'Még nincs felvitt dugvány.',
+}: CuttingsListProps) {
   return (
     <aside className="space-y-3">
       {cuttings.length === 0 && (
         <div className="rounded-3xl border border-dashed border-vine-300 bg-white/70 p-6 text-sm text-vine-500 dark:border-vine-700 dark:bg-vine-800/40 dark:text-vine-300">
-          Még nincs felvitt dugvány.
+          {emptyMessage}
         </div>
       )}
 

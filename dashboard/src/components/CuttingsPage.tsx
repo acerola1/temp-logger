@@ -14,6 +14,12 @@ interface CuttingsPageProps {
   isAdmin: boolean;
 }
 
+type CuttingsSort = 'updated_desc' | 'created_desc' | 'planted_desc';
+type CuttingsTypeFilter = 'all' | 'cutting' | 'graft';
+
+const DEFAULT_SORT: CuttingsSort = 'updated_desc';
+const DEFAULT_TYPE: CuttingsTypeFilter = 'all';
+
 const DEFAULT_FORM_VALUES = (): CuttingFormValues => ({
   variety: '',
   plantType: 'cutting',
@@ -21,6 +27,44 @@ const DEFAULT_FORM_VALUES = (): CuttingFormValues => ({
   status: 'active',
   notes: '',
 });
+
+function parseCuttingsFiltersFromSearch(search: string): {
+  query: string;
+  type: CuttingsTypeFilter;
+  sort: CuttingsSort;
+} {
+  const params = new URLSearchParams(search);
+  const query = (params.get('q') ?? '').trim();
+  const rawType = params.get('type');
+  const rawSort = params.get('sort');
+
+  const type: CuttingsTypeFilter =
+    rawType === 'cutting' || rawType === 'graft' ? rawType : DEFAULT_TYPE;
+  const sort: CuttingsSort =
+    rawSort === 'created_desc' || rawSort === 'planted_desc' || rawSort === 'updated_desc'
+      ? rawSort
+      : DEFAULT_SORT;
+
+  return { query, type, sort };
+}
+
+function buildCuttingsSearch(query: string, type: CuttingsTypeFilter, sort: CuttingsSort): string {
+  const params = new URLSearchParams();
+  const trimmedQuery = query.trim();
+
+  if (trimmedQuery.length > 0) {
+    params.set('q', trimmedQuery);
+  }
+  if (type !== DEFAULT_TYPE) {
+    params.set('type', type);
+  }
+  if (sort !== DEFAULT_SORT) {
+    params.set('sort', sort);
+  }
+
+  const serialized = params.toString();
+  return serialized.length > 0 ? `?${serialized}` : '';
+}
 
 function isMobileLayoutWidth() {
   if (typeof window === 'undefined') return false;
@@ -46,6 +90,13 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   );
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(() => isMobileLayoutWidth());
+  const [searchQuery, setSearchQuery] = useState(() => parseCuttingsFiltersFromSearch(window.location.search).query);
+  const [typeFilter, setTypeFilter] = useState<CuttingsTypeFilter>(
+    () => parseCuttingsFiltersFromSearch(window.location.search).type,
+  );
+  const [sortBy, setSortBy] = useState<CuttingsSort>(
+    () => parseCuttingsFiltersFromSearch(window.location.search).sort,
+  );
 
   const selectedCutting = useMemo(
     () => cuttings.find((cutting) => cutting.id === selectedId) ?? null,
@@ -66,6 +117,33 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
       ).sort((left, right) => left.localeCompare(right, 'hu')),
     [cuttings],
   );
+  const filteredAndSortedCuttings = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLocaleLowerCase('hu');
+    const filtered = cuttings.filter((cutting) => {
+      if (typeFilter !== 'all' && cutting.plantType !== typeFilter) {
+        return false;
+      }
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      const varietyMatch = cutting.variety.toLocaleLowerCase('hu').includes(normalizedQuery);
+      const serialMatch = String(cutting.serialNumber).includes(normalizedQuery);
+      return varietyMatch || serialMatch;
+    });
+
+    const toMs = (value: string) => new Date(value).getTime();
+
+    return [...filtered].sort((left, right) => {
+      if (sortBy === 'created_desc') {
+        return toMs(right.createdAt) - toMs(left.createdAt);
+      }
+      if (sortBy === 'planted_desc') {
+        return toMs(right.plantedAt) - toMs(left.plantedAt);
+      }
+      return toMs(right.updatedAt) - toMs(left.updatedAt);
+    });
+  }, [cuttings, searchQuery, sortBy, typeFilter]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1023px)');
@@ -78,6 +156,10 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   useEffect(() => {
     const handlePopState = () => {
       setSelectedId(getCuttingIdFromPath(window.location.pathname));
+      const parsed = parseCuttingsFiltersFromSearch(window.location.search);
+      setSearchQuery(parsed.query);
+      setTypeFilter(parsed.type);
+      setSortBy(parsed.sort);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -87,23 +169,32 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   useEffect(() => {
     if (cuttings.length === 0) {
       if (window.location.pathname !== '/dugvanyok') {
-        window.history.replaceState({}, '', '/dugvanyok');
+        window.history.replaceState({}, '', `/dugvanyok${window.location.search}`);
       }
       return;
     }
 
     if (!selectedCutting) {
       if (window.location.pathname !== '/dugvanyok') {
-        window.history.replaceState({}, '', '/dugvanyok');
+        window.history.replaceState({}, '', `/dugvanyok${window.location.search}`);
       }
       return;
     }
 
-    const expectedPath = getCuttingPath(selectedCutting.id);
-    if (window.location.pathname !== expectedPath) {
-      window.history.replaceState({}, '', expectedPath);
+    const expectedPathWithSearch = `${getCuttingPath(selectedCutting.id)}${window.location.search}`;
+    const currentPathWithSearch = `${window.location.pathname}${window.location.search}`;
+    if (currentPathWithSearch !== expectedPathWithSearch) {
+      window.history.replaceState({}, '', expectedPathWithSearch);
     }
   }, [cuttings, selectedCutting]);
+
+  useEffect(() => {
+    const nextSearch = buildCuttingsSearch(searchQuery, typeFilter, sortBy);
+    if (window.location.search === nextSearch) {
+      return;
+    }
+    window.history.replaceState({}, '', `${window.location.pathname}${nextSearch}`);
+  }, [searchQuery, sortBy, typeFilter]);
 
   const handleCreate = async (values: CuttingFormValues, files: FileList | null) => {
     if (!isAdmin) {
@@ -129,22 +220,25 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     };
 
     await createCutting(cuttingId, payload);
-    window.history.pushState({}, '', getCuttingPath(cuttingId));
+    window.history.pushState({}, '', `${getCuttingPath(cuttingId)}${window.location.search}`);
     setSelectedId(cuttingId);
     setShowCreateForm(false);
   };
 
   const handleSelectCutting = (cuttingId: string) => {
-    const nextPath = getCuttingPath(cuttingId);
-    if (window.location.pathname !== nextPath) {
+    const nextPath = `${getCuttingPath(cuttingId)}${window.location.search}`;
+    const currentPathWithSearch = `${window.location.pathname}${window.location.search}`;
+    if (currentPathWithSearch !== nextPath) {
       window.history.pushState({}, '', nextPath);
     }
     setSelectedId(cuttingId);
   };
 
   const handleCloseSelectedCutting = () => {
-    if (window.location.pathname !== '/dugvanyok') {
-      window.history.pushState({}, '', '/dugvanyok');
+    const nextPath = `/dugvanyok${window.location.search}`;
+    const currentPathWithSearch = `${window.location.pathname}${window.location.search}`;
+    if (currentPathWithSearch !== nextPath) {
+      window.history.pushState({}, '', nextPath);
     }
     setSelectedId(null);
   };
@@ -207,11 +301,49 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
 
       {!loading && !error && (
         <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <CuttingsList
-            cuttings={cuttings}
-            selectedCuttingId={selectedCutting?.id ?? null}
-            onSelectCutting={handleSelectCutting}
-          />
+          <aside className="space-y-3">
+            <div className="rounded-2xl border border-vine-200 bg-white/80 p-2.5 dark:border-vine-700 dark:bg-vine-900/50">
+              <div className="grid gap-2">
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Fajta vagy # sorszám"
+                  className="h-9 rounded-lg border border-vine-200 bg-white px-2.5 text-sm text-vine-900 outline-none ring-0 placeholder:text-vine-400 focus:border-vine-400 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50 dark:placeholder:text-vine-400 dark:focus:border-vine-500"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={sortBy}
+                    onChange={(event) => setSortBy(event.target.value as CuttingsSort)}
+                    className="h-9 rounded-lg border border-vine-200 bg-white px-2.5 text-sm text-vine-900 outline-none ring-0 focus:border-vine-400 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50 dark:focus:border-vine-500"
+                  >
+                    <option value="updated_desc">Utoljára módosítva</option>
+                    <option value="created_desc">Létrehozva</option>
+                    <option value="planted_desc">Ültetési dátum</option>
+                  </select>
+                  <select
+                    value={typeFilter}
+                    onChange={(event) => setTypeFilter(event.target.value as CuttingsTypeFilter)}
+                    className="h-9 rounded-lg border border-vine-200 bg-white px-2.5 text-sm text-vine-900 outline-none ring-0 focus:border-vine-400 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50 dark:focus:border-vine-500"
+                  >
+                    <option value="all">Mind</option>
+                    <option value="cutting">Dugvány</option>
+                    <option value="graft">Oltvány</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <CuttingsList
+              cuttings={filteredAndSortedCuttings}
+              selectedCuttingId={selectedCutting?.id ?? null}
+              onSelectCutting={handleSelectCutting}
+              emptyMessage={
+                cuttings.length > 0
+                  ? 'Nincs találat a megadott szűrőkkel.'
+                  : 'Még nincs felvitt dugvány.'
+              }
+            />
+          </aside>
 
           <CuttingDetail
             cuttings={cuttings}

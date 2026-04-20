@@ -7,8 +7,8 @@ import {
   ExternalLink,
   ImagePlus,
   Loader2,
-  Search,
-  SearchX,
+  Minus,
+  Plus,
   Sprout,
   Trash2,
   X,
@@ -44,6 +44,14 @@ export function CuttingPhotoGallery({
   const [photoViewerOffset, setPhotoViewerOffset] = useState({ x: 0, y: 0 });
   const [isPhotoViewerDragging, setIsPhotoViewerDragging] = useState(false);
   const [photoViewerDragStart, setPhotoViewerDragStart] = useState({ x: 0, y: 0 });
+  const [activePointerId, setActivePointerId] = useState<number | null>(null);
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchGestureRef = useRef<{
+    startDistance: number;
+    startZoom: number;
+    startMidpoint: { x: number; y: number };
+    startOffset: { x: number; y: number };
+  } | null>(null);
   const detailFileInputRef = useRef<HTMLInputElement>(null);
   const latestPhotosRef = useRef(cutting.photos);
   const { isMobileDevice, openPicker } = usePhotoPicker();
@@ -80,6 +88,9 @@ export function CuttingPhotoGallery({
     setPhotoViewerZoom(1);
     setPhotoViewerOffset({ x: 0, y: 0 });
     setIsPhotoViewerDragging(false);
+    setActivePointerId(null);
+    activePointersRef.current.clear();
+    pinchGestureRef.current = null;
   }, []);
 
   const adjustPhotoViewerZoom = useCallback((delta: number) => {
@@ -163,6 +174,22 @@ export function CuttingPhotoGallery({
     zoomOutPhotoViewer,
   ]);
 
+  useEffect(() => {
+    if (!isPhotoViewerOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscrollBehavior;
+    };
+  }, [isPhotoViewerOpen]);
+
   const handleAddPhotos = async (files: FileList | null) => {
     if (!files || !isAdmin) {
       return;
@@ -217,6 +244,162 @@ export function CuttingPhotoGallery({
       console.error('Cutting photo delete error:', error);
     } finally {
       setPhotoDeletingId(null);
+    }
+  };
+
+  const startPhotoViewerDrag = (pointerId: number, clientX: number, clientY: number) => {
+    if (photoViewerZoom <= 1) {
+      return;
+    }
+    setIsPhotoViewerDragging(true);
+    setActivePointerId(pointerId);
+    setPhotoViewerDragStart({
+      x: clientX - photoViewerOffset.x,
+      y: clientY - photoViewerOffset.y,
+    });
+  };
+
+  const updatePhotoViewerDrag = (pointerId: number, clientX: number, clientY: number) => {
+    if (!isPhotoViewerDragging || photoViewerZoom <= 1 || activePointerId !== pointerId) {
+      return;
+    }
+    setPhotoViewerOffset({
+      x: clientX - photoViewerDragStart.x,
+      y: clientY - photoViewerDragStart.y,
+    });
+  };
+
+  const endPhotoViewerDrag = (pointerId: number) => {
+    if (activePointerId !== pointerId) {
+      return;
+    }
+    setIsPhotoViewerDragging(false);
+    setActivePointerId(null);
+  };
+
+  const clearPhotoViewerGestures = useCallback(() => {
+    activePointersRef.current.clear();
+    pinchGestureRef.current = null;
+    setIsPhotoViewerDragging(false);
+    setActivePointerId(null);
+  }, []);
+
+  useEffect(() => {
+    if (!isPhotoViewerOpen) {
+      clearPhotoViewerGestures();
+    }
+  }, [clearPhotoViewerGestures, isPhotoViewerOpen]);
+
+  const startPinchGesture = (zoom: number, offset: { x: number; y: number }) => {
+    const pointers = Array.from(activePointersRef.current.values());
+    if (pointers.length !== 2) {
+      pinchGestureRef.current = null;
+      return;
+    }
+
+    const [a, b] = pointers;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < 1) {
+      pinchGestureRef.current = null;
+      return;
+    }
+
+    pinchGestureRef.current = {
+      startDistance: distance,
+      startZoom: zoom,
+      startMidpoint: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      startOffset: offset,
+    };
+  };
+
+  const handleViewerPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (activePointersRef.current.size >= 2) {
+      setIsPhotoViewerDragging(false);
+      setActivePointerId(null);
+      startPinchGesture(photoViewerZoom, photoViewerOffset);
+      return;
+    }
+
+    pinchGestureRef.current = null;
+    if (photoViewerZoom > 1) {
+      startPhotoViewerDrag(event.pointerId, event.clientX, event.clientY);
+    }
+  };
+
+  const handleViewerPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!activePointersRef.current.has(event.pointerId)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (activePointersRef.current.size >= 2) {
+      const pinch = pinchGestureRef.current;
+      if (!pinch) {
+        startPinchGesture(photoViewerZoom, photoViewerOffset);
+        return;
+      }
+
+      const pointers = Array.from(activePointersRef.current.values());
+      const [a, b] = pointers;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < 1) {
+        return;
+      }
+
+      const midpoint = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const distanceScale = distance / pinch.startDistance;
+      const nextZoom = Math.max(1, Math.min(6, pinch.startZoom * distanceScale));
+      setPhotoViewerZoom(nextZoom);
+
+      if (nextZoom <= 1) {
+        setPhotoViewerOffset({ x: 0, y: 0 });
+        setIsPhotoViewerDragging(false);
+        setActivePointerId(null);
+      } else {
+        setPhotoViewerOffset({
+          x: pinch.startOffset.x + (midpoint.x - pinch.startMidpoint.x),
+          y: pinch.startOffset.y + (midpoint.y - pinch.startMidpoint.y),
+        });
+      }
+      return;
+    }
+
+    pinchGestureRef.current = null;
+    if (photoViewerZoom > 1) {
+      updatePhotoViewerDrag(event.pointerId, event.clientX, event.clientY);
+    }
+  };
+
+  const handleViewerPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    activePointersRef.current.delete(event.pointerId);
+    endPhotoViewerDrag(event.pointerId);
+
+    if (activePointersRef.current.size >= 2) {
+      startPinchGesture(photoViewerZoom, photoViewerOffset);
+      return;
+    }
+
+    pinchGestureRef.current = null;
+    if (activePointersRef.current.size === 1 && photoViewerZoom > 1) {
+      const [remainingPointerId, point] = Array.from(activePointersRef.current.entries())[0];
+      startPhotoViewerDrag(remainingPointerId, point.x, point.y);
     }
   };
 
@@ -397,7 +580,7 @@ export function CuttingPhotoGallery({
               setIsPhotoViewerOpen(false);
               resetPhotoViewerTransform();
             }}
-            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
+            className="absolute right-4 top-4 z-40 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
             aria-label="Bezárás"
           >
             <X className="h-5 w-5" />
@@ -408,14 +591,14 @@ export function CuttingPhotoGallery({
             target="_blank"
             rel="noreferrer"
             onClick={(event) => event.stopPropagation()}
-            className="absolute right-16 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
+            className="absolute right-16 top-4 z-40 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
             aria-label="Megnyitás új lapon"
             title="Megnyitás új lapon"
           >
             <ExternalLink className="h-5 w-5" />
           </a>
 
-          <div className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-xl border border-white/30 bg-black/40 p-1 text-white">
+          <div className="absolute left-4 top-4 z-40 inline-flex items-center gap-1 rounded-xl border border-white/30 bg-black/40 p-1 text-white">
             <button
               type="button"
               onClick={(event) => {
@@ -426,7 +609,7 @@ export function CuttingPhotoGallery({
               aria-label="Kicsinyítés"
               title="Kicsinyítés"
             >
-              <SearchX className="h-4 w-4" />
+              <Minus className="h-4 w-4" />
             </button>
             <span className="px-2 text-xs tabular-nums">{Math.round(photoViewerZoom * 100)}%</span>
             <button
@@ -439,7 +622,7 @@ export function CuttingPhotoGallery({
               aria-label="Nagyítás"
               title="Nagyítás"
             >
-              <Search className="h-4 w-4" />
+              <Plus className="h-4 w-4" />
             </button>
             <button
               type="button"
@@ -463,7 +646,7 @@ export function CuttingPhotoGallery({
                   event.stopPropagation();
                   goToPreviousPhoto();
                 }}
-                className="absolute left-4 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
+                className="absolute left-4 top-1/2 z-40 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
                 aria-label="Előző kép"
               >
                 <ChevronLeft className="h-6 w-6" />
@@ -474,7 +657,7 @@ export function CuttingPhotoGallery({
                   event.stopPropagation();
                   goToNextPhoto();
                 }}
-                className="absolute right-4 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
+                className="absolute right-4 top-1/2 z-40 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white transition-colors hover:bg-black/60"
                 aria-label="Következő kép"
               >
                 <ChevronRight className="h-6 w-6" />
@@ -483,35 +666,18 @@ export function CuttingPhotoGallery({
           )}
 
           <div
-            className="flex h-[calc(100vh-96px)] w-[calc(100vw-80px)] cursor-default items-center justify-center overflow-hidden"
+            className="relative z-10 touch-none flex h-[calc(100vh-96px)] w-[calc(100vw-80px)] cursor-default items-center justify-center overflow-hidden"
             onClick={(event) => event.stopPropagation()}
             onWheel={(event) => {
               event.stopPropagation();
               event.preventDefault();
               adjustPhotoViewerZoom(event.deltaY > 0 ? -0.15 : 0.15);
             }}
-            onMouseDown={(event) => {
-              if (photoViewerZoom <= 1) {
-                return;
-              }
-              event.preventDefault();
-              setIsPhotoViewerDragging(true);
-              setPhotoViewerDragStart({
-                x: event.clientX - photoViewerOffset.x,
-                y: event.clientY - photoViewerOffset.y,
-              });
-            }}
-            onMouseMove={(event) => {
-              if (!isPhotoViewerDragging || photoViewerZoom <= 1) {
-                return;
-              }
-              setPhotoViewerOffset({
-                x: event.clientX - photoViewerDragStart.x,
-                y: event.clientY - photoViewerDragStart.y,
-              });
-            }}
-            onMouseUp={() => setIsPhotoViewerDragging(false)}
-            onMouseLeave={() => setIsPhotoViewerDragging(false)}
+            onPointerDown={handleViewerPointerDown}
+            onPointerMove={handleViewerPointerMove}
+            onPointerUp={handleViewerPointerEnd}
+            onPointerCancel={handleViewerPointerEnd}
+            onPointerLeave={handleViewerPointerEnd}
           >
             <img
               src={activePhoto.downloadUrl}
@@ -528,7 +694,7 @@ export function CuttingPhotoGallery({
             />
           </div>
 
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-xl border border-white/20 bg-black/45 px-4 py-2 text-xs text-white">
+          <div className="absolute bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-xl border border-white/20 bg-black/45 px-4 py-2 text-xs text-white">
             Kép {activePhotoIndex + 1}/{totalPhotos} • Dátum: {formatDateTime(activePhoto.capturedAt ?? activePhoto.uploadedAt)}
           </div>
         </div>
