@@ -19,7 +19,7 @@ test('dugvany lista es reszletes nezet renderelodik', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Kékfrankos' }).nth(1)).toBeVisible()
   await expect(page.getByText(/Kép 1\/1/)).toBeVisible()
   await expect(page.getByText('Esemény napló')).toBeVisible()
-  await expect(page.getByText('Öntözés')).toBeVisible()
+  await expect(page.getByText('Öntözés').first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Szerkesztés', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Törlés', exact: true })).toHaveCount(0)
 })

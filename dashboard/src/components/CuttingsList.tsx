@@ -1,7 +1,7 @@
 import { Sprout } from 'lucide-react';
 import { formatDate } from '../lib/dateFormat';
 import type { Cutting } from '../types/cutting';
-import { plantTypeLabel, statusBadgeClass, statusLabel } from './cuttingsViewUtils';
+import { categoryBadgeClass, plantTypeLabel, statusBadgeClass, statusLabel } from './cuttingsViewUtils';
 
 interface CuttingsListProps {
   cuttings: Cutting[];
@@ -67,6 +67,18 @@ export function CuttingsList({
                 <p className="mt-1 text-xs text-vine-500 dark:text-vine-300">
                   {plantTypeLabel(cutting.plantType)}
                 </p>
+                {cutting.categories.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {cutting.categories.map((category) => (
+                      <span
+                        key={category}
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${categoryBadgeClass(category)}`}
+                      >
+                        {category}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <p className="mt-1 text-xs text-vine-500 dark:text-vine-300">
                   Ültetve: {formatDate(cutting.plantedAt)}
                 </p>

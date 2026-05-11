@@ -115,6 +115,46 @@ export function eventTypeMarkerClasses(value: CuttingEventType): {
   }
 }
 
+const CATEGORY_BADGE_PALETTE: readonly string[] = [
+  'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
+  'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200',
+  'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200',
+  'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200',
+  'bg-lime-100 text-lime-800 dark:bg-lime-900/40 dark:text-lime-200',
+  'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-200',
+  'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/40 dark:text-fuchsia-200',
+  'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
+  'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
+];
+
+export function categoryBadgeClass(value: string): string {
+  const normalized = value.trim().toLocaleLowerCase('hu');
+  let hash = 5381;
+  for (let i = 0; i < normalized.length; i += 1) {
+    hash = ((hash << 5) + hash + normalized.charCodeAt(i)) | 0;
+  }
+  const index = Math.abs(hash) % CATEGORY_BADGE_PALETTE.length;
+  return CATEGORY_BADGE_PALETTE[index];
+}
+
+export function parseCategoriesInput(value: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of value.split(',')) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLocaleLowerCase('hu');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result;
+}
+
+export function formatCategoriesInput(values: string[]): string {
+  return values.join(', ');
+}
+
 export function toCuttingPhotos(
   uploads: Array<{ storagePath: string; downloadUrl: string; width: number; height: number }>,
 ): CuttingPhoto[] {

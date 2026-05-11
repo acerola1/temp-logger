@@ -5,6 +5,7 @@ export const cuttingFormSchema = z.object({
   plantType: z.enum(['graft', 'cutting']),
   plantedAt: z.string().min(1, 'Az ültetés dátuma kötelező.'),
   status: z.enum(['active', 'lost', 'archived']),
+  categories: z.string(),
   notes: z.string(),
 });
 

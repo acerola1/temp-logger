@@ -7,8 +7,11 @@ import { CuttingPhotoGallery } from './CuttingPhotoGallery';
 import { CuttingTimeline } from './CuttingTimeline';
 import type { TimelineSelection } from './CuttingTimeline';
 import {
+  categoryBadgeClass,
   eventTypeLabel,
   eventTypeStatusOnArchive,
+  formatCategoriesInput,
+  parseCategoriesInput,
   plantTypeLabel,
   statusBadgeClass,
   statusLabel,
@@ -30,6 +33,7 @@ interface CuttingDetailProps {
   cuttings: Cutting[];
   selectedCutting: Cutting | null;
   knownVarieties: string[];
+  knownCategories: string[];
   isAdmin: boolean;
   isMobileLayout: boolean;
   isUpdating: boolean;
@@ -52,6 +56,7 @@ const DEFAULT_EDIT_FORM_VALUES = (cutting: Cutting): CuttingFormValues => ({
   plantType: cutting.plantType,
   plantedAt: toDateInputValue(cutting.plantedAt),
   status: cutting.status,
+  categories: formatCategoriesInput(cutting.categories),
   notes: cutting.notes,
 });
 
@@ -59,6 +64,7 @@ export function CuttingDetail({
   cuttings,
   selectedCutting,
   knownVarieties,
+  knownCategories,
   isAdmin,
   isMobileLayout,
   isUpdating,
@@ -147,6 +153,7 @@ export function CuttingDetail({
         plantType: values.plantType,
         plantedAt: values.plantedAt,
         status: values.status,
+        categories: parseCategoriesInput(values.categories),
         notes: values.notes.trim(),
       });
       setEditMode(false);
@@ -323,6 +330,18 @@ export function CuttingDetail({
                 <p className="mt-1 text-sm text-vine-500 dark:text-vine-300">
                   {plantTypeLabel(selectedCutting.plantType)} · Ültetve: {formatDate(selectedCutting.plantedAt)}
                 </p>
+                {selectedCutting.categories.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {selectedCutting.categories.map((category) => (
+                      <span
+                        key={category}
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${categoryBadgeClass(category)}`}
+                      >
+                        {category}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <span
@@ -349,6 +368,7 @@ export function CuttingDetail({
                 serialNumber={selectedCutting.serialNumber}
                 defaultValues={DEFAULT_EDIT_FORM_VALUES(selectedCutting)}
                 knownVarieties={knownVarieties}
+                knownCategories={knownCategories}
                 isPending={isUpdating}
                 submitLabel="Mentés"
                 showPhotoUpload={false}

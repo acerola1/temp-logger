@@ -24,6 +24,7 @@ export interface Cutting {
   plantType: CuttingPlantType;
   plantedAt: IsoDateString;
   status: CuttingStatus;
+  categories: string[];
   notes: string;
   photos: CuttingPhoto[];
   events: CuttingEvent[];
@@ -38,6 +39,7 @@ export interface CreateCuttingInput {
   plantType: CuttingPlantType;
   plantedAt: string;
   status: CuttingStatus;
+  categories: string[];
   notes: string;
   photos: CuttingPhoto[];
 }

@@ -26,6 +26,7 @@ interface FirestoreCutting {
   plantType?: Cutting['plantType'];
   plantedAt?: string;
   status?: Cutting['status'];
+  categories?: string[];
   notes?: string;
   photos?: CuttingPhoto[];
   events?: CuttingEvent[];
@@ -121,6 +122,9 @@ export function useCuttingsQuery() {
           plantType: data.plantType ?? 'cutting',
           plantedAt: data.plantedAt ?? data.createdAt ?? new Date(0).toISOString(),
           status: data.status ?? 'active',
+          categories: Array.isArray(data.categories)
+            ? data.categories.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+            : [],
           notes: data.notes ?? '',
           photos: mappedPhotos,
           events: Array.isArray(data.events)
@@ -163,6 +167,7 @@ export function useCuttingsQuery() {
         plantType: input.plantType,
         plantedAt: input.plantedAt,
         status: input.status,
+        categories: input.categories,
         notes: input.notes.trim(),
         photos: input.photos,
         events: [],

@@ -10,6 +10,7 @@ interface CuttingEditorProps {
   serialNumber: number;
   defaultValues: CuttingFormValues;
   knownVarieties: string[];
+  knownCategories: string[];
   isPending: boolean;
   submitLabel: string;
   helperText?: string;
@@ -24,6 +25,7 @@ export function CuttingForm({
   serialNumber,
   defaultValues,
   knownVarieties,
+  knownCategories,
   isPending,
   submitLabel,
   helperText,
@@ -120,6 +122,19 @@ export function CuttingForm({
       </div>
 
       <label className="mt-4 block space-y-1">
+        <span className="text-sm font-medium text-vine-700 dark:text-vine-200">Címkék</span>
+        <input
+          list="known-cutting-categories"
+          {...register('categories')}
+          placeholder="pl. tesó, anyós, Facebook"
+          className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
+        />
+        <span className="text-xs text-vine-500 dark:text-vine-400">
+          Vesszővel elválasztva több is megadható.
+        </span>
+      </label>
+
+      <label className="mt-4 block space-y-1">
         <span className="text-sm font-medium text-vine-700 dark:text-vine-200">Jegyzet</span>
         <textarea
           {...register('notes')}
@@ -207,6 +222,11 @@ export function CuttingForm({
       <datalist id="known-grape-varieties">
         {knownVarieties.map((variety) => (
           <option key={variety} value={variety} />
+        ))}
+      </datalist>
+      <datalist id="known-cutting-categories">
+        {knownCategories.map((category) => (
+          <option key={category} value={category} />
         ))}
       </datalist>
     </form>
