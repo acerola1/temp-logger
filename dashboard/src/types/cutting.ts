@@ -1,10 +1,10 @@
 import type { CuttingEvent } from './events';
 import type { IsoDateString, IsoDateTimeString } from './datetime';
 
-export type { CuttingEvent } from './events';
+export type { CuttingEvent, CuttingEventType } from './events';
 
 export type CuttingPlantType = 'graft' | 'cutting';
-export type CuttingStatus = 'active' | 'rooted' | 'lost' | 'archived';
+export type CuttingStatus = 'active' | 'lost' | 'archived';
 
 export interface CuttingPhoto {
   id: string;

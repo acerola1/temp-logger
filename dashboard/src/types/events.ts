@@ -11,7 +11,10 @@ export interface BaseEventInput {
   title: string;
 }
 
+export type CuttingEventType = 'watering' | 'handover' | 'planting_out' | 'perished';
+
 export interface CuttingEvent extends BaseEvent {
+  type: CuttingEventType;
   notes: string;
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { indexSessionEvents } from '../lib/sessionEventSequence';
 import { getErrorMessage } from '../lib/errorMessage';
@@ -63,20 +63,26 @@ export function SessionEventsDialog({
     .slice()
     .sort((l, r) => new Date(r.occurredAt).getTime() - new Date(l.occurredAt).getTime());
 
+  const prevSessionIdRef = useRef(session.id);
   useEffect(() => {
-    queueMicrotask(() => {
-      setShowCreateForm(false);
-      setEditEventId(null);
-    });
+    if (prevSessionIdRef.current === session.id) return;
+    prevSessionIdRef.current = session.id;
+    setShowCreateForm(false);
+    setEditEventId(null);
   }, [session.id]);
 
   useEffect(() => {
     if (!quickCreateRequest || !isAdmin) return;
-    queueMicrotask(() => {
-      setShowCreateForm(true);
-    });
-    onQuickCreateHandled();
-  }, [isAdmin, onQuickCreateHandled, quickCreateRequest]);
+    setShowCreateForm(true);
+  }, [isAdmin, quickCreateRequest]);
+
+  const wasFormOpenRef = useRef(false);
+  useEffect(() => {
+    if (wasFormOpenRef.current && !showCreateForm) {
+      onQuickCreateHandled();
+    }
+    wasFormOpenRef.current = showCreateForm;
+  }, [showCreateForm, onQuickCreateHandled]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">

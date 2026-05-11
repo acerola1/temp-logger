@@ -50,6 +50,7 @@ interface LegacyFirestoreCuttingWateringLog {
   id?: string;
   wateredAt?: string;
   occurredAt?: string;
+  type?: CuttingEvent['type'];
   title?: string;
   notes?: string;
 }
@@ -69,6 +70,7 @@ function mapLegacyLogToEvent(
   return {
     id: log.id ?? `${fallbackIdPrefix}-event-${index}`,
     occurredAt,
+    type: log.type ?? 'watering',
     title: log.title?.trim() || 'Esemény',
     notes: log.notes ?? '',
   } satisfies CuttingEvent;

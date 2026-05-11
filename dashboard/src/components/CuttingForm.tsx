@@ -113,8 +113,7 @@ export function CuttingForm({
             className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
           >
             <option value="active">Aktív</option>
-            <option value="rooted">Begyökeresedett</option>
-            <option value="lost">Elveszett</option>
+            <option value="lost">Elpusztult</option>
             <option value="archived">Archivált</option>
           </select>
         </label>

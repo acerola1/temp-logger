@@ -14,11 +14,13 @@ interface CuttingsPageProps {
   isAdmin: boolean;
 }
 
-type CuttingsSort = 'updated_desc' | 'created_desc' | 'planted_desc';
+type CuttingsSort = 'updated_desc' | 'created_desc' | 'planted_desc' | 'variety_asc';
 type CuttingsTypeFilter = 'all' | 'cutting' | 'graft';
+type CuttingsStatusFilter = 'all' | 'active' | 'lost' | 'archived';
 
 const DEFAULT_SORT: CuttingsSort = 'updated_desc';
 const DEFAULT_TYPE: CuttingsTypeFilter = 'all';
+const DEFAULT_STATUS: CuttingsStatusFilter = 'active';
 
 const DEFAULT_FORM_VALUES = (): CuttingFormValues => ({
   variety: '',
@@ -31,24 +33,41 @@ const DEFAULT_FORM_VALUES = (): CuttingFormValues => ({
 function parseCuttingsFiltersFromSearch(search: string): {
   query: string;
   type: CuttingsTypeFilter;
+  status: CuttingsStatusFilter;
   sort: CuttingsSort;
 } {
   const params = new URLSearchParams(search);
   const query = (params.get('q') ?? '').trim();
   const rawType = params.get('type');
+  const rawStatus = params.get('status');
   const rawSort = params.get('sort');
 
   const type: CuttingsTypeFilter =
     rawType === 'cutting' || rawType === 'graft' ? rawType : DEFAULT_TYPE;
+  const status: CuttingsStatusFilter =
+    rawStatus === 'all' ||
+    rawStatus === 'active' ||
+    rawStatus === 'lost' ||
+    rawStatus === 'archived'
+      ? rawStatus
+      : DEFAULT_STATUS;
   const sort: CuttingsSort =
-    rawSort === 'created_desc' || rawSort === 'planted_desc' || rawSort === 'updated_desc'
+    rawSort === 'created_desc' ||
+    rawSort === 'planted_desc' ||
+    rawSort === 'updated_desc' ||
+    rawSort === 'variety_asc'
       ? rawSort
       : DEFAULT_SORT;
 
-  return { query, type, sort };
+  return { query, type, status, sort };
 }
 
-function buildCuttingsSearch(query: string, type: CuttingsTypeFilter, sort: CuttingsSort): string {
+function buildCuttingsSearch(
+  query: string,
+  type: CuttingsTypeFilter,
+  status: CuttingsStatusFilter,
+  sort: CuttingsSort,
+): string {
   const params = new URLSearchParams();
   const trimmedQuery = query.trim();
 
@@ -57,6 +76,9 @@ function buildCuttingsSearch(query: string, type: CuttingsTypeFilter, sort: Cutt
   }
   if (type !== DEFAULT_TYPE) {
     params.set('type', type);
+  }
+  if (status !== DEFAULT_STATUS) {
+    params.set('status', status);
   }
   if (sort !== DEFAULT_SORT) {
     params.set('sort', sort);
@@ -94,6 +116,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   const [typeFilter, setTypeFilter] = useState<CuttingsTypeFilter>(
     () => parseCuttingsFiltersFromSearch(window.location.search).type,
   );
+  const [statusFilter, setStatusFilter] = useState<CuttingsStatusFilter>(
+    () => parseCuttingsFiltersFromSearch(window.location.search).status,
+  );
   const [sortBy, setSortBy] = useState<CuttingsSort>(
     () => parseCuttingsFiltersFromSearch(window.location.search).sort,
   );
@@ -123,6 +148,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
       if (typeFilter !== 'all' && cutting.plantType !== typeFilter) {
         return false;
       }
+      if (statusFilter !== 'all' && cutting.status !== statusFilter) {
+        return false;
+      }
       if (!normalizedQuery) {
         return true;
       }
@@ -141,9 +169,18 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
       if (sortBy === 'planted_desc') {
         return toMs(right.plantedAt) - toMs(left.plantedAt);
       }
+      if (sortBy === 'variety_asc') {
+        const varietyCompare = left.variety.localeCompare(right.variety, 'hu', {
+          sensitivity: 'base',
+        });
+        if (varietyCompare !== 0) {
+          return varietyCompare;
+        }
+        return left.serialNumber - right.serialNumber;
+      }
       return toMs(right.updatedAt) - toMs(left.updatedAt);
     });
-  }, [cuttings, searchQuery, sortBy, typeFilter]);
+  }, [cuttings, searchQuery, sortBy, statusFilter, typeFilter]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1023px)');
@@ -159,6 +196,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
       const parsed = parseCuttingsFiltersFromSearch(window.location.search);
       setSearchQuery(parsed.query);
       setTypeFilter(parsed.type);
+      setStatusFilter(parsed.status);
       setSortBy(parsed.sort);
     };
 
@@ -189,12 +227,12 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
   }, [cuttings, selectedCutting]);
 
   useEffect(() => {
-    const nextSearch = buildCuttingsSearch(searchQuery, typeFilter, sortBy);
+    const nextSearch = buildCuttingsSearch(searchQuery, typeFilter, statusFilter, sortBy);
     if (window.location.search === nextSearch) {
       return;
     }
     window.history.replaceState({}, '', `${window.location.pathname}${nextSearch}`);
-  }, [searchQuery, sortBy, typeFilter]);
+  }, [searchQuery, sortBy, statusFilter, typeFilter]);
 
   const handleCreate = async (values: CuttingFormValues, files: FileList | null) => {
     if (!isAdmin) {
@@ -320,6 +358,7 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                     <option value="updated_desc">Utoljára módosítva</option>
                     <option value="created_desc">Létrehozva</option>
                     <option value="planted_desc">Ültetési dátum</option>
+                    <option value="variety_asc">Fajta neve</option>
                   </select>
                   <select
                     value={typeFilter}
@@ -329,6 +368,16 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
                     <option value="all">Mind</option>
                     <option value="cutting">Dugvány</option>
                     <option value="graft">Oltvány</option>
+                  </select>
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value as CuttingsStatusFilter)}
+                    className="col-span-2 h-9 rounded-lg border border-vine-200 bg-white px-2.5 text-sm text-vine-900 outline-none ring-0 focus:border-vine-400 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50 dark:focus:border-vine-500"
+                  >
+                    <option value="active">Aktív</option>
+                    <option value="lost">Elpusztult</option>
+                    <option value="archived">Archivált</option>
+                    <option value="all">Mind</option>
                   </select>
                 </div>
               </div>

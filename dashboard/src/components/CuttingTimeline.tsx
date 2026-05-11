@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, CalendarDays, Sprout } from 'lucide-react';
+import { Camera, Sprout, type LucideIcon } from 'lucide-react';
 import { formatDateTime, formatDate } from '../lib/dateFormat';
-import type { Cutting } from '../types/cutting';
+import {
+  EVENT_TYPE_ICON,
+  eventTypeLabel,
+  eventTypeMarkerClasses,
+} from './cuttingsViewUtils';
+import type { Cutting, CuttingEventType } from '../types/cutting';
 
 export type TimelineItemType = 'planted' | 'event' | 'photo';
 
@@ -14,47 +19,60 @@ export interface TimelineSelection {
 interface TimelineItem {
   id: string;
   type: TimelineItemType;
+  eventType: CuttingEventType | null;
   entityId: string | null;
   dateMs: number;
   title: string;
   subtitle: string;
 }
 
-const TYPE_LABELS: Record<TimelineItemType, string> = {
-  planted: 'Ültetés',
-  event: 'Esemény',
-  photo: 'Fotó',
+interface MarkerVisual {
+  icon: LucideIcon;
+  dot: string;
+  iconColor: string;
+  ring: string;
+  label: string;
+}
+
+const PLANTED_VISUAL: MarkerVisual = {
+  icon: Sprout,
+  dot: 'border-green-500 bg-green-50 dark:border-green-400 dark:bg-green-950',
+  iconColor: 'text-green-500 dark:text-green-400',
+  ring: 'ring-green-400 dark:ring-green-500',
+  label: 'Ültetés',
 };
 
-const MARKER_ICONS: Record<TimelineItemType, typeof Sprout> = {
-  planted: Sprout,
-  event: CalendarDays,
-  photo: Camera,
+const PHOTO_VISUAL: MarkerVisual = {
+  icon: Camera,
+  dot: 'border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-950',
+  iconColor: 'text-amber-500 dark:text-amber-400',
+  ring: 'ring-amber-400 dark:ring-amber-500',
+  label: 'Fotó',
 };
 
-const MARKER_CLASSES: Record<TimelineItemType, { dot: string; icon: string; legendDot: string }> = {
-  planted: {
-    dot: 'border-green-500 bg-green-50 dark:border-green-400 dark:bg-green-950',
-    icon: 'text-green-500 dark:text-green-400',
-    legendDot: 'border-green-500 bg-green-50 dark:border-green-400 dark:bg-green-950',
-  },
-  event: {
-    dot: 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950',
-    icon: 'text-blue-500 dark:text-blue-400',
-    legendDot: 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950',
-  },
-  photo: {
-    dot: 'border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-950',
-    icon: 'text-amber-500 dark:text-amber-400',
-    legendDot: 'border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-950',
-  },
+const EVENT_RING: Record<CuttingEventType, string> = {
+  watering: 'ring-blue-400 dark:ring-blue-500',
+  handover: 'ring-indigo-400 dark:ring-indigo-500',
+  planting_out: 'ring-teal-400 dark:ring-teal-500',
+  perished: 'ring-red-400 dark:ring-red-500',
 };
 
-const SELECTED_RING: Record<TimelineItemType, string> = {
-  planted: 'ring-green-400 dark:ring-green-500',
-  event: 'ring-blue-400 dark:ring-blue-500',
-  photo: 'ring-amber-400 dark:ring-amber-500',
-};
+function visualForEvent(eventType: CuttingEventType): MarkerVisual {
+  const colors = eventTypeMarkerClasses(eventType);
+  return {
+    icon: EVENT_TYPE_ICON[eventType],
+    dot: colors.dot,
+    iconColor: colors.icon,
+    ring: EVENT_RING[eventType],
+    label: eventTypeLabel(eventType),
+  };
+}
+
+function visualFor(item: TimelineItem): MarkerVisual {
+  if (item.type === 'planted') return PLANTED_VISUAL;
+  if (item.type === 'photo') return PHOTO_VISUAL;
+  return visualForEvent(item.eventType ?? 'watering');
+}
 
 function buildTimelineItems(cutting: Cutting): TimelineItem[] {
   const items: TimelineItem[] = [];
@@ -62,6 +80,7 @@ function buildTimelineItems(cutting: Cutting): TimelineItem[] {
   items.push({
     id: '__planted__',
     type: 'planted',
+    eventType: null,
     entityId: null,
     dateMs: new Date(cutting.plantedAt).getTime(),
     title: 'Ültetés',
@@ -72,9 +91,10 @@ function buildTimelineItems(cutting: Cutting): TimelineItem[] {
     items.push({
       id: `event-${event.id}`,
       type: 'event',
+      eventType: event.type,
       entityId: event.id,
       dateMs: new Date(event.occurredAt).getTime(),
-      title: event.title || 'Esemény',
+      title: event.title || eventTypeLabel(event.type),
       subtitle: event.notes
         ? `${formatDateTime(event.occurredAt)} — ${event.notes}`
         : formatDateTime(event.occurredAt),
@@ -86,6 +106,7 @@ function buildTimelineItems(cutting: Cutting): TimelineItem[] {
     items.push({
       id: `photo-${photo.id}`,
       type: 'photo',
+      eventType: null,
       entityId: photo.id,
       dateMs: new Date(photoDate).getTime(),
       title: photo.caption || 'Fotó feltöltve',
@@ -155,15 +176,16 @@ export function CuttingTimeline({ cutting, onActiveItemChange }: CuttingTimeline
 
   const items = useMemo(() => buildTimelineItems(cutting), [cutting]);
 
+  const isClosed = cutting.status !== 'active';
   const { startMs, endMs } = useMemo(() => {
     const plantedMs = new Date(cutting.plantedAt).getTime();
-    const nowMs = Date.now();
     const allDates = items.map((item) => item.dateMs);
     const minMs = Math.min(plantedMs, ...allDates);
-    const maxMs = Math.max(nowMs, ...allDates);
+    const dynamicMax = Math.max(plantedMs, ...allDates);
+    const maxMs = isClosed ? dynamicMax : Math.max(Date.now(), dynamicMax);
     const padding = (maxMs - minMs) * 0.03 || 24 * 60 * 60 * 1000;
     return { startMs: minMs - padding, endMs: maxMs + padding };
-  }, [cutting.plantedAt, items]);
+  }, [cutting.plantedAt, isClosed, items]);
 
   const totalSpan = endMs - startMs;
   const safeSpan = totalSpan === 0 ? 1 : totalSpan;
@@ -308,17 +330,23 @@ export function CuttingTimeline({ cutting, onActiveItemChange }: CuttingTimeline
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-vine-600 dark:text-vine-300">
-        {(['planted', 'event', 'photo'] as const).map((type) => {
-          const Icon = MARKER_ICONS[type];
-          const classes = MARKER_CLASSES[type];
+        {[
+          PLANTED_VISUAL,
+          visualForEvent('watering'),
+          visualForEvent('handover'),
+          visualForEvent('planting_out'),
+          visualForEvent('perished'),
+          PHOTO_VISUAL,
+        ].map((visual) => {
+          const Icon = visual.icon;
           return (
-            <span key={type} className="inline-flex items-center gap-1">
+            <span key={visual.label} className="inline-flex items-center gap-1">
               <span
-                className={`inline-flex h-4 w-4 items-center justify-center rounded-full border ${classes.legendDot}`}
+                className={`inline-flex h-4 w-4 items-center justify-center rounded-full border ${visual.dot}`}
               >
-                <Icon className={`h-2.5 w-2.5 ${classes.icon}`} />
+                <Icon className={`h-2.5 w-2.5 ${visual.iconColor}`} />
               </span>
-              {TYPE_LABELS[type]}
+              {visual.label}
             </span>
           );
         })}
@@ -370,8 +398,8 @@ export function CuttingTimeline({ cutting, onActiveItemChange }: CuttingTimeline
           style={{ top: '50%' }}
         />
 
-        {/* "Today" indicator */}
-        {(() => {
+        {/* "Today" indicator (only on active cuttings) */}
+        {!isClosed && (() => {
           const todayLeft = toPercent(Date.now());
           if (todayLeft < 0 || todayLeft > 100) return null;
           return (
@@ -394,8 +422,8 @@ export function CuttingTimeline({ cutting, onActiveItemChange }: CuttingTimeline
         {items.map((item) => {
           const left = toPercent(item.dateMs);
           if (left < 0 || left > 100) return null;
-          const classes = MARKER_CLASSES[item.type];
-          const Icon = MARKER_ICONS[item.type];
+          const visual = visualFor(item);
+          const Icon = visual.icon;
           const isActive = activeId === item.id;
           const offsetY = markerLayout.get(item.id)?.offsetY ?? 0;
 
@@ -416,10 +444,10 @@ export function CuttingTimeline({ cutting, onActiveItemChange }: CuttingTimeline
               <button
                 type="button"
                 onClick={() => handleMarkerClick(item)}
-                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 shadow-sm transition-shadow ${classes.dot} ${isActive ? `ring-2 ${SELECTED_RING[item.type]}` : ''}`}
+                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 shadow-sm transition-shadow ${visual.dot} ${isActive ? `ring-2 ${visual.ring}` : ''}`}
                 aria-label={item.title}
               >
-                <Icon className={`h-3.5 w-3.5 ${classes.icon}`} />
+                <Icon className={`h-3.5 w-3.5 ${visual.iconColor}`} />
               </button>
             </div>
           );

@@ -7,15 +7,24 @@ import { CuttingPhotoGallery } from './CuttingPhotoGallery';
 import { CuttingTimeline } from './CuttingTimeline';
 import type { TimelineSelection } from './CuttingTimeline';
 import {
+  eventTypeLabel,
+  eventTypeStatusOnArchive,
   plantTypeLabel,
   statusBadgeClass,
   statusLabel,
   toDateInputValue,
 } from './cuttingsViewUtils';
 import { formatDate, formatDateTime, toDateTimeLocalValue } from '../lib/dateFormat';
-import { wateringLogSchema } from '../lib/schemas';
-import type { Cutting } from '../types/cutting';
-import type { CuttingFormValues, WateringLogValues } from '../types/forms';
+import { cuttingEventFormSchema } from '../lib/schemas';
+import type { Cutting, CuttingEventType } from '../types/cutting';
+import type { CuttingEventFormValues, CuttingFormValues } from '../types/forms';
+
+const EVENT_TYPE_OPTIONS: CuttingEventType[] = [
+  'watering',
+  'handover',
+  'planting_out',
+  'perished',
+];
 
 interface CuttingDetailProps {
   cuttings: Cutting[];
@@ -30,10 +39,12 @@ interface CuttingDetailProps {
   onClearUpdateError: () => void;
 }
 
-const DEFAULT_WATERING_LOG_VALUES = (): WateringLogValues => ({
+const DEFAULT_EVENT_FORM_VALUES = (): CuttingEventFormValues => ({
   occurredAt: toDateTimeLocalValue(),
+  type: 'watering',
   title: '',
   notes: '',
+  archive: true,
 });
 
 const DEFAULT_EDIT_FORM_VALUES = (cutting: Cutting): CuttingFormValues => ({
@@ -69,20 +80,23 @@ export function CuttingDetail({
     reset: resetAddEventForm,
     setError: setAddEventError,
     clearErrors: clearAddEventErrors,
+    watch: watchAddEvent,
     formState: { errors: addEventFormErrors },
-  } = useForm<WateringLogValues>({
-    resolver: zodResolver(wateringLogSchema),
-    defaultValues: DEFAULT_WATERING_LOG_VALUES(),
+  } = useForm<CuttingEventFormValues>({
+    resolver: zodResolver(cuttingEventFormSchema),
+    defaultValues: DEFAULT_EVENT_FORM_VALUES(),
   });
+  const watchedAddEventType = watchAddEvent('type');
+  const closingStatus = eventTypeStatusOnArchive(watchedAddEventType);
 
   const {
     register: registerEditEvent,
     handleSubmit: handleEditEventSubmit,
     reset: resetEditEventForm,
     formState: { errors: editEventFormErrors },
-  } = useForm<WateringLogValues>({
-    resolver: zodResolver(wateringLogSchema),
-    defaultValues: DEFAULT_WATERING_LOG_VALUES(),
+  } = useForm<CuttingEventFormValues>({
+    resolver: zodResolver(cuttingEventFormSchema),
+    defaultValues: DEFAULT_EVENT_FORM_VALUES(),
   });
 
   useEffect(() => {
@@ -91,8 +105,8 @@ export function CuttingDetail({
       setEditingEventId(null);
       setTargetCuttingIds([]);
       setIsAddEventFormOpen(false);
-      resetAddEventForm(DEFAULT_WATERING_LOG_VALUES());
-      resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
+      resetAddEventForm(DEFAULT_EVENT_FORM_VALUES());
+      resetEditEventForm(DEFAULT_EVENT_FORM_VALUES());
       return;
     }
 
@@ -100,8 +114,8 @@ export function CuttingDetail({
     setEditingEventId(null);
     setTargetCuttingIds([selectedCutting.id]);
     setIsAddEventFormOpen(false);
-    resetAddEventForm(DEFAULT_WATERING_LOG_VALUES());
-    resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
+    resetAddEventForm(DEFAULT_EVENT_FORM_VALUES());
+    resetEditEventForm(DEFAULT_EVENT_FORM_VALUES());
   }, [resetAddEventForm, resetEditEventForm, selectedCutting]);
 
   const sortedEvents = useMemo(
@@ -141,7 +155,7 @@ export function CuttingDetail({
     }
   };
 
-  const handleAddEvent = async (values: WateringLogValues) => {
+  const handleAddEvent = async (values: CuttingEventFormValues) => {
     if (!selectedCutting || !isAdmin) {
       return;
     }
@@ -157,20 +171,23 @@ export function CuttingDetail({
       const sharedEvent = {
         id: crypto.randomUUID(),
         occurredAt: new Date(values.occurredAt).toISOString(),
-        title: values.title.trim() || 'Esemény',
+        type: values.type,
+        title: values.title.trim() || eventTypeLabel(values.type),
         notes: values.notes.trim(),
       };
       const targetCuttings = cuttings.filter((cutting) => targetCuttingIds.includes(cutting.id));
+      const nextStatus = values.archive ? eventTypeStatusOnArchive(values.type) : null;
 
       await Promise.all(
         targetCuttings.map((cutting) =>
           onUpdateCutting(cutting.id, {
             events: [...cutting.events, sharedEvent],
+            ...(nextStatus ? { status: nextStatus } : {}),
           }),
         ),
       );
 
-      resetAddEventForm(DEFAULT_WATERING_LOG_VALUES());
+      resetAddEventForm(DEFAULT_EVENT_FORM_VALUES());
       setTargetCuttingIds([selectedCutting.id]);
       setIsAddEventFormOpen(false);
     } catch (error) {
@@ -178,12 +195,20 @@ export function CuttingDetail({
     }
   };
 
-  const startEditingEvent = (eventItem: { id: string; occurredAt: string; title: string; notes: string }) => {
+  const startEditingEvent = (eventItem: {
+    id: string;
+    occurredAt: string;
+    type: CuttingEventType;
+    title: string;
+    notes: string;
+  }) => {
     setEditingEventId(eventItem.id);
     resetEditEventForm({
       occurredAt: toDateTimeLocalValue(eventItem.occurredAt),
+      type: eventItem.type,
       title: eventItem.title,
       notes: eventItem.notes,
+      archive: false,
     });
   };
 
@@ -206,7 +231,7 @@ export function CuttingDetail({
 
       if (editingEventId === eventId) {
         setEditingEventId(null);
-        resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
+        resetEditEventForm(DEFAULT_EVENT_FORM_VALUES());
       }
     } catch (error) {
       console.error('Cutting event delete error:', error);
@@ -215,7 +240,7 @@ export function CuttingDetail({
     }
   };
 
-  const handleEditEvent = async (values: WateringLogValues) => {
+  const handleEditEvent = async (values: CuttingEventFormValues) => {
     if (!selectedCutting || !isAdmin || !editingEventId) {
       return;
     }
@@ -227,14 +252,15 @@ export function CuttingDetail({
             ? {
                 ...eventItem,
                 occurredAt: new Date(values.occurredAt).toISOString(),
-                title: values.title.trim() || 'Esemény',
+                type: values.type,
+                title: values.title.trim() || eventTypeLabel(values.type),
                 notes: values.notes.trim(),
               }
             : eventItem,
         ),
       });
       setEditingEventId(null);
-      resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
+      resetEditEventForm(DEFAULT_EVENT_FORM_VALUES());
     } catch (error) {
       console.error('Cutting event edit error:', error);
     }
@@ -385,7 +411,21 @@ export function CuttingDetail({
                   onSubmit={handleAddEventSubmit((values) => void handleAddEvent(values))}
                   className="rounded-2xl border border-vine-200 bg-vine-50/80 p-4 dark:border-vine-700 dark:bg-vine-800/40"
                 >
-                  <div className="grid gap-3 md:grid-cols-[220px_220px_minmax(0,1fr)]">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Típus</span>
+                      <select
+                        {...registerAddEvent('type')}
+                        className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
+                      >
+                        {EVENT_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {eventTypeLabel(option)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
                     <label className="space-y-1">
                       <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Időpont</span>
                       <input
@@ -399,7 +439,15 @@ export function CuttingDetail({
                       <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Cím</span>
                       <input
                         {...registerAddEvent('title')}
-                        placeholder="pl. Permetezés"
+                        placeholder={
+                          watchedAddEventType === 'handover'
+                            ? 'pl. Kovács Pisti'
+                            : watchedAddEventType === 'planting_out'
+                              ? 'pl. kerti sor 3.'
+                              : watchedAddEventType === 'perished'
+                                ? 'pl. kiszáradt'
+                                : 'pl. Permetezés'
+                        }
                         className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
                       />
                     </label>
@@ -413,6 +461,21 @@ export function CuttingDetail({
                       />
                     </label>
                   </div>
+
+                  {closingStatus && (
+                    <label className="mt-3 flex items-center gap-2 text-sm text-vine-700 dark:text-vine-200">
+                      <input
+                        type="checkbox"
+                        {...registerAddEvent('archive')}
+                        className="h-4 w-4 rounded border-vine-300 text-vine-600 focus:ring-vine-500"
+                      />
+                      <span>
+                        {closingStatus === 'lost'
+                          ? 'Elpusztultnak jelölöm a dugványt'
+                          : 'Archiválom a dugványt (kiveszem az aktív listából)'}
+                      </span>
+                    </label>
+                  )}
 
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center justify-between">
@@ -503,7 +566,21 @@ export function CuttingDetail({
                             onSubmit={handleEditEventSubmit((values) => void handleEditEvent(values))}
                             className="space-y-3"
                           >
-                            <div className="grid gap-3 md:grid-cols-[220px_220px_minmax(0,1fr)]">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <label className="space-y-1">
+                                <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Típus</span>
+                                <select
+                                  {...registerEditEvent('type')}
+                                  className="w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50"
+                                >
+                                  {EVENT_TYPE_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>
+                                      {eventTypeLabel(option)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+
                               <label className="space-y-1">
                                 <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Időpont</span>
                                 <input
@@ -549,7 +626,7 @@ export function CuttingDetail({
                                 type="button"
                                 onClick={() => {
                                   setEditingEventId(null);
-                                  resetEditEventForm(DEFAULT_WATERING_LOG_VALUES());
+                                  resetEditEventForm(DEFAULT_EVENT_FORM_VALUES());
                                   onClearUpdateError();
                                 }}
                                 className="rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
@@ -561,7 +638,10 @@ export function CuttingDetail({
                         ) : (
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <div className="font-semibold">{log.title || 'Esemény'}</div>
+                              <div className="text-xs uppercase tracking-wider text-vine-500 dark:text-vine-300">
+                                {eventTypeLabel(log.type)}
+                              </div>
+                              <div className="font-semibold">{log.title || eventTypeLabel(log.type)}</div>
                               <div className="font-medium">{formatDateTime(log.occurredAt)}</div>
                               {log.notes && <div className="mt-1 text-vine-500 dark:text-vine-300">{log.notes}</div>}
                             </div>
