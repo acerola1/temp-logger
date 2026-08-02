@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   VINE_EVENT_TYPES,
+  MAX_VINE_EVENT_TARGETS,
   VINE_ROOT_TYPES,
   VINE_STATUSES,
   type CreateVineInput,
@@ -99,6 +100,14 @@ export const VINE_EVENT_TYPE_LABEL: Record<VineEventType, string> = {
   spraying: 'Permetezés',
   ceased: 'Megszűnés',
 };
+
+export function getVineEventTargetError(targetCount: number): string | null {
+  if (targetCount === 0) return 'Válassz legalább egy tőkét.';
+  if (targetCount > MAX_VINE_EVENT_TARGETS) {
+    return `Egy esemény legfeljebb ${MAX_VINE_EVENT_TARGETS} tőkére menthető egyszerre.`;
+  }
+  return null;
+}
 
 function normalizeTags(value: string): string[] {
   const seen = new Set<string>();

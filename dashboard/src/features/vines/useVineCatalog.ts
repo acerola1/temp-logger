@@ -36,6 +36,7 @@ export interface VineCatalog {
   addEvents(input: AddVineEventsInput): Promise<void>;
   editEvent(input: EditVineEventInput): Promise<void>;
   deleteEvent(input: DeleteVineEventInput): Promise<void>;
+  clearMutationError(): void;
 }
 
 export function getNextVineSerialNumber(vines: readonly Vine[]): number {
@@ -116,7 +117,9 @@ export function useVineCatalog(): VineCatalog {
       } catch (mutationError) {
         setMutation({
           pending: false,
-          error: getErrorMessage(mutationError, fallbackError),
+          error: mutationError instanceof Error && mutationError.message.startsWith('Firebase')
+            ? fallbackError
+            : getErrorMessage(mutationError, fallbackError),
           uploadProgress: null,
         });
         throw mutationError;
@@ -176,6 +179,9 @@ export function useVineCatalog(): VineCatalog {
   );
 
   const tagSuggestions = useMemo(() => getVineTagSuggestions(vines), [vines]);
+  const clearMutationError = useCallback(() => {
+    setMutation((current) => current.error ? { ...current, error: null } : current);
+  }, []);
 
   return {
     vines,
@@ -188,5 +194,6 @@ export function useVineCatalog(): VineCatalog {
     addEvents,
     editEvent,
     deleteEvent,
+    clearMutationError,
   };
 }

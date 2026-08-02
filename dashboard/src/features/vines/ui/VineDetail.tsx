@@ -1,17 +1,20 @@
 import { useMemo, useState } from 'react';
-import { ExternalLink, X } from 'lucide-react';
-import { formatDate, formatDateTime } from '../../../lib/dateFormat';
-import type { VineFormValues } from '../forms';
-import type { Vine, VinePlantingDate } from '../model';
+import { CalendarDays, Loader2, ExternalLink, X } from 'lucide-react';
+import { formatDate, formatDateTime, toDateTimeLocalValue } from '../../../lib/dateFormat';
+import type { VineEventFormValues, VineFormValues } from '../forms';
+import type { Vine, VineEvent, VinePlantingDate } from '../model';
+import { VineEventForm } from './VineEventForm';
 import { VineForm, type VineCuttingOption } from './VineForm';
 import {
   ROOT_TYPE_PRESENTATION,
   statusBadgeClass,
   statusLabel,
   tagBadgeClass,
+  VINE_EVENT_PRESENTATION,
 } from './vinePresentation';
 
 interface VineDetailProps {
+  vines: readonly Vine[];
   selectedVine: Vine | null;
   knownVarieties: readonly string[];
   knownRootstockVarieties: readonly string[];
@@ -22,10 +25,24 @@ interface VineDetailProps {
   isAdmin: boolean;
   isMobileLayout: boolean;
   isPending: boolean;
+  uploadProgress: number | null;
   mutationError: string | null;
   onClose: () => void;
   onEdit: (vineId: string, values: VineFormValues) => Promise<void>;
+  onAddEvents: (targetVineIds: string[], values: VineEventFormValues, photos: File[]) => Promise<void>;
+  onEditEvent: (eventId: string, values: VineEventFormValues) => Promise<void>;
+  onDeleteEvent: (eventId: string) => Promise<void>;
+  onClearMutationError: () => void;
   onOpenCutting: (cuttingId: string) => void;
+}
+
+function defaultEventValues(event?: VineEvent): VineEventFormValues {
+  return {
+    type: event?.type ?? 'observation',
+    occurredAt: toDateTimeLocalValue(event?.occurredAt),
+    title: event?.title ?? '',
+    notes: event?.notes ?? '',
+  };
 }
 
 function formatPlantingDate(value: VinePlantingDate): string {
@@ -63,6 +80,7 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
 }
 
 export function VineDetail({
+  vines,
   selectedVine,
   knownVarieties,
   knownRootstockVarieties,
@@ -73,12 +91,21 @@ export function VineDetail({
   isAdmin,
   isMobileLayout,
   isPending,
+  uploadProgress,
   mutationError,
   onClose,
   onEdit,
+  onAddEvents,
+  onEditEvent,
+  onDeleteEvent,
+  onClearMutationError,
   onOpenCutting,
 }: VineDetailProps) {
   const [editMode, setEditMode] = useState(false);
+  const [isAddEventFormOpen, setIsAddEventFormOpen] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const sourceCutting = useMemo(
     () => cuttingOptions.find((option) => option.id === selectedVine?.sourceCuttingId) ?? null,
@@ -102,6 +129,31 @@ export function VineDetail({
     };
     return [currentOption, ...cuttingOptions];
   }, [cuttingOptions, cuttingOptionsError, cuttingOptionsLoading, selectedVine?.sourceCuttingId, sourceCutting]);
+  const sortedEvents = useMemo(
+    () => selectedVine
+      ? [...selectedVine.events].sort(
+          (left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime(),
+        )
+      : [],
+    [selectedVine],
+  );
+  const eventTargetVines = useMemo(
+    () => vines.filter((vine) => vine.status === 'active' || vine.id === selectedVine?.id),
+    [selectedVine?.id, vines],
+  );
+
+  const deleteEvent = async (eventId: string) => {
+    if (deletingEventId || !window.confirm('Biztosan törlöd ezt az eseményt a fotóival együtt?')) return;
+    setDeletingEventId(eventId);
+    try {
+      await onDeleteEvent(eventId);
+      if (editingEventId === eventId) setEditingEventId(null);
+    } catch (error) {
+      console.error('Vine event delete error:', error);
+    } finally {
+      setDeletingEventId(null);
+    }
+  };
 
   if (isMobileLayout && !selectedVine) return null;
 
@@ -213,7 +265,10 @@ export function VineDetail({
               <div className="flex items-center justify-end">
                 <button
                   type="button"
-                  onClick={() => setEditMode((current) => !current)}
+                  onClick={() => {
+                    setEditMode((current) => !current);
+                    onClearMutationError();
+                  }}
                   disabled={isPending}
                   className="rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
                 >
@@ -238,14 +293,136 @@ export function VineDetail({
                   await onEdit(selectedVine.id, values);
                   setEditMode(false);
                 }}
-                onCancel={() => setEditMode(false)}
+                onCancel={() => {
+                  setEditMode(false);
+                  onClearMutationError();
+                }}
                 className="rounded-2xl border border-vine-200 bg-vine-50/80 p-4 dark:border-vine-700 dark:bg-vine-800/40"
                 submitError={mutationError}
               />
             )}
+
+            <section className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-vine-700 dark:text-vine-200">
+                  <CalendarDays className="h-4 w-4" />
+                  Eseménynapló
+                </div>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddEventFormOpen((current) => !current);
+                      onClearMutationError();
+                    }}
+                    disabled={isPending}
+                    className="inline-flex items-center gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
+                  >
+                    {isAddEventFormOpen ? 'Új esemény bezárása' : 'Új esemény'}
+                  </button>
+                )}
+              </div>
+
+              {isAdmin && isAddEventFormOpen && (
+                <VineEventForm
+                  mode="add"
+                  defaultValues={defaultEventValues()}
+                  targetVines={eventTargetVines}
+                  initialTargetVineId={selectedVine.id}
+                  isPending={isPending}
+                  uploadProgress={uploadProgress}
+                  submitError={mutationError}
+                  onSubmit={async (values, targetVineIds, photos) => {
+                    await onAddEvents(targetVineIds, values, photos);
+                    setIsAddEventFormOpen(false);
+                  }}
+                  onCancel={() => {
+                    setIsAddEventFormOpen(false);
+                    onClearMutationError();
+                  }}
+                />
+              )}
+
+              {sortedEvents.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-vine-300 px-4 py-6 text-sm text-vine-500 dark:border-vine-700 dark:text-vine-300">
+                  Még nincs esemény ehhez a tőkéhez.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {sortedEvents.map((event) => {
+                    const presentation = VINE_EVENT_PRESENTATION[event.type];
+                    const Icon = presentation.icon;
+                    const isEditing = editingEventId === event.id;
+
+                    return (
+                      <article key={event.id} data-testid="vine-event" className="rounded-2xl bg-vine-50 px-4 py-3 text-sm text-vine-700 dark:bg-vine-800/50 dark:text-vine-100">
+                        {isEditing && isAdmin ? (
+                          <VineEventForm
+                            mode="edit"
+                            defaultValues={defaultEventValues(event)}
+                            isPending={isPending}
+                            uploadProgress={null}
+                            submitError={mutationError}
+                            onSubmit={async (values) => {
+                              await onEditEvent(event.id, values);
+                              setEditingEventId(null);
+                            }}
+                            onCancel={() => {
+                              setEditingEventId(null);
+                              onClearMutationError();
+                            }}
+                          />
+                        ) : (
+                          <>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex min-w-0 gap-3">
+                                <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${presentation.markerClass}`}>
+                                  <Icon className={`h-4 w-4 ${presentation.iconClass}`} />
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="text-xs uppercase tracking-wider text-vine-500 dark:text-vine-300">{presentation.label}</div>
+                                  <h4 className="font-semibold">{event.title}</h4>
+                                  <div className="font-medium">{formatDateTime(event.occurredAt)}</div>
+                                  {event.notes && <div className="mt-1 whitespace-pre-wrap text-vine-500 dark:text-vine-300">{event.notes}</div>}
+                                </div>
+                              </div>
+
+                              {isAdmin && (
+                                <div className="flex shrink-0 items-center gap-2">
+                                  <button type="button" onClick={() => { setEditingEventId(event.id); onClearMutationError(); }} disabled={isPending} className="rounded-lg border border-vine-200 bg-white px-2.5 py-1.5 text-xs font-medium text-vine-700 transition-colors hover:bg-vine-100 disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800">Szerkesztés</button>
+                                  <button type="button" onClick={() => void deleteEvent(event.id)} disabled={isPending || deletingEventId === event.id} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-red-900 dark:bg-vine-900 dark:text-red-300 dark:hover:bg-red-950/30">
+                                    {deletingEventId === event.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Törlés'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {event.photos.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-2 pl-11">
+                                {event.photos.map((photo) => (
+                                  <button key={photo.id} type="button" onClick={() => setLightboxUrl(photo.downloadUrl)} className="h-20 w-20 overflow-hidden rounded-xl border border-vine-200 dark:border-vine-700" aria-label={`${event.title} fotó megnyitása`}>
+                                    <img src={photo.downloadUrl} alt="" width={photo.width || undefined} height={photo.height || undefined} className="h-full w-full object-cover" />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           </div>
         )}
       </div>
+
+      {lightboxUrl && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 p-4" onClick={() => setLightboxUrl(null)} role="dialog" aria-label="Eseményfotó">
+          <img src={lightboxUrl} alt="" className="max-h-full max-w-full rounded-2xl object-contain" />
+        </div>
+      )}
     </div>
   );
 }

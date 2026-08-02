@@ -382,6 +382,30 @@ describe('Firestore vine catalog', () => {
     ).rejects.toThrow('aktív');
   });
 
+  it('a megnyitott megszűnt tőke dokumentált kivételként naplózható', async () => {
+    await addEvents(adminClientDb, adminClientStorage, {
+      targetVineIds: ['vine-ceased-target'],
+      openedVineId: 'vine-ceased-target',
+      event: {
+        type: 'observation',
+        occurredAt: '2026-08-01T12:30:00.000Z',
+        title: 'Utólagos megfigyelés',
+        notes: 'A tőke állapota nem változik.',
+      },
+      photos: [],
+    });
+
+    const vines = await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((vine) => vine.id === 'vine-ceased-target')?.events.length === 1,
+    );
+    expect(vines.find((vine) => vine.id === 'vine-ceased-target')).toMatchObject({
+      status: 'ceased',
+      events: [{ title: 'Utólagos megfigyelés' }],
+    });
+  });
+
   it('az esemény szerkesztése és törlése nem aktiválja újra a tőkét', async () => {
     const vines = await waitForVines(
       adminClientDb,

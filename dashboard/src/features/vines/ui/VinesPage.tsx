@@ -12,7 +12,12 @@ import {
   type VineListState,
   type VineListStatus,
 } from '../listState';
-import { toVineInput, type VineFormValues } from '../forms';
+import {
+  toVineEventInput,
+  toVineInput,
+  type VineEventFormValues,
+  type VineFormValues,
+} from '../forms';
 import { getNextVineSerialNumber, useVineCatalog } from '../useVineCatalog';
 import { VineDetail } from './VineDetail';
 import { VineForm, type VineCuttingOption } from './VineForm';
@@ -162,6 +167,33 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
     await catalog.editVine(vineId, toVineInput(values));
   };
 
+  const handleAddEvents = async (
+    targetVineIds: string[],
+    values: VineEventFormValues,
+    photos: File[],
+  ) => {
+    await catalog.addEvents({
+      targetVineIds,
+      openedVineId: selectedVine?.id,
+      event: toVineEventInput(values),
+      photos,
+    });
+  };
+
+  const handleEditEvent = async (eventId: string, values: VineEventFormValues) => {
+    if (!selectedVine) return;
+    await catalog.editEvent({
+      vineId: selectedVine.id,
+      eventId,
+      event: toVineEventInput(values),
+    });
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!selectedVine) return;
+    await catalog.deleteEvent({ vineId: selectedVine.id, eventId });
+  };
+
   const handleOpenCutting = (cuttingId: string) => {
     window.history.pushState({}, '', `/dugvanyok/${encodeURIComponent(cuttingId)}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
@@ -292,6 +324,7 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
 
         <VineDetail
           key={selectedVine?.id ?? 'no-selection'}
+          vines={catalog.vines}
           selectedVine={selectedVine}
           knownVarieties={knownVarieties}
           knownRootstockVarieties={knownRootstockVarieties}
@@ -302,9 +335,14 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
           isAdmin={isAdmin}
           isMobileLayout={isMobileLayout}
           isPending={catalog.mutation.pending}
+          uploadProgress={catalog.mutation.uploadProgress}
           mutationError={catalog.mutation.error}
           onClose={() => navigateToVine(null)}
           onEdit={handleEdit}
+          onAddEvents={handleAddEvents}
+          onEditEvent={handleEditEvent}
+          onDeleteEvent={handleDeleteEvent}
+          onClearMutationError={catalog.clearMutationError}
           onOpenCutting={handleOpenCutting}
         />
       </div>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   toVineEventInput,
   toVineInput,
+  getVineEventTargetError,
   vineEventFormSchema,
   vineFormSchema,
   type VineFormValues,
@@ -108,6 +109,12 @@ describe('toVineInput', () => {
 });
 
 describe('vine event forms', () => {
+  it('validates the bulk target count before submission', () => {
+    expect(getVineEventTargetError(0)).toContain('legalább egy');
+    expect(getVineEventTargetError(400)).toBeNull();
+    expect(getVineEventTargetError(401)).toContain('400');
+  });
+
   it.each(['2026-01-01', '1', '2026-02-30T10:00', '2026-01-01T24:00'])(
     'rejects an invalid event date-time: %s',
     (occurredAt) => {

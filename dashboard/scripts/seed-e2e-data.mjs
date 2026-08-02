@@ -158,6 +158,8 @@ async function seed() {
   }
 
   const vineIso = (hours) => new Date(Date.UTC(2026, 6, 1, 12 + hours)).toISOString()
+  const seedPhotoUrl =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlU9WQAAAAASUVORK5CYII='
 
   await Promise.all([
     db.doc('vines/vine-e2e-1').set({
@@ -172,6 +174,27 @@ async function seed() {
       status: 'active',
       tags: ['öreg tőke', 'déli sor'],
       notes: 'Déli fekvésű, rendszeresen termő tőke.',
+      events: [
+        {
+          id: 'vine-event-seed-1',
+          type: 'observation',
+          occurredAt: vineIso(1),
+          title: 'Első fürtök',
+          notes: 'Egészséges lomb és két fürt.',
+          photos: [
+            {
+              id: 'vine-event-photo-seed-1',
+              storagePath: '',
+              downloadUrl: seedPhotoUrl,
+              width: 1,
+              height: 1,
+              uploadedAt: vineIso(1),
+            },
+          ],
+          createdAt: vineIso(1),
+          updatedAt: vineIso(1),
+        },
+      ],
       sourceCuttingId: 'cutting-e2e-1',
       createdAt: vineIso(-2),
       updatedAt: vineIso(3),

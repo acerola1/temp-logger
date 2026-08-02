@@ -1,4 +1,5 @@
-import type { VineRootType, VineStatus } from '../model';
+import { Eye, Scissors, SprayCan, Trash2, type LucideIcon } from 'lucide-react';
+import type { VineEventType, VineRootType, VineStatus } from '../model';
 
 export const ROOT_TYPE_PRESENTATION: Record<
   VineRootType,
@@ -27,6 +28,36 @@ export function statusBadgeClass(value: VineStatus): string {
     ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'
     : 'bg-vine-100 text-vine-800 dark:bg-vine-800 dark:text-vine-100';
 }
+
+export const VINE_EVENT_PRESENTATION: Record<
+  VineEventType,
+  { label: string; icon: LucideIcon; markerClass: string; iconClass: string }
+> = {
+  observation: {
+    label: 'Megfigyelés',
+    icon: Eye,
+    markerClass: 'border-vine-500 bg-vine-50 dark:border-vine-400 dark:bg-vine-950',
+    iconClass: 'text-vine-600 dark:text-vine-300',
+  },
+  pruning: {
+    label: 'Metszés',
+    icon: Scissors,
+    markerClass: 'border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-950',
+    iconClass: 'text-amber-500 dark:text-amber-400',
+  },
+  spraying: {
+    label: 'Permetezés',
+    icon: SprayCan,
+    markerClass: 'border-sky-500 bg-sky-50 dark:border-sky-400 dark:bg-sky-950',
+    iconClass: 'text-sky-500 dark:text-sky-400',
+  },
+  ceased: {
+    label: 'Megszűnés',
+    icon: Trash2,
+    markerClass: 'border-red-500 bg-red-50 dark:border-red-400 dark:bg-red-950',
+    iconClass: 'text-red-500 dark:text-red-400',
+  },
+};
 
 const TAG_BADGE_PALETTE: readonly string[] = [
   'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',

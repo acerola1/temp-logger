@@ -185,6 +185,7 @@ function uniqueEventTargetIds(targetVineIds: readonly string[]): string[] {
 async function assertActiveEventTargets(
   firestore: Firestore,
   targetVineIds: readonly string[],
+  openedVineId?: string,
 ): Promise<void> {
   const snapshots = await Promise.all(
     targetVineIds.map((vineId) => getDoc(doc(firestore, 'vines', vineId))),
@@ -194,7 +195,12 @@ async function assertActiveEventTargets(
     throw new Error('A kiválasztott tőke nem található.');
   }
 
-  if (snapshots.some((snapshot) => snapshot.data()?.status !== 'active')) {
+  if (
+    snapshots.some(
+      (snapshot) =>
+        snapshot.data()?.status !== 'active' && snapshot.id !== openedVineId,
+    )
+  ) {
     throw new Error('Esemény csak aktív tőkéhez adható.');
   }
 }
@@ -229,6 +235,7 @@ async function appendEvent(
   firestore: Firestore,
   vineId: string,
   event: VineEvent,
+  openedVineId?: string,
 ): Promise<VineStatus> {
   return runTransaction(firestore, async (transaction) => {
     const vineReference = doc(firestore, 'vines', vineId);
@@ -238,7 +245,7 @@ async function appendEvent(
     }
 
     const data = snapshot.data();
-    if (data.status !== 'active') {
+    if (data.status !== 'active' && vineId !== openedVineId) {
       throw new Error('Esemény csak aktív tőkéhez adható.');
     }
 
@@ -294,7 +301,7 @@ export async function addEvents(
   onProgress?: VineMutationProgress,
 ): Promise<void> {
   const targetVineIds = validateEventTargets(input.targetVineIds);
-  await assertActiveEventTargets(firestore, targetVineIds);
+  await assertActiveEventTargets(firestore, targetVineIds, input.openedVineId);
 
   const preparedPhotos = await prepareVineEventPhotos(input.photos);
   const targetBytes = preparedPhotos.reduce((sum, photo) => sum + photo.blob.size, 0);
@@ -328,13 +335,18 @@ export async function addEvents(
       artifacts.push(artifact);
 
       const now = Timestamp.now().toDate().toISOString();
-      const previousStatus = await appendEvent(firestore, vineId, {
-        ...details,
-        id: eventId,
-        photos,
-        createdAt: now,
-        updatedAt: now,
-      });
+      const previousStatus = await appendEvent(
+        firestore,
+        vineId,
+        {
+          ...details,
+          id: eventId,
+          photos,
+          createdAt: now,
+          updatedAt: now,
+        },
+        input.openedVineId,
+      );
       persistedArtifacts.push({ ...artifact, previousStatus });
       completedBytes += targetBytes;
       onProgress?.(totalBytes > 0 ? Math.round((completedBytes / totalBytes) * 100) : 100);

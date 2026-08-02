@@ -27,22 +27,22 @@ kell.
 
 ## Elfogadási kritériumok
 
-- [ ] Megfigyelés, metszés, permetezés és megszűnés esemény rögzíthető dátummal és
+- [x] Megfigyelés, metszés, permetezés és megszűnés esemény rögzíthető dátummal és
       idővel, opcionális címmel, jegyzettel és több fotóval.
-- [ ] Üres cím esetén az eseménytípus magyar neve jelenik meg címként.
-- [ ] Ugyanaz az esemény több kiválasztott tőkére menthető, majd az egyes példányok
+- [x] Üres cím esetén az eseménytípus magyar neve jelenik meg címként.
+- [x] Ugyanaz az esemény több kiválasztott tőkére menthető, majd az egyes példányok
       egymástól függetlenül szerkeszthetők és törölhetők.
-- [ ] A célpontlista és a **Mind** művelet nem küld eseményt nem aktív tőkére a
+- [x] A célpontlista és a **Mind** művelet nem küld eseményt nem aktív tőkére a
       megnyitott tőke dokumentált kivételén kívül; a számláló konzisztens.
-- [ ] 400-nál több célpont esetén a felület feltöltés előtt érthető hibát mutat.
-- [ ] A feltöltési progress látható, pending állapotban nincs duplikált beküldés,
+- [x] 400-nál több célpont esetén a felület feltöltés előtt érthető hibát mutat.
+- [x] A feltöltési progress látható, pending állapotban nincs duplikált beküldés,
       hiba esetén az űrlap javítható marad.
-- [ ] Eseménytörlés megerősítést kér, és siker után a fotók sem jelennek meg.
-- [ ] `ceased` esemény után a tőke megszűntként látszik; az esemény törlése nem
+- [x] Eseménytörlés megerősítést kér, és siker után a fotók sem jelennek meg.
+- [x] `ceased` esemény után a tőke megszűntként látszik; az esemény törlése nem
       aktiválja automatikusan.
-- [ ] Nem admin felhasználó az eseményeket és fotókat látja, de módosító vezérlőt
+- [x] Nem admin felhasználó az eseményeket és fotókat látja, de módosító vezérlőt
       nem kap.
-- [ ] Az idővonal és az összes űrlapállapot desktop/mobil DOM-ellenőrzése és
+- [x] Az idővonal és az összes űrlapállapot desktop/mobil DOM-ellenőrzése és
       screenshotja igazolja a prototípussal való vizuális egyezést.
 
 ## Érintett terület
@@ -53,3 +53,13 @@ kell.
 
 ## Comments
 
+- 2026-08-02: Elkészült a publikus esemény-idővonal, a fotónézet, valamint az admin
+  többtőkés eseményrögzítő, szerkesztő és megerősített törlő folyamat.
+- 2026-08-02: A megnyitott megszűnt tőke dokumentált kivételét a catalog validáció
+  és integrációs teszt is lefedi; a többi célpont továbbra is csak aktív lehet.
+- 2026-08-02: A review során az edit űrlap prototípus-eltérését, a hiányzó
+  pending/progress/hiba/edit vizuális állapotokat és az elavult nyers Firebase-hiba
+  átvitelét javítottuk.
+- 2026-08-02: Ellenőrzés: unit tesztek (27/27), lint, production build, integrációs
+  tesztek (12/12) és teljes Playwright E2E (16/16). A desktop és mobil eseménynapló-
+  és űrlapsnapshotok vizuálisan ellenőrizve.

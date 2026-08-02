@@ -78,6 +78,7 @@ export interface VineEventDetailsInput {
 
 export interface AddVineEventsInput {
   targetVineIds: string[];
+  openedVineId?: string;
   event: VineEventDetailsInput;
   photos: File[];
 }
