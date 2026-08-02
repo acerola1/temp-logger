@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { vineFormSchema } from '../lib/schemas';
 import type { VineFormValues } from '../types/forms';
 
@@ -49,7 +49,7 @@ export function VineForm({
     register,
     handleSubmit,
     reset,
-    watch,
+    control,
     formState: { errors },
   } = useForm<VineFormValues>({
     resolver: zodResolver(vineFormSchema),
@@ -60,8 +60,8 @@ export function VineForm({
     reset(defaultValues);
   }, [defaultValues, reset]);
 
-  const plantedAtPrecision = watch('plantedAtPrecision');
-  const rootstockType = watch('rootstockType');
+  const plantedAtPrecision = useWatch({ control, name: 'plantedAtPrecision' });
+  const rootstockType = useWatch({ control, name: 'rootstockType' });
 
   const firstError =
     errors.variety?.message ??

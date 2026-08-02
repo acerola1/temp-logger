@@ -172,6 +172,7 @@ interface CuttingTimelineProps {
 export function CuttingTimeline({ cutting, onActiveItemChange }: CuttingTimelineProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [nowMs] = useState(() => Date.now());
   const containerRef = useRef<HTMLDivElement>(null);
 
   const items = useMemo(() => buildTimelineItems(cutting), [cutting]);
@@ -182,10 +183,10 @@ export function CuttingTimeline({ cutting, onActiveItemChange }: CuttingTimeline
     const allDates = items.map((item) => item.dateMs);
     const minMs = Math.min(plantedMs, ...allDates);
     const dynamicMax = Math.max(plantedMs, ...allDates);
-    const maxMs = isClosed ? dynamicMax : Math.max(Date.now(), dynamicMax);
+    const maxMs = isClosed ? dynamicMax : Math.max(nowMs, dynamicMax);
     const padding = (maxMs - minMs) * 0.03 || 24 * 60 * 60 * 1000;
     return { startMs: minMs - padding, endMs: maxMs + padding };
-  }, [cutting.plantedAt, isClosed, items]);
+  }, [cutting.plantedAt, isClosed, items, nowMs]);
 
   const totalSpan = endMs - startMs;
   const safeSpan = totalSpan === 0 ? 1 : totalSpan;
@@ -400,7 +401,7 @@ export function CuttingTimeline({ cutting, onActiveItemChange }: CuttingTimeline
 
         {/* "Today" indicator (only on active cuttings) */}
         {!isClosed && (() => {
-          const todayLeft = toPercent(Date.now());
+          const todayLeft = toPercent(nowMs);
           if (todayLeft < 0 || todayLeft > 100) return null;
           return (
             <div

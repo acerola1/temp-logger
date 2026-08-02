@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { indexSessionEvents } from '../lib/sessionEventSequence';
 import { getErrorMessage } from '../lib/errorMessage';
@@ -56,33 +56,18 @@ export function SessionEventsDialog({
   quickCreateRequest,
   onQuickCreateHandled,
 }: SessionEventsDialogProps) {
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [manualCreateFormOpen, setManualCreateFormOpen] = useState(false);
   const [editEventId, setEditEventId] = useState<string | null>(null);
+  const showCreateForm = manualCreateFormOpen || (isAdmin && quickCreateRequest !== null);
 
   const sortedEvents = indexSessionEvents(events)
     .slice()
     .sort((l, r) => new Date(r.occurredAt).getTime() - new Date(l.occurredAt).getTime());
 
-  const prevSessionIdRef = useRef(session.id);
-  useEffect(() => {
-    if (prevSessionIdRef.current === session.id) return;
-    prevSessionIdRef.current = session.id;
-    setShowCreateForm(false);
-    setEditEventId(null);
-  }, [session.id]);
-
-  useEffect(() => {
-    if (!quickCreateRequest || !isAdmin) return;
-    setShowCreateForm(true);
-  }, [isAdmin, quickCreateRequest]);
-
-  const wasFormOpenRef = useRef(false);
-  useEffect(() => {
-    if (wasFormOpenRef.current && !showCreateForm) {
-      onQuickCreateHandled();
-    }
-    wasFormOpenRef.current = showCreateForm;
-  }, [showCreateForm, onQuickCreateHandled]);
+  const closeCreateForm = () => {
+    setManualCreateFormOpen(false);
+    onQuickCreateHandled();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
@@ -110,7 +95,11 @@ export function SessionEventsDialog({
               <button
                 type="button"
                 onClick={() => {
-                  setShowCreateForm((current) => !current);
+                  if (showCreateForm) {
+                    closeCreateForm();
+                  } else {
+                    setManualCreateFormOpen(true);
+                  }
                   onClearCreateError();
                 }}
                 className="inline-flex items-center gap-2 rounded-xl bg-vine-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-vine-700"
@@ -131,10 +120,10 @@ export function SessionEventsDialog({
                 isPending={createPending}
                 onSubmit={async (input) => {
                   await onCreateEvent(input);
-                  setShowCreateForm(false);
+                  closeCreateForm();
                 }}
                 onCancel={() => {
-                  setShowCreateForm(false);
+                  closeCreateForm();
                   onClearCreateError();
                 }}
                 defaultOccurredAt={quickCreateRequest?.occurredAt}

@@ -25,19 +25,19 @@ sorszáma plusz egy; a felület nem kínál végleges tőketörlést.
 
 ## Elfogadási kritériumok
 
-- [ ] Publikus felhasználó realtime olvashatja a tőkéket.
-- [ ] Admin a kötelező minimumadatokkal létrehozhat tőkét, amely alapértelmezésben
+- [x] Publikus felhasználó realtime olvashatja a tőkéket.
+- [x] Admin a kötelező minimumadatokkal létrehozhat tőkét, amely alapértelmezésben
       aktív és automatikus sorszámot kap.
-- [ ] Korábban kiosztott sorszámot a normál alkalmazásfolyamat nem használ újra, és
+- [x] Korábban kiosztott sorszámot a normál alkalmazásfolyamat nem használ újra, és
       szerkesztés nem változtatja meg a sorszámot vagy a létrehozási időt.
-- [ ] A catalog teljes `EditVineInput`-ot fogad, nem `Partial<Vine>` értéket.
-- [ ] Tőke- és eseménymódosításra alkalmas, beágyazott `events` tömböt tartalmazó
+- [x] A catalog teljes `EditVineInput`-ot fogad, nem `Partial<Vine>` értéket.
+- [x] Tőke- és eseménymódosításra alkalmas, beágyazott `events` tömböt tartalmazó
       Firestore-leképezés készül.
-- [ ] A forrásdugvány linkjének mentése nem hoz létre tőkét, nem másol és nem
+- [x] A forrásdugvány linkjének mentése nem hoz létre tőkét, nem másol és nem
       szinkronizál adatot.
-- [ ] Törölt vagy nem elérhető forrásdugvány kezelhető domain/UI hiba nélkül.
-- [ ] A tőkecímke-javaslatok csak a tőkék címkéiből származnak.
-- [ ] Az implementációt Firebase Emulator Suite integrációs tesztek fedik.
+- [x] Törölt vagy nem elérhető forrásdugvány kezelhető domain/UI hiba nélkül.
+- [x] A tőkecímke-javaslatok csak a tőkék címkéiből származnak.
+- [x] Az implementációt Firebase Emulator Suite integrációs tesztek fedik.
 
 ## Érintett terület
 
@@ -52,3 +52,5 @@ sorszáma plusz egy; a felület nem kínál végleges tőketörlést.
 
 ## Comments
 
+- Megvalósítva TDD-ben a catalog/firestore seam-en; ellenőrzés:
+  `npm run build`, `npm test`, `npm run test:integration`.
