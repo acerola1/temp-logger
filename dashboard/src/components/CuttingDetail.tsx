@@ -134,6 +134,23 @@ export function CuttingDetail({
     [selectedCutting],
   );
 
+  // Új esemény csak aktív dugványra kerülhet. Kivétel a most megnyitott egyed:
+  // különben egy archivált dugvány saját naplója sem bővíthető.
+  const eventTargetCuttings = useMemo(
+    () =>
+      cuttings.filter(
+        (cutting) => cutting.status === 'active' || cutting.id === selectedCutting?.id,
+      ),
+    [cuttings, selectedCutting],
+  );
+
+  // A kijelölés csak a listában szereplő egyedekre érvényes, így a számláló és a
+  // mentés akkor is konzisztens, ha egy dugvány közben kikerült az aktívak közül.
+  const selectedTargetIds = useMemo(() => {
+    const selectableIds = new Set(eventTargetCuttings.map((cutting) => cutting.id));
+    return targetCuttingIds.filter((id) => selectableIds.has(id));
+  }, [eventTargetCuttings, targetCuttingIds]);
+
   const handleTimelineActiveChange = useCallback((selection: TimelineSelection | null) => {
     if (!selection?.entityId) {
       setHighlightedId(null);
@@ -167,7 +184,11 @@ export function CuttingDetail({
       return;
     }
 
-    if (targetCuttingIds.length === 0) {
+    const targetCuttings = eventTargetCuttings.filter((cutting) =>
+      selectedTargetIds.includes(cutting.id),
+    );
+
+    if (targetCuttings.length === 0) {
       setAddEventError('root', { message: 'Válassz legalább egy dugványt.' });
       return;
     }
@@ -182,7 +203,6 @@ export function CuttingDetail({
         title: values.title.trim() || eventTypeLabel(values.type),
         notes: values.notes.trim(),
       };
-      const targetCuttings = cuttings.filter((cutting) => targetCuttingIds.includes(cutting.id));
       const nextStatus = values.archive ? eventTypeStatusOnArchive(values.type) : null;
 
       await Promise.all(
@@ -504,7 +524,7 @@ export function CuttingDetail({
                         <button
                           type="button"
                           onClick={() => {
-                            setTargetCuttingIds(cuttings.map((cutting) => cutting.id));
+                            setTargetCuttingIds(eventTargetCuttings.map((cutting) => cutting.id));
                             clearAddEventErrors('root');
                           }}
                           className="rounded-lg border border-vine-200 bg-white px-2 py-1 text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
@@ -525,20 +545,33 @@ export function CuttingDetail({
                     </div>
 
                     <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-vine-200 bg-white p-2 dark:border-vine-700 dark:bg-vine-900">
-                      {cuttings.map((cutting) => (
-                        <label
-                          key={cutting.id}
-                          className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm text-vine-800 hover:bg-vine-50 dark:text-vine-100 dark:hover:bg-vine-800"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={targetCuttingIds.includes(cutting.id)}
-                            onChange={() => toggleTargetCutting(cutting.id)}
-                            className="h-4 w-4 rounded border-vine-300 text-vine-600 focus:ring-vine-500"
-                          />
-                          <span>#{cutting.serialNumber} - {cutting.variety}</span>
-                        </label>
-                      ))}
+                      {eventTargetCuttings.length === 0 ? (
+                        <p className="px-2 py-1 text-sm text-vine-500 dark:text-vine-300">
+                          Nincs aktív dugvány, amire eseményt lehetne rögzíteni.
+                        </p>
+                      ) : (
+                        eventTargetCuttings.map((cutting) => (
+                          <label
+                            key={cutting.id}
+                            className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm text-vine-800 hover:bg-vine-50 dark:text-vine-100 dark:hover:bg-vine-800"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedTargetIds.includes(cutting.id)}
+                              onChange={() => toggleTargetCutting(cutting.id)}
+                              className="h-4 w-4 rounded border-vine-300 text-vine-600 focus:ring-vine-500"
+                            />
+                            <span>#{cutting.serialNumber} - {cutting.variety}</span>
+                            {cutting.status !== 'active' && (
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(cutting.status)}`}
+                              >
+                                {statusLabel(cutting.status)}
+                              </span>
+                            )}
+                          </label>
+                        ))
+                      )}
                     </div>
                   </div>
 
@@ -549,7 +582,7 @@ export function CuttingDetail({
                       className="inline-flex items-center gap-2 rounded-xl bg-vine-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-vine-700 disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       {isUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
-                      Esemény mentése ({targetCuttingIds.length})
+                      Esemény mentése ({selectedTargetIds.length})
                     </button>
                     <span className="text-xs text-vine-500 dark:text-vine-300">Tömeges mentés több dugványra.</span>
                   </div>

@@ -1,6 +1,6 @@
 import type { TimeRange } from '../types/sensor';
 
-export type DashboardView = 'monitor' | 'cuttings';
+export type DashboardView = 'monitor' | 'cuttings' | 'vines';
 
 export interface MonitorUrlState {
   timeRange: TimeRange;
@@ -13,9 +13,13 @@ function parseTimeRange(value: string | null): TimeRange {
 }
 
 export function getViewFromPath(pathname: string): DashboardView {
-  return pathname === '/dugvanyok' || pathname.startsWith('/dugvanyok/')
-    ? 'cuttings'
-    : 'monitor';
+  if (pathname === '/dugvanyok' || pathname.startsWith('/dugvanyok/')) {
+    return 'cuttings';
+  }
+  if (pathname === '/tokek' || pathname.startsWith('/tokek/')) {
+    return 'vines';
+  }
+  return 'monitor';
 }
 
 export function getMonitorStateFromUrl(search: string): MonitorUrlState {
