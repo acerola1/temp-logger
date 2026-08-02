@@ -22,23 +22,23 @@ beleértve a több tőkés rögzítést és a fotók robusztus Storage-életcikl
 
 ## Elfogadási kritériumok
 
-- [ ] Egy esemény egy vagy több aktív tőkéhez hozzáadható; minden tőke saját,
+- [x] Egy esemény egy vagy több aktív tőkéhez hozzáadható; minden tőke saját,
       később külön szerkeszthető eseményazonosítót kap.
-- [ ] 400-nál több célpont még feltöltés előtt érthető hibát eredményez.
-- [ ] A fotók a
+- [x] 400-nál több célpont még feltöltés előtt érthető hibát eredményez.
+- [x] A fotók a
       `vines/{vineId}/events/{eventId}/photos/{photoId}.{extension}` útvonalra
       kerülnek, és a Firestore-ban megvan a szükséges metaadatuk.
-- [ ] Több tőkés eseménynél egy példány törlése nem töri el más tőke fotóit.
-- [ ] Sikertelen Firestore-írás után az adott művelet feltöltései best-effort módon
+- [x] Több tőkés eseménynél egy példány törlése nem töri el más tőke fotóit.
+- [x] Sikertelen Firestore-írás után az adott művelet feltöltései best-effort módon
       törlődnek.
-- [ ] Eseménytörlés előbb eltávolítja a publikus rekordot, majd best-effort törli
+- [x] Eseménytörlés előbb eltávolítja a publikus rekordot, majd best-effort törli
       annak Storage-objektumait.
-- [ ] `ceased` esemény létrehozása ugyanabban a tőkefrissítésben megszűnt állapotot
+- [x] `ceased` esemény létrehozása ugyanabban a tőkefrissítésben megszűnt állapotot
       állít; szerkesztése vagy törlése nem aktiválja újra a tőkét.
-- [ ] Esemény szerkesztése a típust, időpontot, címet és jegyzetet módosítja; a
+- [x] Esemény szerkesztése a típust, időpontot, címet és jegyzetet módosítja; a
       meglévő fotók egyenkénti módosítása nem része ennek a verziónak.
-- [ ] Minden érintett tőke `updatedAt` értéke frissül.
-- [ ] Emulatoros integrációs teszt fedi az egy- és többtőkés írást, a fotó-életciklust
+- [x] Minden érintett tőke `updatedAt` értéke frissül.
+- [x] Emulatoros integrációs teszt fedi az egy- és többtőkés írást, a fotó-életciklust
       és a megszűnési átmenetet.
 
 ## Érintett terület
@@ -49,3 +49,10 @@ beleértve a több tőkés rögzítést és a fotók robusztus Storage-életcikl
 
 ## Comments
 
+- Megvalósítva a catalog `addEvents`, `editEvent` és `deleteEvent` parancsait
+  tranzakciós Firestore read–modify–write-tal, 400-as célpontlimittel, Storage
+  kompenzációval és feltöltési progress-szel.
+- Elkészült a `vineEventPhotos` adapter, a tőkénként izolált Storage-útvonal és
+  a `vines/.../events/.../photos/...` publikus olvasás/admin írás szabálya.
+- Ellenőrzés: `npm test` (26 teszt), `npm run test:integration` (11 teszt),
+  `npm run lint`, `npm run build`.

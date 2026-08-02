@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { db } from '../../lib/firebase';
+import { db, storage } from '../../lib/firebase';
 import { getErrorMessage } from '../../lib/errorMessage';
 import { useAuth } from '../../hooks/useAuth';
 import {
+  addEvents as addFirestoreEvents,
   createVine as createFirestoreVine,
+  deleteEvent as deleteFirestoreEvent,
+  editEvent as editFirestoreEvent,
   editVine as editFirestoreVine,
   subscribeToVines,
 } from './firestoreVines';
-import type { CreateVineInput, EditVineInput, Vine } from './model';
+import type {
+  AddVineEventsInput,
+  CreateVineInput,
+  DeleteVineEventInput,
+  EditVineEventInput,
+  EditVineInput,
+  Vine,
+} from './model';
 
 export interface VineCatalogMutationState {
   pending: boolean;
@@ -23,6 +33,9 @@ export interface VineCatalog {
   mutation: VineCatalogMutationState;
   createVine(input: CreateVineInput): Promise<{ vineId: string }>;
   editVine(vineId: string, input: EditVineInput): Promise<void>;
+  addEvents(input: AddVineEventsInput): Promise<void>;
+  editEvent(input: EditVineEventInput): Promise<void>;
+  deleteEvent(input: DeleteVineEventInput): Promise<void>;
 }
 
 export function getNextVineSerialNumber(vines: readonly Vine[]): number {
@@ -87,22 +100,30 @@ export function useVineCatalog(): VineCatalog {
     [],
   );
 
-  const runMutation = useCallback(async <T,>(operation: () => Promise<T>): Promise<T> => {
-    setMutation({ pending: true, error: null, uploadProgress: null });
+  const runMutation = useCallback(
+    async <T,>(
+      operation: (reportProgress: (progress: number) => void) => Promise<T>,
+      fallbackError = 'Nem sikerült menteni a tőkét.',
+    ): Promise<T> => {
+      setMutation({ pending: true, error: null, uploadProgress: null });
 
-    try {
-      const result = await operation();
-      setMutation(INITIAL_MUTATION);
-      return result;
-    } catch (mutationError) {
-      setMutation({
-        pending: false,
-        error: getErrorMessage(mutationError, 'Nem sikerült menteni a tőkét.'),
-        uploadProgress: null,
-      });
-      throw mutationError;
-    }
-  }, []);
+      try {
+        const result = await operation((progress) => {
+          setMutation((current) => ({ ...current, uploadProgress: progress }));
+        });
+        setMutation(INITIAL_MUTATION);
+        return result;
+      } catch (mutationError) {
+        setMutation({
+          pending: false,
+          error: getErrorMessage(mutationError, fallbackError),
+          uploadProgress: null,
+        });
+        throw mutationError;
+      }
+    },
+    [],
+  );
 
   const createVine = useCallback(
     (input: CreateVineInput) =>
@@ -130,6 +151,30 @@ export function useVineCatalog(): VineCatalog {
     [runMutation],
   );
 
+  const addEvents = useCallback(
+    (input: AddVineEventsInput) =>
+      runMutation(
+        (reportProgress) => addFirestoreEvents(db, storage, input, reportProgress),
+        'Nem sikerült menteni az eseményt.',
+      ),
+    [runMutation],
+  );
+
+  const editEvent = useCallback(
+    (input: EditVineEventInput) =>
+      runMutation(() => editFirestoreEvent(db, input), 'Nem sikerült szerkeszteni az eseményt.'),
+    [runMutation],
+  );
+
+  const deleteEvent = useCallback(
+    (input: DeleteVineEventInput) =>
+      runMutation(
+        () => deleteFirestoreEvent(db, storage, input),
+        'Nem sikerült törölni az eseményt.',
+      ),
+    [runMutation],
+  );
+
   const tagSuggestions = useMemo(() => getVineTagSuggestions(vines), [vines]);
 
   return {
@@ -140,5 +185,8 @@ export function useVineCatalog(): VineCatalog {
     mutation,
     createVine,
     editVine,
+    addEvents,
+    editEvent,
+    deleteEvent,
   };
 }

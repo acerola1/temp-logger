@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:integration:run": "vitest run --config vitest.integration.config.ts",
-    "test:integration": "npx firebase-tools emulators:exec --project demo-esp32-vines-integration --config ../firebase.e2e.json --only auth,firestore \"npm run test:integration:run\"",
+    "test:integration": "npx firebase-tools emulators:exec --project demo-esp32-vines-integration --config ../firebase.e2e.json --only auth,firestore,storage \"npm run test:integration:run\"",
     "preview": "vite preview",
     "screenshots": "playwright test -c playwright.screenshots.config.ts scripts/dashboard-screenshots.spec.ts",
     "test:e2e:seed": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8088 GCLOUD_PROJECT=demo-esp32-e2e node scripts/seed-e2e-data.mjs",

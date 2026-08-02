@@ -2,9 +2,11 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   Timestamp,
   type DocumentData,
@@ -13,9 +15,14 @@ import {
   type Unsubscribe,
   updateDoc,
 } from 'firebase/firestore';
+import type { FirebaseStorage } from 'firebase/storage';
+import { MAX_VINE_EVENT_TARGETS } from './model';
 import type {
+  AddVineEventsInput,
   CreateVineInput,
+  DeleteVineEventInput,
   EditVineInput,
+  EditVineEventInput,
   Vine,
   VineEvent,
   VineEventPhoto,
@@ -24,6 +31,13 @@ import type {
   VineRootType,
   VineStatus,
 } from './model';
+import {
+  deleteVineEventPhotos,
+  prepareVineEventPhotos,
+  uploadPreparedVineEventPhotos,
+} from './vineEventPhotos';
+
+export type VineMutationProgress = (progress: number) => void;
 
 function editableFields(input: CreateVineInput) {
   return {
@@ -147,4 +161,257 @@ export async function editVine(
     ...editableFields(input),
     updatedAt: serverTimestamp(),
   });
+}
+
+function normalizeEventDetails(input: AddVineEventsInput['event']): AddVineEventsInput['event'] {
+  return {
+    type: input.type,
+    occurredAt: input.occurredAt,
+    title: input.title.trim(),
+    notes: input.notes.trim(),
+  };
+}
+
+function mapStoredEvents(data: DocumentData): VineEvent[] {
+  return Array.isArray(data.events)
+    ? data.events.map((value) => mapEvent(value as DocumentData))
+    : [];
+}
+
+function uniqueEventTargetIds(targetVineIds: readonly string[]): string[] {
+  return [...new Set(targetVineIds)];
+}
+
+async function assertActiveEventTargets(
+  firestore: Firestore,
+  targetVineIds: readonly string[],
+): Promise<void> {
+  const snapshots = await Promise.all(
+    targetVineIds.map((vineId) => getDoc(doc(firestore, 'vines', vineId))),
+  );
+
+  if (snapshots.some((snapshot) => !snapshot.exists())) {
+    throw new Error('A kiválasztott tőke nem található.');
+  }
+
+  if (snapshots.some((snapshot) => snapshot.data()?.status !== 'active')) {
+    throw new Error('Esemény csak aktív tőkéhez adható.');
+  }
+}
+
+function validateEventTargets(targetVineIds: readonly string[]): string[] {
+  const uniqueTargetIds = uniqueEventTargetIds(targetVineIds);
+
+  if (uniqueTargetIds.length === 0) {
+    throw new Error('Válassz legalább egy tőkét.');
+  }
+
+  if (uniqueTargetIds.length > MAX_VINE_EVENT_TARGETS) {
+    throw new Error(
+      `Egy műveletben legfeljebb ${MAX_VINE_EVENT_TARGETS} tőkéhez adhatsz eseményt.`,
+    );
+  }
+
+  return uniqueTargetIds;
+}
+
+interface EventWriteArtifact {
+  vineId: string;
+  eventId: string;
+  photos: VineEventPhoto[];
+}
+
+interface PersistedEventWriteArtifact extends EventWriteArtifact {
+  previousStatus: VineStatus;
+}
+
+async function appendEvent(
+  firestore: Firestore,
+  vineId: string,
+  event: VineEvent,
+): Promise<VineStatus> {
+  return runTransaction(firestore, async (transaction) => {
+    const vineReference = doc(firestore, 'vines', vineId);
+    const snapshot = await transaction.get(vineReference);
+    if (!snapshot.exists()) {
+      throw new Error('A kiválasztott tőke nem található.');
+    }
+
+    const data = snapshot.data();
+    if (data.status !== 'active') {
+      throw new Error('Esemény csak aktív tőkéhez adható.');
+    }
+
+    const existingEvents = mapStoredEvents(data);
+
+    transaction.update(vineReference, {
+      events: [...existingEvents, event],
+      ...(event.type === 'ceased' ? { status: 'ceased' as const } : {}),
+      updatedAt: serverTimestamp(),
+    });
+
+    return data.status as VineStatus;
+  });
+}
+
+async function rollbackEvent(
+  firestore: Firestore,
+  artifact: PersistedEventWriteArtifact,
+): Promise<boolean> {
+  try {
+    await runTransaction(firestore, async (transaction) => {
+      const vineReference = doc(firestore, 'vines', artifact.vineId);
+      const snapshot = await transaction.get(vineReference);
+      if (!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      const existingEvents = mapStoredEvents(data);
+      const nextEvents = existingEvents.filter((event) => event.id !== artifact.eventId);
+      const shouldRestoreActiveStatus =
+        artifact.previousStatus === 'active' &&
+        data.status === 'ceased' &&
+        !nextEvents.some((event) => event.type === 'ceased');
+
+      if (nextEvents.length !== existingEvents.length) {
+        transaction.update(vineReference, {
+          events: nextEvents,
+          ...(shouldRestoreActiveStatus ? { status: 'active' as const } : {}),
+          updatedAt: serverTimestamp(),
+        });
+      }
+    });
+    return true;
+  } catch (error) {
+    console.warn('Vine event rollback failed:', artifact.vineId, artifact.eventId, error);
+    return false;
+  }
+}
+
+export async function addEvents(
+  firestore: Firestore,
+  storage: FirebaseStorage,
+  input: AddVineEventsInput,
+  onProgress?: VineMutationProgress,
+): Promise<void> {
+  const targetVineIds = validateEventTargets(input.targetVineIds);
+  await assertActiveEventTargets(firestore, targetVineIds);
+
+  const preparedPhotos = await prepareVineEventPhotos(input.photos);
+  const targetBytes = preparedPhotos.reduce((sum, photo) => sum + photo.blob.size, 0);
+  const totalBytes = targetBytes * targetVineIds.length;
+  let completedBytes = 0;
+  const artifacts: EventWriteArtifact[] = [];
+  const persistedArtifacts: PersistedEventWriteArtifact[] = [];
+  const details = normalizeEventDetails(input.event);
+
+  if (preparedPhotos.length > 0) {
+    onProgress?.(0);
+  }
+
+  try {
+    for (const vineId of targetVineIds) {
+      const eventId = crypto.randomUUID();
+      const photos = await uploadPreparedVineEventPhotos(
+        storage,
+        vineId,
+        eventId,
+        preparedPhotos,
+        (uploadedBytes, localTotalBytes) => {
+          const boundedUploadedBytes = Math.min(uploadedBytes, localTotalBytes);
+          const progress = totalBytes > 0
+            ? Math.round(((completedBytes + boundedUploadedBytes) / totalBytes) * 100)
+            : 100;
+          onProgress?.(Math.min(100, progress));
+        },
+      );
+      const artifact = { vineId, eventId, photos } satisfies EventWriteArtifact;
+      artifacts.push(artifact);
+
+      const now = Timestamp.now().toDate().toISOString();
+      const previousStatus = await appendEvent(firestore, vineId, {
+        ...details,
+        id: eventId,
+        photos,
+        createdAt: now,
+        updatedAt: now,
+      });
+      persistedArtifacts.push({ ...artifact, previousStatus });
+      completedBytes += targetBytes;
+      onProgress?.(totalBytes > 0 ? Math.round((completedBytes / totalBytes) * 100) : 100);
+    }
+  } catch (error) {
+    for (const artifact of persistedArtifacts) {
+      if (await rollbackEvent(firestore, artifact)) {
+        await deleteVineEventPhotos(storage, artifact.photos);
+      }
+    }
+
+    const persistedIds = new Set(persistedArtifacts.map((artifact) => artifact.eventId));
+    for (const artifact of artifacts) {
+      if (!persistedIds.has(artifact.eventId)) {
+        await deleteVineEventPhotos(storage, artifact.photos);
+      }
+    }
+    throw error;
+  }
+}
+
+export async function editEvent(
+  firestore: Firestore,
+  input: EditVineEventInput,
+): Promise<void> {
+  await runTransaction(firestore, async (transaction) => {
+    const vineReference = doc(firestore, 'vines', input.vineId);
+    const snapshot = await transaction.get(vineReference);
+    if (!snapshot.exists()) {
+      throw new Error('A tőke nem található.');
+    }
+
+    const data = snapshot.data();
+    const existingEvents = mapStoredEvents(data);
+    const event = existingEvents.find((candidate) => candidate.id === input.eventId);
+    if (!event) {
+      throw new Error('Az esemény nem található.');
+    }
+
+    const details = normalizeEventDetails(input.event);
+    const now = Timestamp.now().toDate().toISOString();
+    transaction.update(vineReference, {
+      events: existingEvents.map((candidate) =>
+        candidate.id === input.eventId
+          ? { ...candidate, ...details, updatedAt: now }
+          : candidate,
+      ),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+export async function deleteEvent(
+  firestore: Firestore,
+  storage: FirebaseStorage,
+  input: DeleteVineEventInput,
+): Promise<void> {
+  const photos = await runTransaction(firestore, async (transaction) => {
+    const vineReference = doc(firestore, 'vines', input.vineId);
+    const snapshot = await transaction.get(vineReference);
+    if (!snapshot.exists()) {
+      throw new Error('A tőke nem található.');
+    }
+
+    const data = snapshot.data();
+    const existingEvents = mapStoredEvents(data);
+    const event = existingEvents.find((candidate) => candidate.id === input.eventId);
+    if (!event) {
+      throw new Error('Az esemény nem található.');
+    }
+
+    transaction.update(vineReference, {
+      events: existingEvents.filter((candidate) => candidate.id !== input.eventId),
+      updatedAt: serverTimestamp(),
+    });
+    return event.photos;
+  });
+
+  await deleteVineEventPhotos(storage, photos);
 }

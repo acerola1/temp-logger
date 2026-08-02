@@ -12,6 +12,11 @@ service firebase.storage {
       allow write: if isAdmin();
     }
 
+    match /vines/{vineId}/events/{eventId}/photos/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /sessions/{deviceId}/{sessionId}/events/{fileName} {
       allow read: if true;
       allow write: if isAdmin();
