@@ -26,20 +26,20 @@ A prototípus `removed`/`removal`, `rootstockType`, `plantedAt` és általános
 
 ## Elfogadási kritériumok
 
-- [ ] A production modell a `active`/`ceased`, illetve az
+- [x] A production modell a `active`/`ceased`, illetve az
       `observation`/`pruning`/`spraying`/`ceased` kanonikus értékeket használja.
-- [ ] A telepítési idő pontos dátumként, csak évként vagy explicit ismeretlenként
+- [x] A telepítési idő pontos dátumként, csak évként vagy explicit ismeretlenként
       reprezentálható.
-- [ ] A fajta és területleírás trimelés után kötelező; ismeretlen fajtaként az
+- [x] A fajta és területleírás trimelés után kötelező; ismeretlen fajtaként az
       `Ismeretlen` szabad szöveg elfogadható.
-- [ ] Nem oltott tőkénél az alanyfajta üres stringre normalizálódik.
-- [ ] Az üres eseménycím az eseménytípus magyar feliratára normalizálódik.
-- [ ] Az URL-alapú listaállapot alapértéke: aktív tőkék, legutóbb módosított elöl.
-- [ ] A keresés fajtában, sorszámban és területleírásban keres; a négy előírt
+- [x] Nem oltott tőkénél az alanyfajta üres stringre normalizálódik.
+- [x] Az üres eseménycím az eseménytípus magyar feliratára normalizálódik.
+- [x] Az URL-alapú listaállapot alapértéke: aktív tőkék, legutóbb módosított elöl.
+- [x] A keresés fajtában, sorszámban és területleírásban keres; a négy előírt
       szűrő és három rendezés működik.
-- [ ] Telepítési idő szerinti rendezésnél az év január 1-jének felel meg, az
+- [x] Telepítési idő szerinti rendezésnél az év január 1-jének felel meg, az
       ismeretlen értékek pedig a lista végére kerülnek.
-- [ ] A tiszta modulokat unit tesztek fedik, beleértve az URL round-tripet és a
+- [x] A tiszta modulokat unit tesztek fedik, beleértve az URL round-tripet és a
       normalizálási szélső eseteket.
 
 ## Érintett terület
@@ -56,4 +56,3 @@ A prototípus `removed`/`removal`, `rootstockType`, `plantedAt` és általános
 - a prototípus komponenseinek productionné alakítása
 
 ## Comments
-
