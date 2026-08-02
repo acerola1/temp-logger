@@ -37,3 +37,17 @@ When adjusting UI layout, spacing, alignment, visibility, or interaction states:
 - before stopping, explicitly ask yourself: “Did I actually solve the user’s task?”
 - if the honest answer is “not yet”, continue working instead of closing the loop
 - the required “next action” line must not be treated as permission to stop early; it is only a communication requirement
+
+## Agent skills
+
+### Issue tracker
+
+A feladatok lokális Markdown fájlokként élnek a `tasks/issues/` könyvtárban. Lásd `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Az alapértelmezett mattpocock triage címkéket használjuk. Lásd `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context elrendezést használunk. Lásd `docs/agents/domain.md`.
