@@ -3,7 +3,7 @@ import { AuthProvider } from './lib/auth';
 import { Header } from './components/Header';
 import { CuttingsPage } from './components/CuttingsPage';
 import { MonitorPage } from './components/MonitorPage';
-import { VinesPage } from './components/VinesPage';
+import { VinesPage } from './features/vines';
 import { useTheme } from './hooks/useTheme';
 import { useIsAdmin } from './hooks/useIsAdmin';
 import { getViewFromPath, type DashboardView } from './lib/dashboardRouting';
@@ -43,10 +43,13 @@ function Dashboard() {
   }, []);
 
   const navigateToView = (view: DashboardView) => {
+    let didNavigate = false;
+
     if (view === 'monitor') {
       const nextPath = `/${lastMonitorSearch}`;
       if (window.location.pathname + window.location.search !== nextPath) {
         window.history.pushState({}, '', nextPath);
+        didNavigate = true;
       }
     } else {
       // A monitor query stringjét csak onnan jövet mentjük el, különben egy másik
@@ -58,10 +61,14 @@ function Dashboard() {
       const nextPath = VIEW_PATHS[view];
       if (window.location.pathname !== nextPath) {
         window.history.pushState({}, '', nextPath);
+        didNavigate = true;
       }
     }
 
     setCurrentView(view);
+    if (didNavigate) {
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
   };
 
   return (
@@ -93,7 +100,7 @@ function Dashboard() {
 
         {currentView === 'monitor' && <MonitorPage theme={theme} isAdmin={isAdmin} />}
         {currentView === 'cuttings' && <CuttingsPage isAdmin={isAdmin} />}
-        {currentView === 'vines' && <VinesPage />}
+        {currentView === 'vines' && <VinesPage isAdmin={isAdmin} />}
       </div>
     </div>
   );

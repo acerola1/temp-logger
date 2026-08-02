@@ -147,6 +147,56 @@ async function seed() {
     updatedAt: iso(-2 * 60 * 60 * 1000),
     createdByUid: null,
   })
+
+  const vineDefaults = {
+    hasFruited: false,
+    rootstockVariety: '',
+    events: [],
+    notes: '',
+    sourceCuttingId: null,
+    createdByUid: null,
+  }
+
+  await Promise.all([
+    db.doc('vines/vine-e2e-1').set({
+      ...vineDefaults,
+      serialNumber: 1,
+      variety: 'Kékfrankos',
+      hasFruited: true,
+      rootType: 'grafted',
+      rootstockVariety: 'Berlandieri x Riparia',
+      plantingDate: { precision: 'date', date: '2022-04-16' },
+      areaDescription: 'Déli kerítés mellett',
+      status: 'active',
+      tags: ['öreg tőke', 'déli sor'],
+      createdAt: iso(-48 * 60 * 60 * 1000),
+      updatedAt: iso(-30 * 60 * 1000),
+    }),
+    db.doc('vines/vine-e2e-2').set({
+      ...vineDefaults,
+      serialNumber: 2,
+      variety: 'Irsai Olivér',
+      rootType: 'own_rooted',
+      plantingDate: { precision: 'year', year: 2024 },
+      areaDescription: 'Kerti út mellett',
+      status: 'active',
+      tags: ['északi sor'],
+      createdAt: iso(-24 * 60 * 60 * 1000),
+      updatedAt: iso(-60 * 60 * 1000),
+    }),
+    db.doc('vines/vine-e2e-3').set({
+      ...vineDefaults,
+      serialNumber: 3,
+      variety: 'Ismeretlen',
+      rootType: 'unknown',
+      plantingDate: { precision: 'unknown' },
+      areaDescription: 'Pince mögött',
+      status: 'ceased',
+      tags: ['régi'],
+      createdAt: iso(-72 * 60 * 60 * 1000),
+      updatedAt: iso(-2 * 60 * 60 * 1000),
+    }),
+  ])
 }
 
 seed().catch((error) => {

@@ -27,18 +27,18 @@ production megoldásként.
 
 ## Elfogadási kritériumok
 
-- [ ] A **Tőkék** menüpont megnyitja a `/tokek` oldalt.
-- [ ] Alapértelmezésben csak aktív tőkék látszanak, utolsó módosítás szerint
+- [x] A **Tőkék** menüpont megnyitja a `/tokek` oldalt.
+- [x] Alapértelmezésben csak aktív tőkék látszanak, utolsó módosítás szerint
       csökkenő sorrendben.
-- [ ] A keresés, a négy szűrő és a három rendezési lehetőség a specifikáció szerint
+- [x] A keresés, a négy szűrő és a három rendezési lehetőség a specifikáció szerint
       működik, és állapotuk URL-ben megmarad frissítés és visszanavigálás után.
-- [ ] A listakártya kizárólag sorszámot, fajtát, gyökérzettípust, állapotot és
+- [x] A listakártya kizárólag sorszámot, fajtát, gyökérzettípust, állapotot és
       címkéket mutat; területleírást és `Termett már` értéket nem.
-- [ ] A lista loading-, lekérdezési hiba-, nincs felvitt tőke- és nincs találat
+- [x] A lista loading-, lekérdezési hiba-, nincs felvitt tőke- és nincs találat
       állapotot érthetően jelenít meg.
-- [ ] Desktopon a kiválasztás és a listaelrendezés, mobilon a lista és vezérlők
+- [x] Desktopon a kiválasztás és a listaelrendezés, mobilon a lista és vezérlők
       megjelenése a prototípust követi.
-- [ ] DOM-ellenőrzés és desktop/mobil screenshot bizonyítja a prototípussal való
+- [x] DOM-ellenőrzés és desktop/mobil screenshot bizonyítja a prototípussal való
       vizuális egyezést a releváns állapotokban.
 
 ## Érintett terület
@@ -50,3 +50,16 @@ production megoldásként.
 
 ## Comments
 
+### 2026-08-02 — implementálva
+
+- A production `VinesPage` a `useVineCatalog` adatait és a tiszta `listState`
+  parse/serialize/szelekciós interface-ét használja; a prototípus mock- és adminlogikája
+  nem került át.
+- A `/tokek` és `/tokek/{vineId}` navigáció keresési paraméterekkel együtt kezeli a
+  kiválasztást, frissítést és böngésző-vissza műveletet.
+- A prototípussal egyező vezérlősor, listakártyák, desktop kijelölés, responsive
+  szélesség, valamint loading-, hiba- és kétféle üres állapot elkészült.
+- E2E seed, Playwright DOM-ellenőrzés és verziózott desktop/mobil screenshot-baseline:
+  `dashboard/e2e/vines-list.spec.ts`.
+  Ellenőrzés: `npm run build`, `npm test`, `npm run lint`, valamint a célzott
+  emulatoros E2E (2/2 zöld).
