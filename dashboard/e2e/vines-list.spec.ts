@@ -46,8 +46,8 @@ test('a desktop és mobil tőkelista a prototípus elrendezését követi', asyn
     Math.round(element.getBoundingClientRect().width),
   );
   expect(desktopWidth).toBeLessThanOrEqual(320);
-  await page.getByRole('button', { name: /#1/ }).click();
-  await expect(page.getByRole('button', { name: /#1/ })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('vine-card').filter({ hasText: '#1' }).click();
+  await expect(page.getByTestId('vine-card').filter({ hasText: '#1' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page).toHaveScreenshot('tokelista-desktop.png', {
     fullPage: true,
     animations: 'disabled',

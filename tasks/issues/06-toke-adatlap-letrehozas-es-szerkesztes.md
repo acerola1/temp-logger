@@ -26,21 +26,21 @@ reprodukálni, mielőtt layout- vagy spacing-eltérésen módosítás történik
 
 ## Elfogadási kritériumok
 
-- [ ] A tőkeadatlap a teljes **Szőlőtőke** elnevezést használja, és megjeleníti a
+- [x] A tőkeadatlap a teljes **Szőlőtőke** elnevezést használja, és megjeleníti a
       specifikált alapadatokat, jegyzetet és audit-időket.
-- [ ] A `/tokek/{vineId}` közvetlen navigáció, a böngésző vissza/előre gombja és a
+- [x] A `/tokek/{vineId}` közvetlen navigáció, a böngésző vissza/előre gombja és a
       lista URL-állapotának megőrzése működik.
-- [ ] Admin létrehozhat tőkét kötelező fajta, gyökérzettípus és területleírás
+- [x] Admin létrehozhat tőkét kötelező fajta, gyökérzettípus és területleírás
       megadásával; a sorszám automatikus és nem szerkeszthető.
-- [ ] Pontos dátum, csak év és ismeretlen telepítési idő is felvihető.
-- [ ] Admin a sorszámon kívül minden előírt adatot szerkeszthet, a megszűnt állapotot
+- [x] Pontos dátum, csak év és ismeretlen telepítési idő is felvihető.
+- [x] Admin a sorszámon kívül minden előírt adatot szerkeszthet, a megszűnt állapotot
       aktívra is visszaállíthatja; végleges törlés nincs a UI-ban.
-- [ ] Az eredeti dugvány kiválasztható és linkként megnyitható; hiányzó cél esetén
+- [x] Az eredeti dugvány kiválasztható és linkként megnyitható; hiányzó cél esetén
       „A hivatkozott dugvány nem elérhető” állapot látszik.
-- [ ] Nem admin felhasználó nem lát módosító vezérlőket.
-- [ ] Mentési pending és hibaállapot nem veszít el bevitt adatot és nem enged
+- [x] Nem admin felhasználó nem lát módosító vezérlőket.
+- [x] Mentési pending és hibaállapot nem veszít el bevitt adatot és nem enged
       duplikált beküldést.
-- [ ] Desktopon és mobilon a lista–adatlap átmenet, az adatlap és az űrlap a
+- [x] Desktopon és mobilon a lista–adatlap átmenet, az adatlap és az űrlap a
       prototípus megjelenését követi; ezt DOM-ellenőrzés és screenshot igazolja.
 
 ## Érintett terület
@@ -51,3 +51,11 @@ reprodukálni, mielőtt layout- vagy spacing-eltérésen módosítás történik
 
 ## Comments
 
+- 2026-08-02: Elkészült a közvetlenül címezhető desktop master–detail és mobil
+  részletmodal, a publikus read-only adatlap, valamint az admin létrehozó és
+  szerkesztő űrlap a production katalógus-parancsokra kötve.
+- 2026-08-02: A review során talált pending alatti mobil bezárást, a dugványlista
+  betöltési/hibaállapotát és a lista–adatlap prezentáció eltérését javítottuk.
+- 2026-08-02: Ellenőrzés: unit tesztek (26/26), lint, production build és teljes
+  Playwright E2E (15/15). A desktop és mobil adatlap-, űrlap- és listasnapshotok
+  vizuálisan ellenőrizve.

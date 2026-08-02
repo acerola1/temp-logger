@@ -157,6 +157,8 @@ async function seed() {
     createdByUid: null,
   }
 
+  const vineIso = (hours) => new Date(Date.UTC(2026, 6, 1, 12 + hours)).toISOString()
+
   await Promise.all([
     db.doc('vines/vine-e2e-1').set({
       ...vineDefaults,
@@ -169,8 +171,10 @@ async function seed() {
       areaDescription: 'Déli kerítés mellett',
       status: 'active',
       tags: ['öreg tőke', 'déli sor'],
-      createdAt: iso(-48 * 60 * 60 * 1000),
-      updatedAt: iso(-30 * 60 * 1000),
+      notes: 'Déli fekvésű, rendszeresen termő tőke.',
+      sourceCuttingId: 'cutting-e2e-1',
+      createdAt: vineIso(-2),
+      updatedAt: vineIso(3),
     }),
     db.doc('vines/vine-e2e-2').set({
       ...vineDefaults,
@@ -181,8 +185,8 @@ async function seed() {
       areaDescription: 'Kerti út mellett',
       status: 'active',
       tags: ['északi sor'],
-      createdAt: iso(-24 * 60 * 60 * 1000),
-      updatedAt: iso(-60 * 60 * 1000),
+      createdAt: vineIso(-1),
+      updatedAt: vineIso(2),
     }),
     db.doc('vines/vine-e2e-3').set({
       ...vineDefaults,
@@ -193,8 +197,9 @@ async function seed() {
       areaDescription: 'Pince mögött',
       status: 'ceased',
       tags: ['régi'],
-      createdAt: iso(-72 * 60 * 60 * 1000),
-      updatedAt: iso(-2 * 60 * 60 * 1000),
+      sourceCuttingId: 'missing-cutting-e2e',
+      createdAt: vineIso(-3),
+      updatedAt: vineIso(1),
     }),
   ])
 }
