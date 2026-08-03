@@ -9,6 +9,16 @@ export default defineConfig({
   workers: 1,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? 'github' : 'list',
+  expect: {
+    toHaveScreenshot: {
+      // A fejlesztői gép és a GitHub runner Chromiumja máshogy simítja az
+      // ékezetes betűk éleit: a CI-ben eddig 20-90 szórt pixel bukott el
+      // változatlan elrendezés mellett. Ez a küszöb elnyeli a betűzaj-eltérést,
+      // de a valódi elrendezés- vagy szövegváltozás (ezres pixelszám) továbbra
+      // is elhasal rajta.
+      maxDiffPixels: 400,
+    },
+  },
   use: {
     baseURL,
     timezoneId: 'Europe/Budapest',
