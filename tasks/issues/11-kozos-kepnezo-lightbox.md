@@ -45,26 +45,52 @@ reprodukálni kell a látható állapotot módosítás előtt.
 
 ## Elfogadási kritériumok
 
-- [ ] Egyetlen néző komponens létezik; a `CuttingPhotoGallery` és a `VineDetail`
+- [x] Egyetlen néző komponens létezik; a `CuttingPhotoGallery` és a `VineDetail`
       is ezt használja.
-- [ ] Görgős és pinch nagyításnál a fókuszpont alatti képrészlet a helyén marad.
-- [ ] Nagyított kép nem húzható ki teljesen a vászonról.
-- [ ] Mobilon alaphelyzetben a vízszintes húzás lapoz, nagyításban mozgat.
-- [ ] Dupla koppintás nagyít, ismételve visszaáll.
-- [ ] `Esc` zár, a nyilak lapoznak, `+`/`-`/`0` a nagyítást vezérli.
-- [ ] A zoom-panel gombjaira koppintás nem zárja be a nézőt és nem indít húzást.
-- [ ] Nyitott néző mellett a háttéroldal nem görgethető; záráskor a korábbi
+- [x] Görgős és pinch nagyításnál a fókuszpont alatti képrészlet a helyén marad.
+- [x] Nagyított kép nem húzható ki teljesen a vászonról.
+- [x] Mobilon alaphelyzetben a vízszintes húzás lapoz, nagyításban mozgat.
+- [x] Dupla koppintás nagyít, ismételve visszaáll.
+- [x] `Esc` zár, a nyilak lapoznak, `+`/`-`/`0` a nagyítást vezérli.
+- [x] A zoom-panel gombjaira koppintás nem zárja be a nézőt és nem indít húzást.
+- [x] Nyitott néző mellett a háttéroldal nem görgethető; záráskor a korábbi
       `overflow` visszaáll.
-- [ ] A tőke adatlapon egy esemény több fotója között lapozni lehet, és látszik
+- [x] A tőke adatlapon egy esemény több fotója között lapozni lehet, és látszik
       az `n / összes` számláló.
-- [ ] A dugvány-galéria eddigi funkciói (aktív kép, bélyegsor, törlés, új lapon
+- [x] A dugvány-galéria eddigi funkciói (aktív kép, bélyegsor, törlés, új lapon
       megnyitás) nem vesznek el.
-- [ ] `npm test`, `npm run lint`, `npm run build` zöld.
+- [x] `npm test`, `npm run lint`, `npm run build` zöld.
 
 ## Érintett terület
 
 - `dashboard/src/features/photos/ui/PhotoLightbox.tsx` (új)
+- `dashboard/src/features/photos/photoLightboxView.ts` (új)
 - `dashboard/src/components/CuttingPhotoGallery.tsx`
 - `dashboard/src/features/vines/ui/VineDetail.tsx`
 
 ## Comments
+
+- 2026-08-03: A `PhotoLightbox` a szoloink fórum-lightboxának gesztusait kapta
+  Tailwindre átültetve (fókuszpontra nagyítás, eltolás-korlátozás, filmszalag
+  rubber-banddel, dupla koppintás, nem passzív wheel listener,
+  `data-lightbox-ui` őrszem), a látványa viszont a mostani dugvány-néző maradt:
+  fekete háttér, kerek overlay gombok, bal felső zoom-panel, alsó számláló.
+- 2026-08-03: A néző csak nyitott állapotban van mountolva (`images` +
+  `initialIndex` + `onClose`), így nincs szinkronizálási hurok a hívó
+  állapotával. A `CuttingPhotoGallery` az `onIndexChange`-en keresztül követi a
+  lapozást, ezért záráskor ott marad az aktív kép, ahol a nézőben abbahagytuk.
+- 2026-08-03: A nagyítás matematikája külön, DOM nélküli modulba került
+  (`photoLightboxView.ts`): a fókuszpontra nagyítás és az eltolás-korlátozás így
+  unit teszttel bizonyítható, a komponens csak megméri a képet és a vásznat.
+- 2026-08-03: A `VineDetail` nézője kikerült a mobil részletmodal wrapperéből:
+  korábban a benne lévő koppintás felbukott a wrapper `onClick`-jére, és a
+  képnéző zárása az egész adatlapot bezárta.
+- 2026-08-03: A lapozás szándékosan nem körkörös, ezért a dugvány-galéria e2e
+  lépése az utolsó képen már a letiltott `Következő kép` gombot ellenőrzi, és
+  visszafelé lapoz. Az eseményfotók bélyeggombjai több kép esetén sorszámot
+  kapnak az akadálymentes nevükben.
+- 2026-08-03: Ellenőrzés: unit + komponenstesztek (84/84), lint, production
+  build, teljes Playwright E2E (18/18) két fotóra bővített seed eseménnyel.
+  Igazi böngészőben visszanéztem a néző desktop és mobil állapotát, a húzásos
+  lapozást, a dupla klikkes nagyítást és azt, hogy a nagyított kép eltolása
+  pontosan a vászon határán áll meg.

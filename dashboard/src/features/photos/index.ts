@@ -30,5 +30,6 @@ export {
   type PhotoSelection,
   type SelectedPhoto,
 } from './photoSelection';
+export { PhotoLightbox, type PhotoLightboxImage } from './ui/PhotoLightbox';
 export { PhotoPickerButtons } from './ui/PhotoPickerButtons';
 export { PhotoPreviewList } from './ui/PhotoPreviewList';

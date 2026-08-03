@@ -93,14 +93,14 @@ test('admin CRUD: uj dugvany + foto + ontozesi log + session esemeny', async ({ 
     ])
   await expect(page.getByText(/Kép 2\/2/)).toBeVisible()
   await page.getByTitle('Teljes képernyős nézet').click()
-  const photoViewer = page
-    .getByRole('button', { name: 'Bezárás' })
-    .locator('xpath=ancestor::div[contains(@class,"fixed")]')
-    .first()
+  const photoViewer = page.getByRole('dialog', { name: 'Dugványfotó' })
   await expect(photoViewer).toBeVisible()
-  await expect(photoViewer.getByRole('button', { name: 'Következő kép' })).toBeVisible()
-  await photoViewer.getByRole('button', { name: 'Következő kép' }).click()
+  // A néző nem körkörös: az utolsó képen a továbblapozás tiltott.
+  await expect(photoViewer.getByRole('button', { name: 'Következő kép' })).toBeDisabled()
+  await photoViewer.getByRole('button', { name: 'Előző kép' }).click()
+  await expect(photoViewer.getByText(/Kép 1\/2/)).toBeVisible()
   await photoViewer.getByRole('button', { name: 'Bezárás' }).click()
+  // A nézőben lapozás az oldal aktív képét is átállította.
   await expect(page.getByText(/Kép 1\/2/)).toBeVisible()
   await page.getByRole('button', { name: 'Törlés', exact: true }).first().click()
   await expect(page.getByText(/Kép 1\/1/)).toBeVisible()

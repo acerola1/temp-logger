@@ -190,6 +190,15 @@ async function seed() {
               height: 1,
               uploadedAt: vineIso(1),
             },
+            // Két fotó kell, hogy az eseményen belüli lapozás is látszódjon.
+            {
+              id: 'vine-event-photo-seed-2',
+              storagePath: '',
+              downloadUrl: seedPhotoUrl,
+              width: 1,
+              height: 1,
+              uploadedAt: vineIso(1),
+            },
           ],
           createdAt: vineIso(1),
           updatedAt: vineIso(1),

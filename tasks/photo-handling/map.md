@@ -13,7 +13,7 @@ Források:
 | --- | --- | --- | --- |
 | [09](../issues/09-kozos-foto-feature-kiemelese.md) | Közös fotó-feature kiemelése, duplikált feltöltés megszüntetése | – | done |
 | [10](../issues/10-tokeesemeny-mobil-kamera-es-fotoelonezet.md) | Tőkeesemény: mobil kamera és fotó-előnézet | 09 | done |
-| [11](../issues/11-kozos-kepnezo-lightbox.md) | Közös képnéző gesztusokkal, tőke adatlap bekötése | 09 | ready-for-agent |
+| [11](../issues/11-kozos-kepnezo-lightbox.md) | Közös képnéző gesztusokkal, tőke adatlap bekötése | 09 | done |
 | [12](../issues/12-egyseges-foto-metaadat.md) | Egységes fotó-metaadat és valódi készítési idő | 09 | ready-for-agent |
 | [13](../issues/13-tokeesemeny-fotoinak-utolagos-kezelese.md) | Tőkeesemény fotóinak utólagos kezelése | 10, 11 | ready-for-agent |
 

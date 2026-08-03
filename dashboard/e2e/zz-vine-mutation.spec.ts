@@ -96,7 +96,9 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
 
   const createdEvent = page.getByTestId('vine-event').filter({ hasText: 'Közös metszés' });
   await expect(createdEvent).toBeVisible();
-  await expect(createdEvent.getByRole('button', { name: 'Közös metszés fotó megnyitása' })).toHaveCount(2);
+  await expect(
+    createdEvent.getByRole('button', { name: /Közös metszés \d+\. fotó megnyitása/ }),
+  ).toHaveCount(2);
 
   await page.getByRole('button', { name: /#1 Kékfrankos/ }).click();
   const copiedEvent = page.getByTestId('vine-event').filter({ hasText: 'Közös metszés' });

@@ -10,7 +10,7 @@ test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és
   await expect(page.getByText('Déli fekvésű, rendszeresen termő tőke.')).toBeVisible();
   await expect(page.getByText('Első fürtök')).toBeVisible();
   await expect(page.getByText('Egészséges lomb és két fürt.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Első fürtök fotó megnyitása' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Első fürtök 1. fotó megnyitása' })).toBeVisible();
   await expect(page.getByText('#1 - Kékfrankos')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Alapadatok szerkesztése' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Új tőke' })).toHaveCount(0);
@@ -18,9 +18,19 @@ test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és
   await expect(page.getByRole('button', { name: 'Szerkesztés' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Törlés' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Első fürtök fotó megnyitása' }).click();
-  await expect(page.getByRole('dialog', { name: 'Eseményfotó' })).toBeVisible();
-  await page.getByRole('dialog', { name: 'Eseményfotó' }).click();
+  // A közös képnéző: eseményen belüli lapozás, számláló, nem körkörös szélek.
+  await page.getByRole('button', { name: 'Első fürtök 1. fotó megnyitása' }).click();
+  const photoViewer = page.getByRole('dialog', { name: 'Eseményfotó' });
+  await expect(photoViewer).toBeVisible();
+  await expect(photoViewer.getByText(/Kép 1\/2/)).toBeVisible();
+  await expect(photoViewer.getByRole('button', { name: 'Előző kép' })).toBeDisabled();
+  await photoViewer.getByRole('button', { name: 'Következő kép' }).click();
+  await expect(photoViewer.getByText(/Kép 2\/2/)).toBeVisible();
+  await expect(photoViewer.getByRole('button', { name: 'Következő kép' })).toBeDisabled();
+  await page.keyboard.press('ArrowLeft');
+  await expect(photoViewer.getByText(/Kép 1\/2/)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(photoViewer).toHaveCount(0);
 
   await page.getByRole('button', { name: '#1 - Kékfrankos' }).click();
   await expect(page).toHaveURL(/\/dugvanyok\/cutting-e2e-1$/);
@@ -174,6 +184,14 @@ test('a desktop master-detail és a mobil részletmodal a prototípust követi',
     fullPage: true,
     animations: 'disabled',
   });
+
+  // A képnéző a mobil részletmodal fölött nyílik, és a zárása csak őt zárja.
+  await page.getByRole('button', { name: 'Első fürtök 1. fotó megnyitása' }).click();
+  const mobileViewer = page.getByRole('dialog', { name: 'Eseményfotó' });
+  await expect(mobileViewer).toBeVisible();
+  await mobileViewer.getByRole('button', { name: 'Bezárás' }).click();
+  await expect(mobileViewer).toHaveCount(0);
+  await expect(detail).toBeVisible();
 
   await page.getByRole('button', { name: 'Részletek bezárása' }).click();
   await expect(page).toHaveURL(/\/tokek$/);
