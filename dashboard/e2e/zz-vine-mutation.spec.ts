@@ -1,7 +1,33 @@
-import { expect, test } from '@playwright/test';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { expect, test, type Locator } from '@playwright/test';
+
+test.describe.configure({ retries: 0 });
+
+const FIXED_TIMESTAMP = '2026-08-03T16:45:00Z';
+const FIXED_VINE_TIMESTAMP = '2026-08-03T16:45:59Z';
+
+async function stabilizeVineTimestamps(
+  vineId: string,
+  detail: Locator,
+) {
+  const adminApp =
+    getApps().find((app) => app.name === 'e2e-mutation') ??
+    initializeApp({ projectId: 'demo-esp32-e2e' }, 'e2e-mutation');
+  const timestamp = Timestamp.fromDate(new Date(FIXED_VINE_TIMESTAMP));
+
+  await getFirestore(adminApp).doc(`vines/${vineId}`).update({
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+  await expect(
+    detail.locator('dt', { hasText: 'Módosítva' }).locator('xpath=following-sibling::dd'),
+  ).toHaveText('2026.08.03. 18:45');
+}
 
 test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerkeszti és visszaaktiválja', async ({ page }) => {
   test.setTimeout(60_000);
+  await page.clock.setFixedTime(new Date(FIXED_TIMESTAMP));
   await page.goto('/tokek');
   await page.getByRole('button', { name: 'Teszt admin belépés' }).click();
   await expect(page.locator('[data-access-mode="admin"]')).toBeVisible();
@@ -34,8 +60,10 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await createForm.getByRole('button', { name: 'Mentés' }).click();
 
   await expect(page).toHaveURL(/\/tokek\/[^?]+$/);
+  const createdVineId = new URL(page.url()).pathname.split('/').at(-1)!;
+  const vineDetail = page.getByTestId('vine-detail');
   await expect(page.getByText('Szőlőtőke #4')).toBeVisible();
-  await expect(page.getByTestId('vine-detail').getByRole('heading', { name: 'Cabernet franc' })).toBeVisible();
+  await expect(vineDetail.getByRole('heading', { name: 'Cabernet franc' })).toBeVisible();
   await expect(page.getByText('2025', { exact: true })).toBeVisible();
   await expect(page.getByText('#1 - Kékfrankos')).toBeVisible();
 
@@ -45,12 +73,14 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await editForm.locator('[name="variety"]').fill('Cabernet Franc');
   await editForm.locator('[name="status"]').selectOption('ceased');
   await editForm.getByRole('button', { name: 'Mentés' }).click();
+  await expect(editForm).toHaveCount(0);
   await expect(page.getByTestId('vine-detail').getByText('Megszűnt', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Alapadatok szerkesztése' }).click();
   editForm = page.getByRole('form', { name: 'Szőlőtőke #4 űrlap' });
   await editForm.locator('[name="status"]').selectOption('active');
   await editForm.getByRole('button', { name: 'Mentés' }).click();
+  await expect(editForm).toHaveCount(0);
   await expect(page.getByTestId('vine-detail').getByText('Aktív', { exact: true })).toBeVisible();
   await expect(page.getByText('Szőlőtőke #4')).toBeVisible();
 
@@ -72,6 +102,7 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   editForm = page.getByRole('form', { name: 'Szőlőtőke #4 űrlap' });
   await editForm.locator('[name="status"]').selectOption('active');
   await editForm.getByRole('button', { name: 'Mentés' }).click();
+  await expect(editForm).toHaveCount(0);
   await expect(page.getByTestId('vine-detail').getByText('Aktív', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Új esemény' }).click();
@@ -116,6 +147,7 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await createdEvent
     .getByRole('textbox', { name: 'Közös metszés 3. fotó képaláírása' })
     .fill('  Utólag pótolt kép  ');
+  await stabilizeVineTimestamps(createdVineId, vineDetail);
   await expect(page).toHaveScreenshot('toke-esemeny-foto-alairas-desktop.png', {
     fullPage: true,
     animations: 'disabled',
@@ -123,6 +155,7 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await createdEvent.getByRole('button', { name: 'Aláírás mentése' }).click();
   await expect(createdEvent.getByText('Utólag pótolt kép', { exact: true })).toBeVisible();
 
+  await stabilizeVineTimestamps(createdVineId, vineDetail);
   await expect(page).toHaveScreenshot('toke-esemeny-fotosor-desktop.png', {
     fullPage: true,
     animations: 'disabled',
