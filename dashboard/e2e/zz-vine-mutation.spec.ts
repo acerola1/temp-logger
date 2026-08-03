@@ -55,6 +55,26 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await expect(page.getByText('Szőlőtőke #4')).toBeVisible();
 
   await page.getByRole('button', { name: 'Új esemény' }).click();
+  const cessationForm = page.getByRole('form', { name: 'Új tőkeesemény' });
+  await cessationForm.locator('[name="type"]').selectOption('ceased');
+  await cessationForm.locator('[name="title"]').fill('E2E megszűnés');
+  await cessationForm.getByRole('button', { name: 'Esemény mentése (1)' }).click();
+  const cessationEvent = page.getByTestId('vine-event').filter({ hasText: 'E2E megszűnés' });
+  await expect(cessationEvent).toBeVisible();
+  await expect(page.getByTestId('vine-detail').getByText('Megszűnt', { exact: true })).toBeVisible();
+
+  page.once('dialog', (dialog) => void dialog.accept());
+  await cessationEvent.getByRole('button', { name: 'Törlés' }).click();
+  await expect(cessationEvent).toHaveCount(0);
+  await expect(page.getByTestId('vine-detail').getByText('Megszűnt', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Alapadatok szerkesztése' }).click();
+  editForm = page.getByRole('form', { name: 'Szőlőtőke #4 űrlap' });
+  await editForm.locator('[name="status"]').selectOption('active');
+  await editForm.getByRole('button', { name: 'Mentés' }).click();
+  await expect(page.getByTestId('vine-detail').getByText('Aktív', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Új esemény' }).click();
   const addEventForm = page.getByRole('form', { name: 'Új tőkeesemény' });
   const firstVineTarget = addEventForm.getByRole('checkbox', { name: '#1 - Kékfrankos' });
   await firstVineTarget.check();

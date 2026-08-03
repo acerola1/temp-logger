@@ -1,4 +1,15 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Route } from '@playwright/test';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+
+function getAdminDb() {
+  if (getApps().length === 0) {
+    initializeApp({
+      projectId: process.env.GCLOUD_PROJECT || 'demo-esp32-e2e',
+    });
+  }
+  return getFirestore();
+}
 
 test('a production tőkelista keres, szűr, rendez és URL-ben tartja az állapotot', async ({ page }) => {
   await page.goto('/tokek');
@@ -35,6 +46,26 @@ test('a production tőkelista keres, szűr, rendez és URL-ben tartja az állapo
   await page.getByLabel('Állapot').selectOption('ceased');
   await expect(page.getByTestId('vine-card')).toHaveCount(1);
   await expect(page.getByTestId('vine-card')).toContainText('Megszűnt');
+
+  await page.getByRole('button', { name: 'Alaphelyzet' }).click();
+  await page.getByLabel('Rendezés').selectOption('planting_desc');
+  await expect(page.getByTestId('vine-card').first()).toContainText('Irsai Olivér');
+  await page.getByLabel('Rendezés').selectOption('variety_asc');
+  await expect(page.getByTestId('vine-card').first()).toContainText('Irsai Olivér');
+
+  await page.getByLabel('Gyökérzet').selectOption('grafted');
+  await expect(page.getByTestId('vine-card')).toHaveCount(1);
+  await expect(page.getByTestId('vine-card')).toContainText('Kékfrankos');
+  await page.getByLabel('Gyökérzet').selectOption('all');
+
+  await page.getByLabel('Termés').selectOption('no');
+  await expect(page.getByTestId('vine-card')).toHaveCount(1);
+  await expect(page.getByTestId('vine-card')).toContainText('Irsai Olivér');
+  await page.getByLabel('Termés').selectOption('all');
+
+  await page.getByLabel('Címke').selectOption('déli sor');
+  await expect(page.getByTestId('vine-card')).toHaveCount(1);
+  await expect(page.getByTestId('vine-card')).toContainText('Kékfrankos');
 });
 
 test('a desktop és mobil tőkelista a prototípus elrendezését követi', async ({ page }) => {
@@ -65,4 +96,62 @@ test('a desktop és mobil tőkelista a prototípus elrendezését követi', asyn
     fullPage: true,
     animations: 'disabled',
   });
+});
+
+test('a tőkelista loading állapota desktopon és mobilon stabil', async ({ page }) => {
+  let releaseFirestore!: () => void;
+  const firestoreGate = new Promise<void>((resolve) => {
+    releaseFirestore = resolve;
+  });
+  const holdFirestore = async (route: Route) => {
+    await firestoreGate;
+    await route.continue();
+  };
+
+  await page.route('http://127.0.0.1:8088/**', holdFirestore);
+  try {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/tokek');
+    await expect(page.getByRole('status', { name: 'Tőkék betöltése' })).toBeVisible();
+    await expect(page).toHaveScreenshot('tokelista-loading-desktop.png', {
+      fullPage: true,
+      animations: 'disabled',
+    });
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await expect(page.getByRole('status', { name: 'Tőkék betöltése' })).toBeVisible();
+    await expect(page).toHaveScreenshot('tokelista-loading-mobile.png', {
+      fullPage: true,
+      animations: 'disabled',
+    });
+  } finally {
+    releaseFirestore();
+    await page.unrouteAll({ behavior: 'wait' });
+  }
+});
+
+test('az üres tőkekatalógus desktopon és mobilon érthető állapotot mutat', async ({ page }) => {
+  const db = getAdminDb();
+  const snapshot = await db.collection('vines').get();
+  const vines = snapshot.docs.map((document) => ({ id: document.id, data: document.data() }));
+
+  await Promise.all(snapshot.docs.map((document) => document.ref.delete()));
+  try {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/tokek');
+    await expect(page.getByRole('status')).toContainText('Még nincs felvitt tőke.');
+    await expect(page).toHaveScreenshot('tokelista-empty-desktop.png', {
+      fullPage: true,
+      animations: 'disabled',
+    });
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await expect(page.getByRole('status')).toContainText('Még nincs felvitt tőke.');
+    await expect(page).toHaveScreenshot('tokelista-empty-mobile.png', {
+      fullPage: true,
+      animations: 'disabled',
+    });
+  } finally {
+    await Promise.all(vines.map((vine) => db.doc(`vines/${vine.id}`).set(vine.data)));
+  }
 });

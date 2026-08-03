@@ -27,24 +27,24 @@ UI-prototípust kell követnie desktopon és mobilon.
 
 ## Elfogadási kritériumok
 
-- [ ] `vines/{vineId}` publikus read és admin-only create/update/delete szabályt kap.
-- [ ] A `vines/{vineId}/events/{eventId}/photos/{fileName}` Storage útvonal publikus
+- [x] `vines/{vineId}` publikus read és admin-only create/update/delete szabályt kap.
+- [x] A `vines/{vineId}/events/{eventId}/photos/{fileName}` Storage útvonal publikus
       read és admin-only write/delete szabályt kap.
-- [ ] Emulatoros negatív teszt bizonyítja, hogy nem admin közvetlen Firestore- és
+- [x] Emulatoros negatív teszt bizonyítja, hogy nem admin közvetlen Firestore- és
       Storage-írása elutasításra kerül.
-- [ ] E2E teszt fedi a publikus listát/adatlapot, admin létrehozást és szerkesztést,
+- [x] E2E teszt fedi a publikus listát/adatlapot, admin létrehozást és szerkesztést,
       keresést/szűrést/rendezést, dugványlinket, egy- és többtőkés eseményt,
       fotófeltöltést/törlést és megszűnés/visszaállítás folyamatot.
-- [ ] E2E teszt fedi a közvetlen detail URL-t, böngésző-visszát és a desktop/mobil
+- [x] E2E teszt fedi a közvetlen detail URL-t, böngésző-visszát és a desktop/mobil
       használatot.
-- [ ] A releváns autentikációs, admin-, adat-, loading-, üres- és hibaállapotokat
+- [x] A releváns autentikációs, admin-, adat-, loading-, üres- és hibaállapotokat
       a prototípussal azonos viewporton reprodukált DOM-ellenőrzés és screenshot
       validálja.
-- [ ] A production belépési pont kizárólag a feature `VinesPage` exportját használja;
+- [x] A production belépési pont kizárólag a feature `VinesPage` exportját használja;
       az `App` nem ismer domain- vagy Firebase-részleteket.
-- [ ] A `useMockVines`, mock seed UI, prototípus-admin kapcsoló, prototípusjelölések
+- [x] A `useMockVines`, mock seed UI, prototípus-admin kapcsoló, prototípusjelölések
       és felülírt production komponensek kikerülnek.
-- [ ] A build, lint, unit/integrációs és teljes E2E suite zöld.
+- [x] A build, lint, unit/integrációs és teljes E2E suite zöld.
 
 ## Érintett terület
 
@@ -57,3 +57,9 @@ UI-prototípust kell követnie desktopon és mobilon.
 
 ## Comments
 
+- 2026-08-03: Az autentikált nem-admin közvetlen Firestore- és Storage-írásának
+  tiltását emulatoros integrációs teszt igazolja.
+- 2026-08-03: A throwaway tőkeprototípus komponensei, mock tárolója, régi domain-
+  és űrlaptípusai eltávolítva; az `App` kizárólag a feature exportját használja.
+- 2026-08-03: Ellenőrzés: unit tesztek (27/27), lint, production build, integrációs
+  tesztek (13/13) és teljes Playwright E2E (18/18), desktop/mobil screenshotokkal.

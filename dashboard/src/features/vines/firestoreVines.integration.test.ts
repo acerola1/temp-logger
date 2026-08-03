@@ -7,8 +7,14 @@ import {
   createUserWithEmailAndPassword,
   getAuth,
 } from 'firebase/auth';
-import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
-import { connectStorageEmulator, getBytes, getStorage, ref } from 'firebase/storage';
+import { connectFirestoreEmulator, doc, getFirestore, setDoc } from 'firebase/firestore';
+import {
+  connectStorageEmulator,
+  getBytes,
+  getStorage,
+  ref,
+  uploadBytes,
+} from 'firebase/storage';
 import type { Firestore } from 'firebase/firestore';
 import type { CreateVineInput, Vine } from './model';
 import {
@@ -89,6 +95,13 @@ describe('Firestore vine catalog', () => {
   const adminDb = getAdminFirestore(adminApp);
   const clientApp = initializeApp({ projectId, apiKey: 'test-api-key' });
   const clientDb = getFirestore(clientApp);
+  const nonAdminClientApp = initializeApp(
+    { projectId, apiKey: 'test-api-key', storageBucket: `${projectId}.appspot.com` },
+    'vine-integration-non-admin',
+  );
+  const nonAdminClientDb = getFirestore(nonAdminClientApp);
+  const nonAdminClientStorage = getStorage(nonAdminClientApp);
+  const nonAdminClientAuth = getAuth(nonAdminClientApp);
   const adminClientApp = initializeApp(
     { projectId, apiKey: 'test-api-key', storageBucket: `${projectId}.appspot.com` },
     'vine-integration-admin',
@@ -100,6 +113,11 @@ describe('Firestore vine catalog', () => {
 
   beforeAll(async () => {
     connectFirestoreEmulator(clientDb, '127.0.0.1', 8088);
+    connectFirestoreEmulator(nonAdminClientDb, '127.0.0.1', 8088);
+    connectStorageEmulator(nonAdminClientStorage, '127.0.0.1', 9199);
+    connectAuthEmulator(nonAdminClientAuth, 'http://127.0.0.1:9099', {
+      disableWarnings: true,
+    });
     connectFirestoreEmulator(adminClientDb, '127.0.0.1', 8088);
     connectStorageEmulator(adminClientStorage, '127.0.0.1', 9199);
     connectAuthEmulator(adminClientAuth, 'http://127.0.0.1:9099', {
@@ -112,6 +130,11 @@ describe('Firestore vine catalog', () => {
     );
     adminUid = credential.user.uid;
     await adminDb.collection('admins').doc(adminUid).set({ role: 'admin' });
+    await createUserWithEmailAndPassword(
+      nonAdminClientAuth,
+      'vine-user@example.com',
+      'User1234!',
+    );
     await adminDb.collection('vines').doc('vine-public').set({
       serialNumber: 7,
       variety: '  Pölöskei muskotály  ',
@@ -144,6 +167,7 @@ describe('Firestore vine catalog', () => {
 
   afterAll(async () => {
     await deleteApp(clientApp);
+    await deleteApp(nonAdminClientApp);
     await deleteApp(adminClientApp);
     await deleteAdminApp(adminApp);
   });
@@ -182,6 +206,29 @@ describe('Firestore vine catalog', () => {
         createdByUid: 'admin-1',
       },
     ]);
+  });
+
+  it('autentikált nem-admin közvetlen Firestore- és Storage-írását elutasítja', async () => {
+    await expect(
+      setDoc(
+        doc(nonAdminClientDb, 'vines', 'vine-forbidden'),
+        vineDocument('non-admin', {
+          createdAt: '2026-08-03T06:00:00.000Z',
+          updatedAt: '2026-08-03T06:00:00.000Z',
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'permission-denied' });
+
+    await expect(
+      uploadBytes(
+        ref(
+          nonAdminClientStorage,
+          'vines/vine-public/events/event-forbidden/photos/photo.png',
+        ),
+        new Uint8Array([1, 2, 3]),
+        { contentType: 'image/png' },
+      ),
+    ).rejects.toMatchObject({ code: 'storage/unauthorized' });
   });
 
   it('admin automatikus következő sorszámmal és szerveridőkkel hoz létre tőkét', async () => {
