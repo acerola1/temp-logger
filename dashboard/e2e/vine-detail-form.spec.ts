@@ -64,6 +64,7 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
   await expect(page.getByTestId('vine-detail')).toHaveCSS('position', 'fixed');
   await expect(form).toBeVisible();
   await form.scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await expect(page).toHaveScreenshot('toke-esemeny-urlap-mobile.png', {
     fullPage: true,
     animations: 'disabled',
@@ -116,6 +117,7 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
 
     await page.setViewportSize({ width: 375, height: 812 });
     await form.scrollIntoViewIfNeeded();
+    await page.evaluate(() => window.scrollTo(0, 0));
     await expect(page).toHaveScreenshot('toke-esemeny-urlap-pending-mobile.png', {
       fullPage: true,
       animations: 'disabled',
@@ -134,6 +136,7 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
 
   await page.setViewportSize({ width: 375, height: 812 });
   await form.scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await expect(page).toHaveScreenshot('toke-esemeny-urlap-hiba-mobile.png', {
     fullPage: true,
     animations: 'disabled',
@@ -154,6 +157,7 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
 
   await page.setViewportSize({ width: 375, height: 812 });
   await editForm.scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await expect(page).toHaveScreenshot('toke-esemeny-urlap-szerkesztes-mobile.png', {
     fullPage: true,
     animations: 'disabled',
