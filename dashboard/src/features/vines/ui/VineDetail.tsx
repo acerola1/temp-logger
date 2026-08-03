@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CalendarDays, Loader2, ExternalLink, X } from 'lucide-react';
 import { formatDate, formatDateTime, toDateTimeLocalValue } from '../../../lib/dateFormat';
-import { PhotoLightbox, type PhotoLightboxImage } from '../../photos';
+import { PhotoLightbox, photoLightboxCaption, type PhotoLightboxImage } from '../../photos';
 import type { VineEventFormValues, VineFormValues } from '../forms';
 import type { Vine, VineEvent, VinePlantingDate } from '../model';
 import { VineEventForm } from './VineEventForm';
@@ -156,7 +156,7 @@ export function VineDetail({
             id: photo.id,
             url: photo.downloadUrl,
             alt: lightboxEvent.title,
-            caption: `${lightboxEvent.title} • ${formatDateTime(lightboxEvent.occurredAt)}`,
+            caption: photoLightboxCaption(photo, lightboxEvent.title),
           }))
         : [],
     [lightboxEvent],

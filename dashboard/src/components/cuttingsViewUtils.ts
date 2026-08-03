@@ -1,4 +1,5 @@
 import { Droplet, Handshake, Skull, TreePine, type LucideIcon } from 'lucide-react';
+import { toPhotoRecord, type UploadedPhotoObject } from '../features/photos';
 import type {
   Cutting,
   CuttingEventType,
@@ -155,24 +156,8 @@ export function formatCategoriesInput(values: string[]): string {
   return values.join(', ');
 }
 
-export function toCuttingPhotos(
-  uploads: Array<{ storagePath: string; downloadUrl: string; width: number; height: number }>,
-): CuttingPhoto[] {
+export function toCuttingPhotos(uploads: readonly UploadedPhotoObject[]): CuttingPhoto[] {
   const now = new Date().toISOString();
 
-  return uploads.map((item) => {
-    const fileName = item.storagePath.split('/').at(-1) ?? '';
-    const photoId = fileName.split('.')[0] ?? crypto.randomUUID();
-
-    return {
-      id: photoId,
-      storagePath: item.storagePath,
-      downloadUrl: item.downloadUrl,
-      capturedAt: now,
-      uploadedAt: now,
-      width: item.width,
-      height: item.height,
-      caption: '',
-    } satisfies CuttingPhoto;
-  });
+  return uploads.map((upload) => toPhotoRecord({ ...upload, id: upload.photoId }, now));
 }

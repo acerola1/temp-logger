@@ -1,5 +1,5 @@
-export type IsoDateString = string;
-export type IsoDateTimeString = string;
+import type { Photo } from '../photos/photoMetadata';
+import type { IsoDateString, IsoDateTimeString } from '../../types/datetime';
 
 export const VINE_STATUSES = ['active', 'ceased'] as const;
 export type VineStatus = (typeof VINE_STATUSES)[number];
@@ -15,14 +15,8 @@ export type VinePlantingDate =
   | { precision: 'year'; year: number }
   | { precision: 'unknown' };
 
-export interface VineEventPhoto {
-  id: string;
-  storagePath: string;
-  downloadUrl: string;
-  width: number;
-  height: number;
-  uploadedAt: IsoDateTimeString;
-}
+// A tőkeeseményfotó ugyanaz a közös fotó-metaadat, mint a dugványfotó.
+export type VineEventPhoto = Photo;
 
 export interface VineEvent {
   id: string;

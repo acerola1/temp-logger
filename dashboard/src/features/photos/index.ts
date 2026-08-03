@@ -1,3 +1,14 @@
+// A feature határa: az EXIF-olvasás, az orientáció-matematika és a dekódolás a
+// modulon belüli részlet, azokat a `photos` moduljai közvetlenül importálják.
+export {
+  photoDateLabel,
+  photoDateText,
+  photoLightboxCaption,
+  toPhotoRecord,
+  type Photo,
+  type PhotoDateLabel,
+  type PhotoDates,
+} from './photoMetadata';
 export {
   DEFAULT_MAX_IMAGE_SIDE,
   getFileExtension,

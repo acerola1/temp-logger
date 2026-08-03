@@ -5,6 +5,7 @@ import {
   uploadBytesResumable,
   type FirebaseStorage,
 } from 'firebase/storage';
+import type { IsoDateTimeString } from '../../types/datetime';
 import { getFileExtension, type PreparedImageUpload } from './imagePreparation';
 
 export type PreparedPhoto = PreparedImageUpload;
@@ -16,6 +17,8 @@ export interface UploadedPhotoObject {
   width: number;
   height: number;
   contentType: string;
+  /** Az előkészítéskor kiolvasott EXIF-készítési idő, továbbadva a rekordnak. */
+  capturedAt: IsoDateTimeString | null;
 }
 
 export type PhotoUploadProgress = (uploadedBytes: number, totalBytes: number) => void;
@@ -94,6 +97,7 @@ export async function uploadPreparedPhotos({
         width: prepared.width,
         height: prepared.height,
         contentType: prepared.contentType,
+        capturedAt: prepared.capturedAt,
       });
     }
 

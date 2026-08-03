@@ -188,9 +188,13 @@ async function seed() {
               downloadUrl: seedPhotoUrl,
               width: 1,
               height: 1,
+              capturedAt: vineIso(-2),
               uploadedAt: vineIso(1),
+              caption: '',
             },
-            // Két fotó kell, hogy az eseményen belüli lapozás is látszódjon.
+            // Két fotó kell, hogy az eseményen belüli lapozás is látszódjon. Ez a
+            // rekord szándékosan a `capturedAt` előtti alakban marad, hogy a régi
+            // fotók megjelenítése is fedve legyen.
             {
               id: 'vine-event-photo-seed-2',
               storagePath: '',

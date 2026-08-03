@@ -67,6 +67,12 @@ function timestampToIso(value: unknown): string {
   return new Date(0).toISOString();
 }
 
+// A `capturedAt` és a `caption` csak a 12-es issue óta kerül a rekordba, ezért a
+// régi fotóknál hiányzik: ilyenkor `null`, illetve üres felirat jár.
+function optionalTimestampToIso(value: unknown): string | null {
+  return value instanceof Timestamp || typeof value === 'string' ? timestampToIso(value) : null;
+}
+
 function mapPhoto(value: DocumentData): VineEventPhoto {
   return {
     id: typeof value.id === 'string' ? value.id : '',
@@ -74,7 +80,9 @@ function mapPhoto(value: DocumentData): VineEventPhoto {
     downloadUrl: typeof value.downloadUrl === 'string' ? value.downloadUrl : '',
     width: typeof value.width === 'number' ? value.width : 0,
     height: typeof value.height === 'number' ? value.height : 0,
+    capturedAt: optionalTimestampToIso(value.capturedAt),
     uploadedAt: timestampToIso(value.uploadedAt),
+    caption: typeof value.caption === 'string' ? value.caption : '',
   };
 }
 

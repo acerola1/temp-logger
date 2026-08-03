@@ -37,12 +37,13 @@ vi.mock('firebase/storage', () => ({
 
 const storage = {} as FirebaseStorage;
 
-function makePreparedPhoto(bytes: number): PreparedPhoto {
+function makePreparedPhoto(bytes: number, capturedAt: string | null = null): PreparedPhoto {
   return {
     blob: new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' }),
     width: 100,
     height: 80,
     contentType: 'image/jpeg',
+    capturedAt,
   };
 }
 

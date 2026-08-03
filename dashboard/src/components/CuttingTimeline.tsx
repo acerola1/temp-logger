@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Sprout, type LucideIcon } from 'lucide-react';
 import { formatDateTime, formatDate } from '../lib/dateFormat';
+import { photoDateLabel, photoDateText } from '../features/photos';
 import {
   EVENT_TYPE_ICON,
   eventTypeLabel,
@@ -102,15 +103,15 @@ function buildTimelineItems(cutting: Cutting): TimelineItem[] {
   }
 
   for (const photo of cutting.photos) {
-    const photoDate = photo.capturedAt ?? photo.uploadedAt;
+    const dateLabel = photoDateLabel(photo);
     items.push({
       id: `photo-${photo.id}`,
       type: 'photo',
       eventType: null,
       entityId: photo.id,
-      dateMs: new Date(photoDate).getTime(),
-      title: photo.caption || 'Fotó feltöltve',
-      subtitle: formatDateTime(photoDate),
+      dateMs: new Date(dateLabel.value).getTime(),
+      title: photo.caption || (dateLabel.isCaptured ? 'Fotó' : 'Fotó feltöltve'),
+      subtitle: photoDateText(photo),
     });
   }
 

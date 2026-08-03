@@ -2,6 +2,7 @@ import type { FirebaseStorage } from 'firebase/storage';
 // A keretrendszer-független magot közvetlenül importáljuk, nem az index-en át:
 // így a tőke-adatréteg nem húzza be a React-hook Storage-szingletonját.
 import { prepareImageUpload } from '../photos/imagePreparation';
+import { toPhotoRecord } from '../photos/photoMetadata';
 import {
   deletePhotoObjects,
   uploadPreparedPhotos,
@@ -51,14 +52,11 @@ export async function uploadPreparedVineEventPhotos(
     onProgress,
   });
 
-  return uploads.map((upload) => ({
-    id: upload.photoId,
-    storagePath: upload.storagePath,
-    downloadUrl: upload.downloadUrl,
-    width: upload.width,
-    height: upload.height,
-    uploadedAt: new Date().toISOString(),
-  }));
+  const now = new Date().toISOString();
+
+  // A felirat egyelőre üresen keletkezik; a szerkesztő felülete a 13-as issue-ban
+  // készül el.
+  return uploads.map((upload) => toPhotoRecord({ ...upload, id: upload.photoId }, now));
 }
 
 export async function deleteVineEventPhotos(

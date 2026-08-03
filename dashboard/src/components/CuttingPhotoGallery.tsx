@@ -10,9 +10,12 @@ import {
   Trash2,
 } from 'lucide-react';
 import { storage } from '../lib/firebase';
-import { formatDateTime, formatMonthDay } from '../lib/dateFormat';
+import { formatMonthDay } from '../lib/dateFormat';
 import {
   PhotoLightbox,
+  photoDateLabel,
+  photoDateText,
+  photoLightboxCaption,
   usePhotoPicker,
   usePhotoUpload,
   type PhotoLightboxImage,
@@ -56,6 +59,27 @@ export function CuttingPhotoGallery({
     ? cutting.photos.findIndex((photo) => photo.id === activePhoto.id)
     : -1;
 
+  // A bélyegek dátumcímkéi: a feltöltés-progressz miatt sűrűn újrarendelünk,
+  // ezért a dátumformázás nem futhat minden rendernél.
+  const photoDateBadges = useMemo(
+    () =>
+      new Map(
+        cutting.photos.map((photo) => {
+          const label = photoDateLabel(photo);
+
+          return [
+            photo.id,
+            {
+              isCaptured: label.isCaptured,
+              badge: formatMonthDay(label.value),
+              title: photoDateText(photo),
+            },
+          ];
+        }),
+      ),
+    [cutting.photos],
+  );
+
   const goToPreviousPhoto = useCallback(() => {
     if (totalPhotos <= 1 || activePhotoIndex < 0) {
       return;
@@ -80,7 +104,7 @@ export function CuttingPhotoGallery({
         id: photo.id,
         url: photo.downloadUrl,
         alt: cutting.variety,
-        caption: `Dátum: ${formatDateTime(photo.capturedAt ?? photo.uploadedAt)}`,
+        caption: photoLightboxCaption(photo),
       })),
     [cutting.photos, cutting.variety],
   );
@@ -266,7 +290,7 @@ export function CuttingPhotoGallery({
               <div className="flex items-center justify-between gap-3 px-4 py-3 text-xs text-vine-500 dark:text-vine-300">
                 <div className="flex items-center gap-3">
                   <span>Kép {activePhotoIndex + 1}/{totalPhotos}</span>
-                  <span>Dátum: {formatDateTime(activePhoto.capturedAt ?? activePhoto.uploadedAt)}</span>
+                  <span>{photoDateText(activePhoto)}</span>
                 </div>
                 {isAdmin && (
                   <button
@@ -291,6 +315,7 @@ export function CuttingPhotoGallery({
             {cutting.photos.map((photo) => {
               const isActive = photo.id === activePhoto?.id;
               const isHighlighted = photo.id === highlightedPhotoId;
+              const dateBadge = photoDateBadges.get(photo.id);
 
               return (
                 <button
@@ -311,9 +336,19 @@ export function CuttingPhotoGallery({
                     alt={cutting.variety}
                     className="h-24 w-full rounded-xl border border-vine-200/80 object-cover dark:border-vine-700/70"
                   />
-                  <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                    {formatMonthDay(photo.capturedAt ?? photo.uploadedAt)}
-                  </span>
+                  {/* Készítési idő nélkül a bélyeg a feltöltés napját mutatja, de
+                      `↑`-lal és dőlt szedéssel jelzi, hogy nem a felvétel ideje. */}
+                  {dateBadge && (
+                    <span
+                      title={dateBadge.title}
+                      className={`pointer-events-none absolute left-1.5 top-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white ${
+                        dateBadge.isCaptured ? '' : 'italic'
+                      }`}
+                    >
+                      {dateBadge.isCaptured ? '' : '↑'}
+                      {dateBadge.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
