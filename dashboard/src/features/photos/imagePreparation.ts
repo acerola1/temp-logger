@@ -1,7 +1,24 @@
-const MAX_IMAGE_SIDE = 1000;
+// A kliensoldali kép-előkészítés egyetlen helye: a hívó adja a méretkorlátot,
+// alapértelmezésben a dugvány- és munkamenetfotók 1000 px-e érvényes.
+export const DEFAULT_MAX_IMAGE_SIDE = 1000;
 
-interface PrepareImageUploadOptions {
+const JPEG_QUALITY = 0.9;
+
+export interface PrepareImageUploadOptions {
   maxImageSide?: number;
+}
+
+export interface PreparedImageUpload {
+  blob: Blob;
+  width: number;
+  height: number;
+  contentType: string;
+}
+
+export function getFileExtension(contentType: string): string {
+  if (contentType === 'image/png') return 'png';
+  if (contentType === 'image/webp') return 'webp';
+  return 'jpg';
 }
 
 function loadImage(file: File): Promise<{
@@ -31,21 +48,14 @@ function loadImage(file: File): Promise<{
   });
 }
 
-export interface PreparedImageUpload {
-  blob: Blob;
-  width: number;
-  height: number;
-  contentType: string;
-}
-
-// A tasteroom példájához igazodva a hosszabbik oldalt 1000 px-re korlátozzuk.
 export async function prepareImageUpload(
   file: File,
   options: PrepareImageUploadOptions = {},
 ): Promise<PreparedImageUpload> {
-  const maxImageSide = options.maxImageSide ?? MAX_IMAGE_SIDE;
+  const maxImageSide = options.maxImageSide ?? DEFAULT_MAX_IMAGE_SIDE;
   const { width, height, image } = await loadImage(file);
   const longestSide = Math.max(width, height);
+  // png/webp esetén megtartjuk az eredeti formátumot, minden mást jpeg-be viszünk.
   const contentType =
     file.type === 'image/webp' || file.type === 'image/png' ? file.type : 'image/jpeg';
 
@@ -76,7 +86,7 @@ export async function prepareImageUpload(
     canvas.toBlob(
       (nextBlob) => resolve(nextBlob),
       contentType,
-      contentType === 'image/jpeg' ? 0.9 : undefined,
+      contentType === 'image/jpeg' ? JPEG_QUALITY : undefined,
     );
   });
 

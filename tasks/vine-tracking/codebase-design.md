@@ -229,8 +229,9 @@ számára. A UI és az űrlapok nem állítanak audit-időbélyeget.
 vines/{vineId}/events/{eventId}/photos/{photoId}.{extension}
 ```
 
-- A képek ugyanazt a kliensoldali, legfeljebb 1000 px-es előkészítést
-  használják, mint a meglévő képfeltöltések.
+- A képek ugyanazt a kliensoldali előkészítést használják, mint a meglévő
+  képfeltöltések, de tőkeeseménynél a hosszabbik oldal korlátja 1280 px
+  (a dugványoknál marad 1000 px).
 - Minden eseménypéldány saját Storage objektumokat kap. Több tőkés eseménynél
   ugyanazok a kiválasztott fájlok tőkénként külön kerülnek feltöltésre, hogy
   egy esemény későbbi törlése ne törje el más tőke fotóit.

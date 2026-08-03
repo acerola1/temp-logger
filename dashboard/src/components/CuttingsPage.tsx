@@ -9,7 +9,7 @@ import {
   parseCategoriesInput,
   toCuttingPhotos,
 } from './cuttingsViewUtils';
-import { usePhotoUpload } from '../hooks/usePhotoUpload';
+import { usePhotoUpload } from '../features/photos';
 import { useCuttingsQuery } from '../hooks/queries/useCuttingsQuery';
 import { getErrorMessage } from '../lib/errorMessage';
 import type { CreateCuttingInput } from '../types/cutting';

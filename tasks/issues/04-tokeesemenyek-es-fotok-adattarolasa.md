@@ -16,7 +16,7 @@ beleértve a több tőkés rögzítést és a fotók robusztus Storage-életcikl
 - beágyazott eseménytömb biztonságos read–modify–write kezelése
 - legfeljebb 400 céltőke egy műveletben
 - tőkénként önálló eseménypéldány és önálló fotóobjektumok
-- legfeljebb 1000 px-es kliensoldali kép-előkészítés
+- legfeljebb 1280 px-es kliensoldali kép-előkészítés
 - feltöltési progress és részleges hibák kompenzálása
 - `ceased` esemény állapotátmenete
 
@@ -56,3 +56,6 @@ beleértve a több tőkés rögzítést és a fotók robusztus Storage-életcikl
   a `vines/.../events/.../photos/...` publikus olvasás/admin írás szabálya.
 - Ellenőrzés: `npm test` (26 teszt), `npm run test:integration` (11 teszt),
   `npm run lint`, `npm run build`.
+- Utólagos módosítás: a tőkeeseményfotók kép-előkészítési korlátja 1000 px-ről
+  1280 px-re nőtt, a szoloink fórumképeivel egyezően. A dugványoldal maradt
+  1000 px-en. Lásd `tasks/photo-handling/spec.md`.

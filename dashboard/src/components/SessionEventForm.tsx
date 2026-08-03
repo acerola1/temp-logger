@@ -5,8 +5,7 @@ import { deleteObject, ref } from 'firebase/storage';
 import { Camera, ImagePlus, Loader2, X } from 'lucide-react';
 import { storage } from '../lib/firebase';
 import { toDateTimeLocalValue } from '../lib/dateFormat';
-import { usePhotoPicker } from '../hooks/usePhotoPicker';
-import { usePhotoUpload } from '../hooks/usePhotoUpload';
+import { usePhotoPicker, usePhotoUpload } from '../features/photos';
 import { sessionEventSchema } from '../lib/schemas';
 import type { SessionEventInput } from '../types/events';
 import type { SessionEventValues } from '../types/forms';
@@ -50,7 +49,7 @@ export function SessionEventForm({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { isMobileDevice, openPicker } = usePhotoPicker();
+  const { isMobileDevice, openPicker } = usePhotoPicker({ allowMultiple: false });
   const { upload: uploadPhotos, uploading: uploadingPhoto, error: photoUploadError } = usePhotoUpload();
 
   const {
@@ -210,16 +209,15 @@ export function SessionEventForm({
               </button>
             </>
           ) : (
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-100 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800">
+            <button
+              type="button"
+              onClick={() => openPicker(fileRef, 'gallery')}
+              disabled={isPending || uploadingPhoto}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
+            >
               <ImagePlus className="h-4 w-4" />
               {mode === 'edit' ? 'Kép cseréje' : 'Kép kiválasztása'}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
+            </button>
           )}
           {selectedFile && (
             <span className="text-xs text-vine-500 dark:text-vine-300">{selectedFile.name}</span>

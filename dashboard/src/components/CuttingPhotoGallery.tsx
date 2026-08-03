@@ -15,8 +15,7 @@ import {
 } from 'lucide-react';
 import { storage } from '../lib/firebase';
 import { formatDateTime, formatMonthDay } from '../lib/dateFormat';
-import { usePhotoPicker } from '../hooks/usePhotoPicker';
-import { usePhotoUpload } from '../hooks/usePhotoUpload';
+import { usePhotoPicker, usePhotoUpload } from '../features/photos';
 import type { Cutting } from '../types/cutting';
 import { toCuttingPhotos } from './cuttingsViewUtils';
 

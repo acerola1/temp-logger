@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Camera, ImagePlus, Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { usePhotoPicker } from '../hooks/usePhotoPicker';
+import { usePhotoPicker } from '../features/photos';
 import { cuttingFormSchema } from '../lib/schemas';
 import type { CuttingFormValues } from '../types/forms';
 

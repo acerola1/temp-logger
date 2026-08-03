@@ -1,22 +1,23 @@
+import type { FirebaseStorage } from 'firebase/storage';
+// A keretrendszer-független magot közvetlenül importáljuk, nem az index-en át:
+// így a tőke-adatréteg nem húzza be a React-hook Storage-szingletonját.
+import { prepareImageUpload } from '../photos/imagePreparation';
 import {
-  deleteObject,
-  getDownloadURL,
-  ref,
-  uploadBytesResumable,
-  type FirebaseStorage,
-} from 'firebase/storage';
-import { getFileExtension } from '../../lib/fileUtils';
-import { prepareImageUpload } from '../../lib/imageUpload';
+  deletePhotoObjects,
+  uploadPreparedPhotos,
+  type PhotoUploadProgress,
+  type PreparedPhoto,
+} from '../photos/photoUpload';
 import type { VineEventPhoto } from './model';
 
-export interface PreparedVineEventPhoto {
-  blob: Blob;
-  width: number;
-  height: number;
-  contentType: string;
-}
+// A tőkeeseményfotók a szoloink fórumképeinek méretkorlátját követik: a
+// hosszabbik oldal 1280 px. Az egész tőke a szabad ég alatt áll, a fontos
+// részletek (rügy, metszés, betegségtünet) 1000 px-en már elmosódtak.
+const VINE_EVENT_PHOTO_MAX_SIDE = 1280;
 
-export type VineEventPhotoUploadProgress = (uploadedBytes: number, totalBytes: number) => void;
+export type PreparedVineEventPhoto = PreparedPhoto;
+
+export type VineEventPhotoUploadProgress = PhotoUploadProgress;
 
 export function buildVineEventPhotoStoragePath(
   vineId: string,
@@ -31,27 +32,7 @@ export async function prepareVineEventPhotos(
   files: readonly File[],
 ): Promise<PreparedVineEventPhoto[]> {
   return Promise.all(
-    files.map(async (file) => {
-      const prepared = await prepareImageUpload(file, { maxImageSide: 1000 });
-      return {
-        blob: prepared.blob,
-        width: prepared.width,
-        height: prepared.height,
-        contentType: prepared.contentType,
-      };
-    }),
-  );
-}
-
-async function deleteStoragePaths(storage: FirebaseStorage, paths: readonly string[]): Promise<void> {
-  await Promise.all(
-    paths.map(async (storagePath) => {
-      try {
-        await deleteObject(ref(storage, storagePath));
-      } catch (error) {
-        console.warn('Vine event photo cleanup failed:', storagePath, error);
-      }
-    }),
+    files.map((file) => prepareImageUpload(file, { maxImageSide: VINE_EVENT_PHOTO_MAX_SIDE })),
   );
 }
 
@@ -62,58 +43,29 @@ export async function uploadPreparedVineEventPhotos(
   preparedPhotos: readonly PreparedVineEventPhoto[],
   onProgress?: VineEventPhotoUploadProgress,
 ): Promise<VineEventPhoto[]> {
-  const totalBytes = preparedPhotos.reduce((sum, photo) => sum + photo.blob.size, 0);
-  let uploadedBytes = 0;
-  const uploadedPaths: string[] = [];
-  const photos: VineEventPhoto[] = [];
+  const uploads = await uploadPreparedPhotos({
+    storage,
+    photos: preparedPhotos,
+    buildStoragePath: ({ photoId, extension }) =>
+      buildVineEventPhotoStoragePath(vineId, eventId, photoId, extension),
+    onProgress,
+  });
 
-  try {
-    for (const prepared of preparedPhotos) {
-      const photoId = crypto.randomUUID();
-      const extension = getFileExtension(prepared.contentType);
-      const storagePath = buildVineEventPhotoStoragePath(vineId, eventId, photoId, extension);
-      const storageRef = ref(storage, storagePath);
-      uploadedPaths.push(storagePath);
-
-      await new Promise<void>((resolve, reject) => {
-        const uploadTask = uploadBytesResumable(storageRef, prepared.blob, {
-          contentType: prepared.contentType,
-        });
-
-        uploadTask.on(
-          'state_changed',
-          (snapshot) => onProgress?.(uploadedBytes + snapshot.bytesTransferred, totalBytes),
-          reject,
-          () => {
-            uploadedBytes += prepared.blob.size;
-            onProgress?.(uploadedBytes, totalBytes);
-            resolve();
-          },
-        );
-      });
-
-      photos.push({
-        id: photoId,
-        storagePath,
-        downloadUrl: await getDownloadURL(storageRef),
-        width: prepared.width,
-        height: prepared.height,
-        uploadedAt: new Date().toISOString(),
-      });
-    }
-
-    return photos;
-  } catch (error) {
-    await deleteStoragePaths(storage, uploadedPaths);
-    throw error;
-  }
+  return uploads.map((upload) => ({
+    id: upload.photoId,
+    storagePath: upload.storagePath,
+    downloadUrl: upload.downloadUrl,
+    width: upload.width,
+    height: upload.height,
+    uploadedAt: new Date().toISOString(),
+  }));
 }
 
 export async function deleteVineEventPhotos(
   storage: FirebaseStorage,
   photos: readonly VineEventPhoto[],
 ): Promise<void> {
-  await deleteStoragePaths(
+  await deletePhotoObjects(
     storage,
     photos
       .map((photo) => photo.storagePath)
