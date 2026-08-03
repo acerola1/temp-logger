@@ -39,6 +39,10 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
   const form = page.getByRole('form', { name: 'Új tőkeesemény' });
   await expect(form).toBeVisible();
   await form.locator('[name="occurredAt"]').fill('2026-08-02T19:30');
+  // Desktopon (érintés nélküli böngészőben) egyetlen választógomb jelenik meg.
+  await expect(form.getByRole('button', { name: 'Kép kiválasztása' })).toBeVisible();
+  await expect(form.getByRole('button', { name: 'Fotózás' })).toHaveCount(0);
+  await expect(form.getByText('Legfeljebb 6 fotó választható ki.')).toBeVisible();
   await expect(form.getByRole('checkbox')).toHaveCount(2);
   await expect(form.getByRole('button', { name: 'Esemény mentése (1)' })).toBeVisible();
   await expect(page).toHaveScreenshot('toke-esemeny-urlap-desktop.png', {
@@ -58,14 +62,22 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
   await page.setViewportSize({ width: 1280, height: 1100 });
   await form.getByRole('checkbox', { name: '#1 - Kékfrankos' }).uncheck();
   await form.getByRole('checkbox', { name: '#2 - Irsai Olivér' }).check();
-  await form.locator('input[type="file"]').setInputFiles({
-    name: 'allapot.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlU9WQAAAAASUVORK5CYII=',
-      'base64',
-    ),
-  });
+  const pixel = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlU9WQAAAAASUVORK5CYII=',
+    'base64',
+  );
+  await form.locator('input[type="file"]').setInputFiles([
+    { name: 'allapot.png', mimeType: 'image/png', buffer: pixel },
+    { name: 'eltavolitando.png', mimeType: 'image/png', buffer: pixel },
+  ]);
+
+  // A bélyegek látszanak, és a törölt kép a feltöltésbe sem kerül bele.
+  const previews = form.getByRole('list', { name: 'Kiválasztott fotók' });
+  await expect(previews.getByRole('img')).toHaveCount(2);
+  await expect(form.getByText('2/6 fotó kiválasztva')).toBeVisible();
+  await form.getByRole('button', { name: 'eltavolitando.png eltávolítása' }).click();
+  await expect(previews.getByRole('img')).toHaveCount(1);
+  await expect(form.getByText('1/6 fotó kiválasztva')).toBeVisible();
 
   let releaseUpload!: () => void;
   const uploadGate = new Promise<void>((resolve) => {
@@ -85,6 +97,8 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
     await expect(form.getByRole('button', { name: 'Esemény mentése (1)' })).toBeDisabled();
     await expect(form.getByRole('status')).toContainText('Fotók feltöltése');
     await expect(form.getByRole('progressbar', { name: 'Fotók feltöltése' })).toHaveAttribute('aria-valuenow', '0');
+    await expect(form.getByRole('button', { name: 'Kép kiválasztása' })).toBeDisabled();
+    await expect(form.getByRole('button', { name: 'allapot.png eltávolítása' })).toBeDisabled();
     await expect(page).toHaveScreenshot('toke-esemeny-urlap-pending-desktop.png', {
       fullPage: true,
       animations: 'disabled',

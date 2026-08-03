@@ -90,7 +90,7 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
     { name: 'metszes-1.png', mimeType: 'image/png', buffer: pixel },
     { name: 'metszes-2.png', mimeType: 'image/png', buffer: pixel },
   ]);
-  await expect(addEventForm.getByText('2 fotó kiválasztva')).toBeVisible();
+  await expect(addEventForm.getByText('2/6 fotó kiválasztva')).toBeVisible();
   await addEventForm.getByRole('button', { name: 'Esemény mentése (2)' }).click();
   await expect(addEventForm).toHaveCount(0);
 

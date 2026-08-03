@@ -21,3 +21,14 @@ export {
   type UploadRequest,
 } from './usePhotoUpload';
 export { usePhotoPicker, type PhotoPickerSource } from './usePhotoPicker';
+export {
+  DEFAULT_MAX_SELECTED_PHOTOS,
+  appendSelectedPhotos,
+  releaseSelectedPhotos,
+  removeSelectedPhotoAt,
+  selectedPhotoFiles,
+  type PhotoSelection,
+  type SelectedPhoto,
+} from './photoSelection';
+export { PhotoPickerButtons } from './ui/PhotoPickerButtons';
+export { PhotoPreviewList } from './ui/PhotoPreviewList';

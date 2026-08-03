@@ -1,7 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ImagePlus, Loader2 } from 'lucide-react';
 import { useForm, useWatch } from 'react-hook-form';
+// A `photos` almoduljait közvetlenül importáljuk, nem az indexen át: az űrlap
+// így nem húzza be a feltöltő hook Firebase-szingletonját.
+import {
+  DEFAULT_MAX_SELECTED_PHOTOS,
+  appendSelectedPhotos,
+  releaseSelectedPhotos,
+  removeSelectedPhotoAt,
+  selectedPhotoFiles,
+  type SelectedPhoto,
+} from '../../photos/photoSelection';
+import { PhotoPickerButtons } from '../../photos/ui/PhotoPickerButtons';
+import { PhotoPreviewList } from '../../photos/ui/PhotoPreviewList';
 import {
   VINE_EVENT_TYPE_LABEL,
   getVineEventTargetError,
@@ -48,7 +60,10 @@ export function VineEventForm({
   const [targetVineIds, setTargetVineIds] = useState<string[]>(
     initialTargetVineId ? [initialTargetVineId] : [],
   );
-  const [photos, setPhotos] = useState<File[]>([]);
+  const [photos, setPhotos] = useState<readonly SelectedPhoto[]>([]);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  // A lecsatoláskori felszabadításhoz kell az aktuális lista effekten kívül is.
+  const photosRef = useRef<readonly SelectedPhoto[]>([]);
   const [targetError, setTargetError] = useState<string | null>(null);
   const {
     register,
@@ -62,6 +77,25 @@ export function VineEventForm({
   const selectedType = useWatch({ control, name: 'type' });
   const selectableIds = useMemo(() => new Set(targetVines.map((vine) => vine.id)), [targetVines]);
   const selectedTargetIds = targetVineIds.filter((vineId) => selectableIds.has(vineId));
+
+  // A kiválasztás elhagyása után nem maradhat felszabadítatlan objectURL.
+  useEffect(() => () => releaseSelectedPhotos(photosRef.current), []);
+
+  const applyPhotos = (next: readonly SelectedPhoto[]) => {
+    photosRef.current = next;
+    setPhotos(next);
+  };
+
+  const addPhotos = (files: File[]) => {
+    const selection = appendSelectedPhotos(photos, files);
+    applyPhotos(selection.photos);
+    setPhotoError(selection.error);
+  };
+
+  const removePhoto = (index: number) => {
+    applyPhotos(removeSelectedPhotoAt(photos, index));
+    setPhotoError(null);
+  };
 
   const selectAllTargets = () => {
     const allTargetIds = targetVines.map((vine) => vine.id);
@@ -83,7 +117,7 @@ export function VineEventForm({
     }
 
     setTargetError(null);
-    await onSubmit(values, targets, photos);
+    await onSubmit(values, targets, selectedPhotoFiles(photos));
   });
 
   return (
@@ -128,21 +162,22 @@ export function VineEventForm({
 
       {mode === 'add' && (
         <>
-          <label className="mt-3 block space-y-1">
-            <span className={FIELD_LABEL_CLASS}>Fotók</span>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              disabled={isPending}
-              onChange={(event) => setPhotos(Array.from(event.target.files ?? []))}
-              className="block w-full text-sm text-vine-700 file:mr-3 file:rounded-lg file:border-0 file:bg-vine-100 file:px-3 file:py-1.5 file:text-vine-700 dark:text-vine-200 dark:file:bg-vine-800 dark:file:text-vine-100"
-            />
+          <div className="mt-3 space-y-2">
+            <span className={`block ${FIELD_LABEL_CLASS}`}>Fotók</span>
+            <PhotoPickerButtons onSelect={addPhotos} disabled={isPending} />
+            <PhotoPreviewList photos={photos} onRemove={removePhoto} disabled={isPending} />
             <span className="inline-flex items-center gap-1 text-xs text-vine-500 dark:text-vine-400">
               <ImagePlus className="h-3.5 w-3.5" />
-              {photos.length > 0 ? `${photos.length} fotó kiválasztva` : 'Több fotó is kiválasztható.'}
+              {photos.length > 0
+                ? `${photos.length}/${DEFAULT_MAX_SELECTED_PHOTOS} fotó kiválasztva`
+                : `Legfeljebb ${DEFAULT_MAX_SELECTED_PHOTOS} fotó választható ki.`}
             </span>
-          </label>
+            {photoError && (
+              <p role="alert" className="text-xs text-red-600 dark:text-red-300">
+                {photoError}
+              </p>
+            )}
+          </div>
 
           {selectedType === 'ceased' && (
             <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">

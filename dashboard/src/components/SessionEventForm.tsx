@@ -1,11 +1,11 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { deleteObject, ref } from 'firebase/storage';
-import { Camera, ImagePlus, Loader2, X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { storage } from '../lib/firebase';
 import { toDateTimeLocalValue } from '../lib/dateFormat';
-import { usePhotoPicker, usePhotoUpload } from '../features/photos';
+import { PhotoPickerButtons, usePhotoUpload } from '../features/photos';
 import { sessionEventSchema } from '../lib/schemas';
 import type { SessionEventInput } from '../types/events';
 import type { SessionEventValues } from '../types/forms';
@@ -48,8 +48,6 @@ export function SessionEventForm({
 }: SessionEventEditorProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const { isMobileDevice, openPicker } = usePhotoPicker({ allowMultiple: false });
   const { upload: uploadPhotos, uploading: uploadingPhoto, error: photoUploadError } = usePhotoUpload();
 
   const {
@@ -180,45 +178,12 @@ export function SessionEventForm({
       <div className="space-y-1">
         <span className="text-xs font-medium text-vine-700 dark:text-vine-200">Kép</span>
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+          <PhotoPickerButtons
+            onSelect={(files) => setSelectedFile(files[0] ?? null)}
+            disabled={isPending || uploadingPhoto}
+            allowMultiple={false}
+            singleLabel={mode === 'edit' ? 'Kép cseréje' : 'Kép kiválasztása'}
           />
-          {isMobileDevice ? (
-            <>
-              <button
-                type="button"
-                onClick={() => openPicker(fileRef, 'camera')}
-                disabled={isPending || uploadingPhoto}
-                className="inline-flex items-center gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
-              >
-                <Camera className="h-4 w-4" />
-                Fotózás
-              </button>
-              <button
-                type="button"
-                onClick={() => openPicker(fileRef, 'gallery')}
-                disabled={isPending || uploadingPhoto}
-                className="inline-flex items-center gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
-              >
-                <ImagePlus className="h-4 w-4" />
-                Galéria
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => openPicker(fileRef, 'gallery')}
-              disabled={isPending || uploadingPhoto}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
-            >
-              <ImagePlus className="h-4 w-4" />
-              {mode === 'edit' ? 'Kép cseréje' : 'Kép kiválasztása'}
-            </button>
-          )}
           {selectedFile && (
             <span className="text-xs text-vine-500 dark:text-vine-300">{selectedFile.name}</span>
           )}

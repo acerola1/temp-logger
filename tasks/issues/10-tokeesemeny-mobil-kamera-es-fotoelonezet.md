@@ -34,21 +34,21 @@ Mobilon és desktopon is reprodukálni kell a látható állapotot módosítás 
 
 ## Elfogadási kritériumok
 
-- [ ] Érintőeszközön a `Fotózás` gomb közvetlenül a hátsó kamerát nyitja, a
+- [x] Érintőeszközön a `Fotózás` gomb közvetlenül a hátsó kamerát nyitja, a
       `Galéria` a fájlválasztót többes kijelöléssel.
-- [ ] Desktopon egyetlen `Kép kiválasztása` gomb jelenik meg.
-- [ ] A kiválasztott képek bélyegként látszanak, egyenként eltávolíthatók, és az
+- [x] Desktopon egyetlen `Kép kiválasztása` gomb jelenik meg.
+- [x] A kiválasztott képek bélyegként látszanak, egyenként eltávolíthatók, és az
       eltávolítás után a feltöltésbe sem kerülnek bele.
-- [ ] Ugyanaz a fájl egymás után kétszer is kiválasztható.
-- [ ] Több körben hozzáadott képek összeadódnak a limitig; a limit feletti
+- [x] Ugyanaz a fájl egymás után kétszer is kiválasztható.
+- [x] Több körben hozzáadott képek összeadódnak a limitig; a limit feletti
       kijelölés érthető üzenettel elutasításra kerül.
-- [ ] A kiválasztás elhagyása után nem marad felszabadítatlan objectURL.
-- [ ] Feltöltés közben a választógombok tiltottak, a progress sáv változatlanul
+- [x] A kiválasztás elhagyása után nem marad felszabadítatlan objectURL.
+- [x] Feltöltés közben a választógombok tiltottak, a progress sáv változatlanul
       működik.
-- [ ] A tőkeesemény szerkesztő módja továbbra sem kezel fotót – ez nem ennek az
+- [x] A tőkeesemény szerkesztő módja továbbra sem kezel fotót – ez nem ennek az
       issue-nak a scope-ja.
-- [ ] Komponensteszt fedi a kiválasztást, az eltávolítást és a limitet.
-- [ ] `npm test`, `npm run lint`, `npm run build` zöld.
+- [x] Komponensteszt fedi a kiválasztást, az eltávolítást és a limitet.
+- [x] `npm test`, `npm run lint`, `npm run build` zöld.
 
 ## Érintett terület
 
@@ -58,3 +58,25 @@ Mobilon és desktopon is reprodukálni kell a látható állapotot módosítás 
 - `dashboard/src/components/SessionEventForm.tsx` (ugyanerre a komponensre áll)
 
 ## Comments
+
+- 2026-08-03: Közös `PhotoPickerButtons` került a `features/photos/ui/`-ba: a
+  rejtett inputot maga tartja, érintőeszközön `Fotózás` + `Galéria`, egyébként
+  egyetlen, feliratozható választógomb. A `change` kezelő is nullázza az inputot,
+  így ugyanaz a fájl egymás után újra kiválasztható.
+- 2026-08-03: A kiválasztás állapotát a `photoSelection.ts` írja le
+  (`appendSelectedPhotos` a maradék helyre vágással, `removeSelectedPhotoAt`,
+  `releaseSelectedPhotos`). Az objectURL a befogadott képpel együtt keletkezik és
+  eltávolításnál, illetve az űrlap lecsatolásánál szabadul fel, így a
+  `PhotoPreviewList` effekt nélküli, tisztán prezentációs komponens maradt.
+- 2026-08-03: A limit 6 kép (`DEFAULT_MAX_SELECTED_PHOTOS`), a felette lévő
+  kijelölés `Legfeljebb 6 fotó választható ki, N kép kimaradt.` üzenetet ad. A
+  `SessionEventForm` ugyanerre a gombra állt, a szerkesztő mód továbbra sem kezel
+  fotót.
+- 2026-08-03: A komponensteszthez `@testing-library/react` + `happy-dom` került a
+  devDependencies közé (jsdom 30 a Node 20.15-ön `require(ESM)`-re esik), a
+  vitest `.test.tsx`-eket is futtat fájlszintű `@vitest-environment happy-dom`
+  docblockkal.
+- 2026-08-03: Ellenőrzés: unit + komponenstesztek (61/61), lint, production build,
+  teljes Playwright E2E (18/18) frissített tőkeesemény-snapshotokkal; a
+  munkamenet-űrlap választógombját desktop és mobil viewporton is
+  visszanéztem.
