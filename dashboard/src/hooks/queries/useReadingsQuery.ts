@@ -53,7 +53,7 @@ export function useReadingsQuery(deviceId: string | null, sessionId: string | nu
           deviceId,
           temperatureC: data.temperatureC,
           humidity: data.humidity,
-          recordedAt: serverRecordedAt ?? data.recordedAt ?? new Date().toISOString(),
+          recordedAt: serverRecordedAt ?? data.recordedAt ?? new Date(0).toISOString(),
           sessionId: data.sessionId ?? undefined,
         } satisfies SensorReading;
       });

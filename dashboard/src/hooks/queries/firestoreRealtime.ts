@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { hashKey, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { onSnapshot, type DocumentData, type Query, type QuerySnapshot } from 'firebase/firestore';
 
 interface FirestoreRealtimeQueryOptions<T> {
@@ -11,6 +11,11 @@ interface FirestoreRealtimeQueryOptions<T> {
   onErrorMessage?: string;
 }
 
+interface SubscriptionState {
+  token: object;
+  error: string | null;
+}
+
 export function useFirestoreRealtimeQuery<T>({
   queryKey,
   queryRef,
@@ -20,31 +25,27 @@ export function useFirestoreRealtimeQuery<T>({
   onErrorMessage = 'Nem sikerült betölteni az adatokat.',
 }: FirestoreRealtimeQueryOptions<T>) {
   const queryClient = useQueryClient();
-  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [subscriptionState, setSubscriptionState] = useState<SubscriptionState | null>(null);
+  const mapSnapshotRef = useRef(mapSnapshot);
+  const onErrorMessageRef = useRef(onErrorMessage);
+  const queryKeyRef = useRef(queryKey);
+  const queryKeyHash = hashKey(queryKey);
+  const subscriptionToken = useMemo(
+    () => ({ enabled, queryKeyHash, queryRef }),
+    [enabled, queryKeyHash, queryRef],
+  );
+
+  useEffect(() => {
+    mapSnapshotRef.current = mapSnapshot;
+    onErrorMessageRef.current = onErrorMessage;
+    queryKeyRef.current = queryKey;
+  });
 
   const queryResult = useQuery<T, Error>({
     queryKey,
-    enabled: enabled && !!queryRef,
+    queryFn: async () => initialData,
+    enabled: false,
     initialData,
-    queryFn: async () => {
-      if (!queryRef) {
-        return initialData;
-      }
-
-      return new Promise<T>((resolve, reject) => {
-        const unsubscribe = onSnapshot(
-          queryRef,
-          (snapshot) => {
-            unsubscribe();
-            resolve(mapSnapshot(snapshot));
-          },
-          (error) => {
-            unsubscribe();
-            reject(error);
-          },
-        );
-      });
-    },
   });
 
   useEffect(() => {
@@ -52,30 +53,32 @@ export function useFirestoreRealtimeQuery<T>({
       return;
     }
 
+    const subscribedQueryKey = queryKeyRef.current;
+
     const unsubscribe = onSnapshot(
       queryRef,
       (snapshot) => {
-        queryClient.setQueryData(queryKey, mapSnapshot(snapshot));
-        setSubscriptionError(null);
+        queryClient.setQueryData(subscribedQueryKey, mapSnapshotRef.current(snapshot));
+        setSubscriptionState({ token: subscriptionToken, error: null });
       },
       (error) => {
         console.error('Firestore realtime query error:', error);
-        setSubscriptionError(onErrorMessage);
+        setSubscriptionState({ token: subscriptionToken, error: onErrorMessageRef.current });
       },
     );
 
     return unsubscribe;
-  }, [enabled, mapSnapshot, onErrorMessage, queryClient, queryKey, queryRef]);
+  }, [enabled, queryClient, queryKeyHash, queryRef, subscriptionToken]);
 
-  const error =
-    enabled && queryRef
-      ? subscriptionError ?? (queryResult.error ? queryResult.error.message : null)
-      : null;
+  const active = enabled && !!queryRef;
+  const hasCurrentResult = subscriptionState?.token === subscriptionToken;
+  const loading = active && !hasCurrentResult;
+  const error = active && hasCurrentResult ? subscriptionState.error : null;
 
   return {
     data: queryResult.data ?? initialData,
-    loading: enabled && !!queryRef ? queryResult.isLoading : false,
-    isFetching: queryResult.isFetching,
+    loading,
+    isFetching: loading,
     error,
   };
 }
