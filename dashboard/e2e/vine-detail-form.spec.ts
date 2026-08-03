@@ -143,7 +143,7 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
   await page.setViewportSize({ width: 1280, height: 1100 });
   await page.getByRole('button', { name: 'Új esemény bezárása' }).click();
   const seededEvent = page.getByTestId('vine-event').filter({ hasText: 'Első fürtök' });
-  await seededEvent.getByRole('button', { name: 'Szerkesztés' }).click();
+  await seededEvent.getByRole('button', { name: 'Szerkesztés', exact: true }).click();
   const editForm = page.getByRole('form', { name: 'Tőkeesemény szerkesztése' });
   await expect(editForm).toBeVisible();
   await expect(editForm.locator('input[type="file"]')).toHaveCount(0);

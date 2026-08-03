@@ -64,7 +64,7 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await expect(page.getByTestId('vine-detail').getByText('Megszűnt', { exact: true })).toBeVisible();
 
   page.once('dialog', (dialog) => void dialog.accept());
-  await cessationEvent.getByRole('button', { name: 'Törlés' }).click();
+  await cessationEvent.getByRole('button', { name: 'Törlés', exact: true }).click();
   await expect(cessationEvent).toHaveCount(0);
   await expect(page.getByTestId('vine-detail').getByText('Megszűnt', { exact: true })).toBeVisible();
 
@@ -100,9 +100,58 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
     createdEvent.getByRole('button', { name: /Közös metszés \d+\. fotó megnyitása/ }),
   ).toHaveCount(2);
 
+  // Utólagos fotókezelés a már mentett eseményen: felvétel, aláírás, egyedi törlés.
+  const eventPhotos = createdEvent.getByRole('list', { name: 'Közös metszés fotói' });
+  await expect(createdEvent.getByText('Fotók 2/12')).toBeVisible();
+  await createdEvent.locator('input[type="file"]').setInputFiles([
+    { name: 'metszes-3.png', mimeType: 'image/png', buffer: pixel },
+    { name: 'metszes-4.png', mimeType: 'image/png', buffer: pixel },
+  ]);
+  await expect(createdEvent.getByText('Fotók 4/12')).toBeVisible();
+  await expect(eventPhotos.getByRole('listitem')).toHaveCount(4);
+
+  await createdEvent
+    .getByRole('button', { name: 'Közös metszés 3. fotó képaláírásának szerkesztése' })
+    .click();
+  await createdEvent
+    .getByRole('textbox', { name: 'Közös metszés 3. fotó képaláírása' })
+    .fill('  Utólag pótolt kép  ');
+  await expect(page).toHaveScreenshot('toke-esemeny-foto-alairas-desktop.png', {
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await createdEvent.getByRole('button', { name: 'Aláírás mentése' }).click();
+  await expect(createdEvent.getByText('Utólag pótolt kép', { exact: true })).toBeVisible();
+
+  await expect(page).toHaveScreenshot('toke-esemeny-fotosor-desktop.png', {
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await createdEvent.scrollIntoViewIfNeeded();
+  await expect(page).toHaveScreenshot('toke-esemeny-fotosor-mobile.png', {
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  // A mentett felirat a közös nézőben is megjelenik.
+  await createdEvent.getByRole('button', { name: 'Közös metszés 3. fotó megnyitása' }).click();
+  const eventPhotoViewer = page.getByRole('dialog', { name: 'Eseményfotó' });
+  await expect(eventPhotoViewer.getByText(/Utólag pótolt kép/)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(eventPhotoViewer).toHaveCount(0);
+
+  page.once('dialog', (dialog) => void dialog.accept());
+  await createdEvent.getByRole('button', { name: 'Közös metszés 1. fotó törlése' }).click();
+  await expect(eventPhotos.getByRole('listitem')).toHaveCount(3);
+  await expect(createdEvent.getByText('Fotók 3/12')).toBeVisible();
+  // A felirat a megmaradt fotón marad, a törlés nem tolta el a rekordokat.
+  await expect(createdEvent.getByText('Utólag pótolt kép', { exact: true })).toBeVisible();
+
   await page.getByRole('button', { name: /#1 Kékfrankos/ }).click();
   const copiedEvent = page.getByTestId('vine-event').filter({ hasText: 'Közös metszés' });
-  await copiedEvent.getByRole('button', { name: 'Szerkesztés' }).click();
+  await copiedEvent.getByRole('button', { name: 'Szerkesztés', exact: true }).click();
   const editEventForm = page.getByRole('form', { name: 'Tőkeesemény szerkesztése' });
   await editEventForm.locator('[name="title"]').fill('Csak az első tőkén szerkesztve');
   await editEventForm.getByRole('button', { name: 'Mentés' }).click();
@@ -115,7 +164,7 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await page.getByRole('button', { name: /#1 Kékfrankos/ }).click();
   const editedEvent = page.getByTestId('vine-event').filter({ hasText: 'Csak az első tőkén szerkesztve' });
   page.once('dialog', (dialog) => void dialog.accept());
-  await editedEvent.getByRole('button', { name: 'Törlés' }).click();
+  await editedEvent.getByRole('button', { name: 'Törlés', exact: true }).click();
   await expect(editedEvent).toHaveCount(0);
 
   await page.getByLabel('Állapot').selectOption('all');

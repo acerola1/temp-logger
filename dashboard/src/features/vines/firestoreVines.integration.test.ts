@@ -16,12 +16,15 @@ import {
   uploadBytes,
 } from 'firebase/storage';
 import type { Firestore } from 'firebase/firestore';
-import type { CreateVineInput, Vine } from './model';
+import { MAX_VINE_EVENT_PHOTOS, type CreateVineInput, type Vine, type VineEvent } from './model';
 import {
+  addEventPhotos,
   addEvents,
   createVine,
   deleteEvent,
+  deleteEventPhoto,
   editEvent,
+  editEventPhotoCaption,
   editVine,
   subscribeToVines,
 } from './firestoreVines';
@@ -642,5 +645,302 @@ describe('Firestore vine catalog', () => {
     expect(new Uint8Array(await getBytes(ref(adminClientStorage, secondPhoto?.storagePath ?? '')))).toEqual(
       new Uint8Array([1, 2, 3]),
     );
+  });
+
+  function testPhoto(name: string, bytes: number[]): File {
+    return new File([new Uint8Array(bytes)], name, { type: 'image/png' });
+  }
+
+  async function seedVineWithEvent(
+    vineId: string,
+    serialNumber: number,
+    title: string,
+    photos: File[] = [],
+  ): Promise<{ vine: Vine; event: VineEvent }> {
+    await adminDb.collection('vines').doc(vineId).set(
+      vineDocument(adminUid, {
+        serialNumber,
+        variety: 'Utólagos fotó',
+        areaDescription: 'Fotóterület',
+      }),
+    );
+
+    await withTestImage(() =>
+      addEvents(adminClientDb, adminClientStorage, {
+        targetVineIds: [vineId],
+        event: {
+          type: 'observation',
+          occurredAt: '2026-08-03T09:00:00.000Z',
+          title,
+          notes: '',
+        },
+        photos,
+      }),
+    );
+
+    const vines = await waitForVines(
+      adminClientDb,
+      (nextVines) => nextVines.find((vine) => vine.id === vineId)?.events.length === 1,
+    );
+    const vine = vines.find((candidate) => candidate.id === vineId);
+    const event = vine?.events[0];
+    if (!vine || !event) throw new Error('A tesztesemény nem jött létre.');
+
+    return { vine, event };
+  }
+
+  it('meglévő eseményhez egy műveletben több fotót is felvesz ugyanarra az útvonalra', async () => {
+    const { vine, event } = await seedVineWithEvent(
+      'vine-late-photos',
+      40,
+      'Utólagos fotózás',
+      [testPhoto('elso.png', [1, 1, 1])],
+    );
+
+    await withTestImage(() =>
+      addEventPhotos(adminClientDb, adminClientStorage, {
+        vineId: vine.id,
+        eventId: event.id,
+        photos: [testPhoto('masodik.png', [2, 2, 2]), testPhoto('harmadik.png', [3, 3, 3])],
+      }),
+    );
+
+    const vines = await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((candidate) => candidate.id === vine.id)?.events[0]?.photos.length === 3,
+    );
+    const updatedVine = vines.find((candidate) => candidate.id === vine.id);
+    const updatedEvent = updatedVine?.events[0];
+
+    expect(updatedEvent?.photos.map((photo) => photo.storagePath)).toEqual([
+      expect.stringMatching(
+        new RegExp(`^vines/${vine.id}/events/${event.id}/photos/[^/]+\\.png$`),
+      ),
+      expect.stringMatching(
+        new RegExp(`^vines/${vine.id}/events/${event.id}/photos/[^/]+\\.png$`),
+      ),
+      expect.stringMatching(
+        new RegExp(`^vines/${vine.id}/events/${event.id}/photos/[^/]+\\.png$`),
+      ),
+    ]);
+    expect(
+      new Uint8Array(
+        await getBytes(ref(adminClientStorage, updatedEvent?.photos[2]?.storagePath ?? '')),
+      ),
+    ).toEqual(new Uint8Array([3, 3, 3]));
+    // Az utólagos fotó feliratja üresen keletkezik, a többi metaadat megvan.
+    expect(updatedEvent?.photos[1]).toMatchObject({ caption: '', width: 640, height: 480 });
+    expect(updatedVine?.updatedAt).not.toBe(vine.updatedAt);
+    expect(updatedEvent?.updatedAt).not.toBe(event.updatedAt);
+  });
+
+  it('egyetlen fotó törlése az esemény többi fotóját és a másik tőke példányát sem érinti', async () => {
+    await Promise.all(
+      [
+        ['vine-late-delete-one', 41],
+        ['vine-late-delete-two', 42],
+      ].map(([vineId, serialNumber]) =>
+        adminDb
+          .collection('vines')
+          .doc(vineId as string)
+          .set(
+            vineDocument(adminUid, {
+              serialNumber: serialNumber as number,
+              variety: 'Utólagos fotó',
+              areaDescription: 'Fotóterület',
+            }),
+          ),
+      ),
+    );
+
+    await withTestImage(() =>
+      addEvents(adminClientDb, adminClientStorage, {
+        targetVineIds: ['vine-late-delete-one', 'vine-late-delete-two'],
+        event: {
+          type: 'observation',
+          occurredAt: '2026-08-03T10:00:00.000Z',
+          title: 'Közös fotózás',
+          notes: '',
+        },
+        photos: [testPhoto('kozos.png', [4, 4, 4]), testPhoto('torlendo.png', [5, 5, 5])],
+      }),
+    );
+
+    const seeded = await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines
+          .filter((vine) => ['vine-late-delete-one', 'vine-late-delete-two'].includes(vine.id))
+          .every((vine) => vine.events[0]?.photos.length === 2),
+    );
+    const first = seeded.find((vine) => vine.id === 'vine-late-delete-one');
+    const second = seeded.find((vine) => vine.id === 'vine-late-delete-two');
+    const firstEvent = first?.events[0];
+    const keptPhoto = firstEvent?.photos[0];
+    const removedPhoto = firstEvent?.photos[1];
+    const otherVinePhoto = second?.events[0]?.photos[1];
+
+    await deleteEventPhoto(adminClientDb, adminClientStorage, {
+      vineId: 'vine-late-delete-one',
+      eventId: firstEvent?.id ?? '',
+      photoId: removedPhoto?.id ?? '',
+    });
+
+    const afterDelete = await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((vine) => vine.id === 'vine-late-delete-one')?.events[0]?.photos.length === 1,
+    );
+    const remainingPhotos = afterDelete.find((vine) => vine.id === 'vine-late-delete-one')
+      ?.events[0]?.photos;
+
+    expect(remainingPhotos?.map((photo) => photo.id)).toEqual([keptPhoto?.id]);
+    await expect(
+      getBytes(ref(adminClientStorage, removedPhoto?.storagePath ?? '')),
+    ).rejects.toMatchObject({ code: 'storage/object-not-found' });
+    expect(
+      new Uint8Array(await getBytes(ref(adminClientStorage, keptPhoto?.storagePath ?? ''))),
+    ).toEqual(new Uint8Array([4, 4, 4]));
+    // A másik tőke azonos nevű eseménypéldánya érintetlen marad.
+    expect(
+      afterDelete.find((vine) => vine.id === 'vine-late-delete-two')?.events[0]?.photos,
+    ).toHaveLength(2);
+    expect(
+      new Uint8Array(await getBytes(ref(adminClientStorage, otherVinePhoto?.storagePath ?? ''))),
+    ).toEqual(new Uint8Array([5, 5, 5]));
+  });
+
+  it('a képaláírást megőrzi, és az üres feliratot is elfogadja', async () => {
+    const { vine, event } = await seedVineWithEvent(
+      'vine-late-caption',
+      43,
+      'Feliratozott fotó',
+      [testPhoto('felirat.png', [6, 6, 6])],
+    );
+    const photoId = event.photos[0]?.id ?? '';
+
+    await editEventPhotoCaption(adminClientDb, {
+      vineId: vine.id,
+      eventId: event.id,
+      photoId,
+      caption: '  Két fürt a keleti oldalon  ',
+    });
+
+    const captioned = await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((candidate) => candidate.id === vine.id)?.events[0]?.photos[0]?.caption ===
+        'Két fürt a keleti oldalon',
+    );
+    expect(captioned.find((candidate) => candidate.id === vine.id)?.updatedAt).not.toBe(
+      vine.updatedAt,
+    );
+
+    await editEventPhotoCaption(adminClientDb, {
+      vineId: vine.id,
+      eventId: event.id,
+      photoId,
+      caption: '   ',
+    });
+
+    const cleared = await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((candidate) => candidate.id === vine.id)?.events[0]?.photos[0]?.caption ===
+        '',
+    );
+    expect(cleared.find((candidate) => candidate.id === vine.id)?.events[0]?.photos).toHaveLength(1);
+  });
+
+  it('sikertelen Firestore-írás után az utólagos feltöltést eltávolítja', async () => {
+    const { vine, event } = await seedVineWithEvent(
+      'vine-late-compensation',
+      44,
+      'Kompenzált utólagos fotó',
+      [testPhoto('marad.png', [7, 7, 7])],
+    );
+
+    const randomUuidDescriptor = Object.getOwnPropertyDescriptor(crypto, 'randomUUID');
+    Object.defineProperty(crypto, 'randomUUID', {
+      configurable: true,
+      value: () => 'late-comp-photo',
+    });
+
+    try {
+      await withTestImage(async () => {
+        // A publikus kliens olvasni tud, írni nem: a feltöltés lefut, a
+        // tranzakció elhasal, a Storage-objektumnak mégsem szabad megmaradnia.
+        await expect(
+          addEventPhotos(clientDb, adminClientStorage, {
+            vineId: vine.id,
+            eventId: event.id,
+            photos: [testPhoto('nem-menthet.png', [8, 8, 8])],
+          }),
+        ).rejects.toBeDefined();
+      });
+    } finally {
+      if (randomUuidDescriptor) {
+        Object.defineProperty(crypto, 'randomUUID', randomUuidDescriptor);
+      }
+    }
+
+    await expect(
+      getBytes(
+        ref(
+          adminClientStorage,
+          `vines/${vine.id}/events/${event.id}/photos/late-comp-photo.png`,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'storage/object-not-found' });
+    const vines = await waitForVines(
+      adminClientDb,
+      (nextVines) => nextVines.some((candidate) => candidate.id === vine.id),
+    );
+    expect(vines.find((candidate) => candidate.id === vine.id)?.events[0]?.photos).toHaveLength(1);
+  });
+
+  it('a fotókorlát fölötti felvételt még a fájlok beolvasása előtt elutasítja', async () => {
+    const storedPhoto = (index: number) => ({
+      id: `limit-photo-${index}`,
+      storagePath: `vines/vine-late-limit/events/limit-event/photos/limit-photo-${index}.png`,
+      downloadUrl: 'https://example.test/limit.png',
+      width: 1,
+      height: 1,
+      capturedAt: null,
+      uploadedAt: '2026-08-03T10:00:00.000Z',
+      caption: '',
+    });
+
+    await adminDb.collection('vines').doc('vine-late-limit').set(
+      vineDocument(adminUid, {
+        serialNumber: 45,
+        variety: 'Teli esemény',
+        areaDescription: 'Fotóterület',
+        events: [
+          {
+            id: 'limit-event',
+            type: 'observation',
+            occurredAt: '2026-08-03T10:00:00.000Z',
+            title: 'Teli fotósor',
+            notes: '',
+            photos: Array.from({ length: MAX_VINE_EVENT_PHOTOS }, (_, index) =>
+              storedPhoto(index + 1),
+            ),
+            createdAt: AdminTimestamp.now(),
+            updatedAt: AdminTimestamp.now(),
+          },
+        ],
+      }),
+    );
+
+    const invalidFile = { name: 'must-not-be-read.png' } as File;
+    await expect(
+      addEventPhotos(adminClientDb, adminClientStorage, {
+        vineId: 'vine-late-limit',
+        eventId: 'limit-event',
+        photos: [invalidFile],
+      }),
+    ).rejects.toThrow(`${MAX_VINE_EVENT_PHOTOS}`);
   });
 });

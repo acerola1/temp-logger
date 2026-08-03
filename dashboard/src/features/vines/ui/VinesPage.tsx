@@ -194,6 +194,25 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
     await catalog.deleteEvent({ vineId: selectedVine.id, eventId });
   };
 
+  const handleAddEventPhotos = async (eventId: string, photos: File[]) => {
+    if (!selectedVine) return;
+    await catalog.addEventPhotos({ vineId: selectedVine.id, eventId, photos });
+  };
+
+  const handleDeleteEventPhoto = async (eventId: string, photoId: string) => {
+    if (!selectedVine) return;
+    await catalog.deleteEventPhoto({ vineId: selectedVine.id, eventId, photoId });
+  };
+
+  const handleEditEventPhotoCaption = async (
+    eventId: string,
+    photoId: string,
+    caption: string,
+  ) => {
+    if (!selectedVine) return;
+    await catalog.editEventPhotoCaption({ vineId: selectedVine.id, eventId, photoId, caption });
+  };
+
   const handleOpenCutting = (cuttingId: string) => {
     window.history.pushState({}, '', `/dugvanyok/${encodeURIComponent(cuttingId)}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
@@ -342,6 +361,9 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
           onAddEvents={handleAddEvents}
           onEditEvent={handleEditEvent}
           onDeleteEvent={handleDeleteEvent}
+          onAddEventPhotos={handleAddEventPhotos}
+          onDeleteEventPhoto={handleDeleteEventPhoto}
+          onEditEventPhotoCaption={handleEditEventPhotoCaption}
           onClearMutationError={catalog.clearMutationError}
           onOpenCutting={handleOpenCutting}
         />

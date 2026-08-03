@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   VINE_EVENT_TYPES,
+  MAX_VINE_EVENT_PHOTOS,
   MAX_VINE_EVENT_TARGETS,
   VINE_ROOT_TYPES,
   VINE_STATUSES,
@@ -107,6 +108,38 @@ export function getVineEventTargetError(targetCount: number): string | null {
     return `Egy esemény legfeljebb ${MAX_VINE_EVENT_TARGETS} tőkére menthető egyszerre.`;
   }
   return null;
+}
+
+export interface VineEventPhotoSelection {
+  /** A maradék helyre vágott, feltölthető képek. */
+  accepted: File[];
+  /** Felhasználónak szánt üzenet, ha a kijelölés nem fért bele a korlátba. */
+  error: string | null;
+}
+
+// Az eseményhez utólag felvett fotók a maradék helyre kerülnek. Ha egy kép sem
+// fér be, `accepted` üres: a hívó ilyenkor feltöltést sem indít.
+export function selectVineEventPhotos(
+  currentCount: number,
+  files: readonly File[],
+): VineEventPhotoSelection {
+  const remainingSlots = Math.max(0, MAX_VINE_EVENT_PHOTOS - currentCount);
+  const accepted = files.slice(0, remainingSlots);
+  const rejectedCount = files.length - accepted.length;
+
+  if (rejectedCount === 0) return { accepted, error: null };
+
+  if (remainingSlots === 0) {
+    return {
+      accepted: [],
+      error: `Ehhez az eseményhez már ${MAX_VINE_EVENT_PHOTOS} fotó tartozik. Előbb törölj egyet.`,
+    };
+  }
+
+  return {
+    accepted,
+    error: `Ehhez az eseményhez már csak ${remainingSlots} fotó vehető fel, ${rejectedCount} kép kimaradt.`,
+  };
 }
 
 function normalizeTags(value: string): string[] {

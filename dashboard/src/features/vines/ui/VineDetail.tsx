@@ -5,6 +5,7 @@ import { PhotoLightbox, photoLightboxCaption, type PhotoLightboxImage } from '..
 import type { VineEventFormValues, VineFormValues } from '../forms';
 import type { Vine, VineEvent, VinePlantingDate } from '../model';
 import { VineEventForm } from './VineEventForm';
+import { VineEventPhotos } from './VineEventPhotos';
 import { VineForm, type VineCuttingOption } from './VineForm';
 import {
   ROOT_TYPE_PRESENTATION,
@@ -33,6 +34,9 @@ interface VineDetailProps {
   onAddEvents: (targetVineIds: string[], values: VineEventFormValues, photos: File[]) => Promise<void>;
   onEditEvent: (eventId: string, values: VineEventFormValues) => Promise<void>;
   onDeleteEvent: (eventId: string) => Promise<void>;
+  onAddEventPhotos: (eventId: string, photos: File[]) => Promise<void>;
+  onDeleteEventPhoto: (eventId: string, photoId: string) => Promise<void>;
+  onEditEventPhotoCaption: (eventId: string, photoId: string, caption: string) => Promise<void>;
   onClearMutationError: () => void;
   onOpenCutting: (cuttingId: string) => void;
 }
@@ -99,6 +103,9 @@ export function VineDetail({
   onAddEvents,
   onEditEvent,
   onDeleteEvent,
+  onAddEventPhotos,
+  onDeleteEventPhoto,
+  onEditEventPhotoCaption,
   onClearMutationError,
   onOpenCutting,
 }: VineDetailProps) {
@@ -106,6 +113,9 @@ export function VineDetail({
   const [isAddEventFormOpen, setIsAddEventFormOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
+  // A feltöltési progressz és a hibaüzenet a katalógusban egy közös állapot,
+  // ezért jelöljük, melyik esemény fotóműveletéhez tartozik éppen.
+  const [photoEventId, setPhotoEventId] = useState<string | null>(null);
   // A néző egy esemény fotóit lapozza, ezért az eseményt és a kezdőindexet tartjuk.
   const [lightbox, setLightbox] = useState<{ eventId: string; index: number } | null>(null);
 
@@ -162,8 +172,17 @@ export function VineDetail({
     [lightboxEvent],
   );
 
+  // Minden fotóművelet előtt átállítjuk a jelölést, hogy a progressz és az
+  // esetleges hiba az érintett eseménykártyán jelenjen meg.
+  const runPhotoMutation = async (eventId: string, operation: () => Promise<void>) => {
+    setPhotoEventId(eventId);
+    onClearMutationError();
+    await operation();
+  };
+
   const deleteEvent = async (eventId: string) => {
     if (deletingEventId || !window.confirm('Biztosan törlöd ezt az eseményt a fotóival együtt?')) return;
+    setPhotoEventId(null);
     setDeletingEventId(eventId);
     try {
       await onDeleteEvent(eventId);
@@ -288,6 +307,7 @@ export function VineDetail({
                     type="button"
                     onClick={() => {
                       setEditMode((current) => !current);
+                      setPhotoEventId(null);
                       onClearMutationError();
                     }}
                     disabled={isPending}
@@ -319,7 +339,7 @@ export function VineDetail({
                     onClearMutationError();
                   }}
                   className="rounded-2xl border border-vine-200 bg-vine-50/80 p-4 dark:border-vine-700 dark:bg-vine-800/40"
-                  submitError={mutationError}
+                  submitError={photoEventId === null ? mutationError : null}
                 />
               )}
 
@@ -334,6 +354,7 @@ export function VineDetail({
                       type="button"
                       onClick={() => {
                         setIsAddEventFormOpen((current) => !current);
+                        setPhotoEventId(null);
                         onClearMutationError();
                       }}
                       disabled={isPending}
@@ -351,9 +372,10 @@ export function VineDetail({
                     targetVines={eventTargetVines}
                     initialTargetVineId={selectedVine.id}
                     isPending={isPending}
-                    uploadProgress={uploadProgress}
-                    submitError={mutationError}
+                    uploadProgress={photoEventId === null ? uploadProgress : null}
+                    submitError={photoEventId === null ? mutationError : null}
                     onSubmit={async (values, targetVineIds, photos) => {
+                      setPhotoEventId(null);
                       await onAddEvents(targetVineIds, values, photos);
                       setIsAddEventFormOpen(false);
                     }}
@@ -383,7 +405,7 @@ export function VineDetail({
                               defaultValues={defaultEventValues(event)}
                               isPending={isPending}
                               uploadProgress={null}
-                              submitError={mutationError}
+                              submitError={photoEventId === null ? mutationError : null}
                               onSubmit={async (values) => {
                                 await onEditEvent(event.id, values);
                                 setEditingEventId(null);
@@ -410,7 +432,7 @@ export function VineDetail({
 
                                 {isAdmin && (
                                   <div className="flex shrink-0 items-center gap-2">
-                                    <button type="button" onClick={() => { setEditingEventId(event.id); onClearMutationError(); }} disabled={isPending} className="rounded-lg border border-vine-200 bg-white px-2.5 py-1.5 text-xs font-medium text-vine-700 transition-colors hover:bg-vine-100 disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800">Szerkesztés</button>
+                                    <button type="button" onClick={() => { setEditingEventId(event.id); setPhotoEventId(null); onClearMutationError(); }} disabled={isPending} className="rounded-lg border border-vine-200 bg-white px-2.5 py-1.5 text-xs font-medium text-vine-700 transition-colors hover:bg-vine-100 disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800">Szerkesztés</button>
                                     <button type="button" onClick={() => void deleteEvent(event.id)} disabled={isPending || deletingEventId === event.id} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-red-900 dark:bg-vine-900 dark:text-red-300 dark:hover:bg-red-950/30">
                                       {deletingEventId === event.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Törlés'}
                                     </button>
@@ -418,25 +440,25 @@ export function VineDetail({
                                 )}
                               </div>
 
-                              {event.photos.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-2 pl-11">
-                                  {event.photos.map((photo, photoIndex) => (
-                                    <button
-                                      key={photo.id}
-                                      type="button"
-                                      onClick={() => setLightbox({ eventId: event.id, index: photoIndex })}
-                                      className="h-20 w-20 overflow-hidden rounded-xl border border-vine-200 dark:border-vine-700"
-                                      aria-label={
-                                        event.photos.length > 1
-                                          ? `${event.title} ${photoIndex + 1}. fotó megnyitása`
-                                          : `${event.title} fotó megnyitása`
-                                      }
-                                    >
-                                      <img src={photo.downloadUrl} alt="" width={photo.width || undefined} height={photo.height || undefined} className="h-full w-full object-cover" />
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
+                              <VineEventPhotos
+                                event={event}
+                                isAdmin={isAdmin}
+                                isPending={isPending}
+                                uploadProgress={photoEventId === event.id ? uploadProgress : null}
+                                errorMessage={photoEventId === event.id ? mutationError : null}
+                                onOpenPhoto={(photoIndex) => setLightbox({ eventId: event.id, index: photoIndex })}
+                                onAddPhotos={(photos) =>
+                                  runPhotoMutation(event.id, () => onAddEventPhotos(event.id, photos))
+                                }
+                                onDeletePhoto={(photoId) =>
+                                  runPhotoMutation(event.id, () => onDeleteEventPhoto(event.id, photoId))
+                                }
+                                onEditCaption={(photoId, caption) =>
+                                  runPhotoMutation(event.id, () =>
+                                    onEditEventPhotoCaption(event.id, photoId, caption),
+                                  )
+                                }
+                              />
                             </>
                           )}
                         </article>

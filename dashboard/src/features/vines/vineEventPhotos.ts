@@ -54,8 +54,8 @@ export async function uploadPreparedVineEventPhotos(
 
   const now = new Date().toISOString();
 
-  // A felirat egyelőre üresen keletkezik; a szerkesztő felülete a 13-as issue-ban
-  // készül el.
+  // A felirat üresen keletkezik: a feltöltés nem tud róla, az eseménykártya
+  // fotósorában szerkeszthető utólag.
   return uploads.map((upload) => toPhotoRecord({ ...upload, id: upload.photoId }, now));
 }
 

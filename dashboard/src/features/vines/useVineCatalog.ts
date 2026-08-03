@@ -3,18 +3,24 @@ import { db, storage } from '../../lib/firebase';
 import { getErrorMessage } from '../../lib/errorMessage';
 import { useAuth } from '../../hooks/useAuth';
 import {
+  addEventPhotos as addFirestoreEventPhotos,
   addEvents as addFirestoreEvents,
   createVine as createFirestoreVine,
   deleteEvent as deleteFirestoreEvent,
+  deleteEventPhoto as deleteFirestoreEventPhoto,
   editEvent as editFirestoreEvent,
+  editEventPhotoCaption as editFirestoreEventPhotoCaption,
   editVine as editFirestoreVine,
   subscribeToVines,
 } from './firestoreVines';
 import type {
+  AddVineEventPhotosInput,
   AddVineEventsInput,
   CreateVineInput,
   DeleteVineEventInput,
+  DeleteVineEventPhotoInput,
   EditVineEventInput,
+  EditVineEventPhotoCaptionInput,
   EditVineInput,
   Vine,
 } from './model';
@@ -36,6 +42,9 @@ export interface VineCatalog {
   addEvents(input: AddVineEventsInput): Promise<void>;
   editEvent(input: EditVineEventInput): Promise<void>;
   deleteEvent(input: DeleteVineEventInput): Promise<void>;
+  addEventPhotos(input: AddVineEventPhotosInput): Promise<void>;
+  deleteEventPhoto(input: DeleteVineEventPhotoInput): Promise<void>;
+  editEventPhotoCaption(input: EditVineEventPhotoCaptionInput): Promise<void>;
   clearMutationError(): void;
 }
 
@@ -178,6 +187,33 @@ export function useVineCatalog(): VineCatalog {
     [runMutation],
   );
 
+  const addEventPhotos = useCallback(
+    (input: AddVineEventPhotosInput) =>
+      runMutation(
+        (reportProgress) => addFirestoreEventPhotos(db, storage, input, reportProgress),
+        'Nem sikerült feltölteni a fotókat.',
+      ),
+    [runMutation],
+  );
+
+  const deleteEventPhoto = useCallback(
+    (input: DeleteVineEventPhotoInput) =>
+      runMutation(
+        () => deleteFirestoreEventPhoto(db, storage, input),
+        'Nem sikerült törölni a fotót.',
+      ),
+    [runMutation],
+  );
+
+  const editEventPhotoCaption = useCallback(
+    (input: EditVineEventPhotoCaptionInput) =>
+      runMutation(
+        () => editFirestoreEventPhotoCaption(db, input),
+        'Nem sikerült menteni a képaláírást.',
+      ),
+    [runMutation],
+  );
+
   const tagSuggestions = useMemo(() => getVineTagSuggestions(vines), [vines]);
   const clearMutationError = useCallback(() => {
     setMutation((current) => current.error ? { ...current, error: null } : current);
@@ -194,6 +230,9 @@ export function useVineCatalog(): VineCatalog {
     addEvents,
     editEvent,
     deleteEvent,
+    addEventPhotos,
+    deleteEventPhoto,
+    editEventPhotoCaption,
     clearMutationError,
   };
 }

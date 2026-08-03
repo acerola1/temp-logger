@@ -88,4 +88,28 @@ export interface DeleteVineEventInput {
   eventId: string;
 }
 
+export interface AddVineEventPhotosInput {
+  vineId: string;
+  eventId: string;
+  photos: File[];
+}
+
+export interface DeleteVineEventPhotoInput {
+  vineId: string;
+  eventId: string;
+  photoId: string;
+}
+
+export interface EditVineEventPhotoCaptionInput {
+  vineId: string;
+  eventId: string;
+  photoId: string;
+  caption: string;
+}
+
 export const MAX_VINE_EVENT_TARGETS = 400;
+
+// Eseményenkénti fotókorlát. Egy választásból legfeljebb hat kép jön
+// (`DEFAULT_MAX_SELECTED_PHOTOS`), tehát két teli kör belefér, a fotók viszont a
+// tőke dokumentumába beágyazva élnek: a tömb nem nőhet korlátlanul.
+export const MAX_VINE_EVENT_PHOTOS = 12;

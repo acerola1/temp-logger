@@ -16,13 +16,16 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import type { FirebaseStorage } from 'firebase/storage';
-import { MAX_VINE_EVENT_TARGETS } from './model';
+import { MAX_VINE_EVENT_PHOTOS, MAX_VINE_EVENT_TARGETS } from './model';
 import type {
+  AddVineEventPhotosInput,
   AddVineEventsInput,
   CreateVineInput,
   DeleteVineEventInput,
+  DeleteVineEventPhotoInput,
   EditVineInput,
   EditVineEventInput,
+  EditVineEventPhotoCaptionInput,
   Vine,
   VineEvent,
   VineEventPhoto,
@@ -404,6 +407,161 @@ export async function editEvent(
       ),
       updatedAt: serverTimestamp(),
     });
+  });
+}
+
+// A fotók az esemény beágyazott tömbjében élnek, ezért minden fotóművelet
+// tranzakciós read–modify–write ugyanazon a tőkedokumentumon: két párhuzamos
+// írás nem írhatja felül egymás fotóit, és a művelet csak a megnevezett esemény
+// példányát érinti, más tőke azonos nevű eseményét nem.
+async function updateEventPhotos<T>(
+  firestore: Firestore,
+  vineId: string,
+  eventId: string,
+  apply: (photos: readonly VineEventPhoto[]) => { photos: VineEventPhoto[]; result: T },
+): Promise<T> {
+  return runTransaction(firestore, async (transaction) => {
+    const vineReference = doc(firestore, 'vines', vineId);
+    const snapshot = await transaction.get(vineReference);
+    if (!snapshot.exists()) {
+      throw new Error('A tőke nem található.');
+    }
+
+    const existingEvents = mapStoredEvents(snapshot.data());
+    const event = existingEvents.find((candidate) => candidate.id === eventId);
+    if (!event) {
+      throw new Error('Az esemény nem található.');
+    }
+
+    const { photos, result } = apply(event.photos);
+    const now = Timestamp.now().toDate().toISOString();
+    transaction.update(vineReference, {
+      events: existingEvents.map((candidate) =>
+        candidate.id === eventId ? { ...candidate, photos, updatedAt: now } : candidate,
+      ),
+      updatedAt: serverTimestamp(),
+    });
+
+    return result;
+  });
+}
+
+function photoLimitError(): Error {
+  return new Error(`Egy eseményhez legfeljebb ${MAX_VINE_EVENT_PHOTOS} fotó tartozhat.`);
+}
+
+// A korlátot már a fotók előkészítése előtt megnézzük: hiába töltenénk fel, ha a
+// tranzakció úgyis elutasítja.
+async function assertEventPhotoCapacity(
+  firestore: Firestore,
+  input: AddVineEventPhotosInput,
+): Promise<void> {
+  const snapshot = await getDoc(doc(firestore, 'vines', input.vineId));
+  if (!snapshot.exists()) {
+    throw new Error('A tőke nem található.');
+  }
+
+  const event = mapStoredEvents(snapshot.data()).find(
+    (candidate) => candidate.id === input.eventId,
+  );
+  if (!event) {
+    throw new Error('Az esemény nem található.');
+  }
+
+  if (event.photos.length + input.photos.length > MAX_VINE_EVENT_PHOTOS) {
+    throw photoLimitError();
+  }
+}
+
+export async function addEventPhotos(
+  firestore: Firestore,
+  storage: FirebaseStorage,
+  input: AddVineEventPhotosInput,
+  onProgress?: VineMutationProgress,
+): Promise<void> {
+  if (input.photos.length === 0) {
+    throw new Error('Válassz legalább egy fotót.');
+  }
+
+  await assertEventPhotoCapacity(firestore, input);
+
+  const preparedPhotos = await prepareVineEventPhotos(input.photos);
+  onProgress?.(0);
+  const photos = await uploadPreparedVineEventPhotos(
+    storage,
+    input.vineId,
+    input.eventId,
+    preparedPhotos,
+    (uploadedBytes, totalBytes) => {
+      const progress = totalBytes > 0
+        ? Math.round((Math.min(uploadedBytes, totalBytes) / totalBytes) * 100)
+        : 100;
+      onProgress?.(Math.min(100, progress));
+    },
+  );
+
+  try {
+    await updateEventPhotos(firestore, input.vineId, input.eventId, (existingPhotos) => {
+      if (existingPhotos.length + photos.length > MAX_VINE_EVENT_PHOTOS) {
+        throw photoLimitError();
+      }
+
+      return { photos: [...existingPhotos, ...photos], result: undefined };
+    });
+  } catch (error) {
+    // Storage-kompenzáció: sikertelen Firestore-írás után nem maradhat árva
+    // objektum, ahogy az `addEvents`-nél sem.
+    await deleteVineEventPhotos(storage, photos);
+    throw error;
+  }
+}
+
+export async function deleteEventPhoto(
+  firestore: Firestore,
+  storage: FirebaseStorage,
+  input: DeleteVineEventPhotoInput,
+): Promise<void> {
+  // Előbb a Firestore-rekordból vesszük ki a képet, és csak utána töröljük
+  // best-effort a Storage-objektumot: a felület így nem mutat olyan bélyeget,
+  // ami már nem letölthető.
+  const removedPhoto = await updateEventPhotos(
+    firestore,
+    input.vineId,
+    input.eventId,
+    (existingPhotos) => {
+      const photo = existingPhotos.find((candidate) => candidate.id === input.photoId);
+      if (!photo) {
+        throw new Error('A fotó nem található.');
+      }
+
+      return {
+        photos: existingPhotos.filter((candidate) => candidate.id !== input.photoId),
+        result: photo,
+      };
+    },
+  );
+
+  await deleteVineEventPhotos(storage, [removedPhoto]);
+}
+
+export async function editEventPhotoCaption(
+  firestore: Firestore,
+  input: EditVineEventPhotoCaptionInput,
+): Promise<void> {
+  // Az üres felirat érvényes érték: a szerkesztő így tudja törölni is.
+  const caption = input.caption.trim();
+
+  await updateEventPhotos(firestore, input.vineId, input.eventId, (existingPhotos) => {
+    if (!existingPhotos.some((candidate) => candidate.id === input.photoId)) {
+      throw new Error('A fotó nem található.');
+    }
+
+    return {
+      photos: existingPhotos.map((candidate) =>
+        candidate.id === input.photoId ? { ...candidate, caption } : candidate,
+      ),
+      result: undefined,
+    };
   });
 }
 
