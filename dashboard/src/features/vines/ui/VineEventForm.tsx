@@ -24,16 +24,33 @@ import {
   VINE_EVENT_TYPES,
   type Vine,
 } from '../model';
-import { statusBadgeClass, statusLabel } from './vinePresentation';
+import { VineTargetPickerDialog } from './VineTargetPickerDialog';
 
 const INPUT_CLASS =
   'w-full rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-900 outline-none transition-colors focus:border-vine-500 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50';
 const FIELD_LABEL_CLASS = 'text-xs font-medium text-vine-700 dark:text-vine-200';
+// Ennyi sorszám fér el az összefoglaló sorban, a többi darabszámként jelenik meg.
+const SUMMARY_SERIAL_LIMIT = 8;
+
+function summarizeTargets(
+  targetVines: readonly Vine[],
+  selectedTargetIds: readonly string[],
+): string | null {
+  const selectedIds = new Set(selectedTargetIds);
+  const serials = targetVines
+    .filter((vine) => selectedIds.has(vine.id))
+    .map((vine) => `#${vine.serialNumber}`);
+
+  if (serials.length === 0) return null;
+  if (serials.length <= SUMMARY_SERIAL_LIMIT) return serials.join(', ');
+  return `${serials.slice(0, SUMMARY_SERIAL_LIMIT).join(', ')} +${serials.length - SUMMARY_SERIAL_LIMIT}`;
+}
 
 interface VineEventFormProps {
   mode: 'add' | 'edit';
   defaultValues: VineEventFormValues;
   targetVines?: readonly Vine[];
+  tagSuggestions?: readonly string[];
   initialTargetVineId?: string;
   isPending: boolean;
   uploadProgress: number | null;
@@ -50,6 +67,7 @@ export function VineEventForm({
   mode,
   defaultValues,
   targetVines = [],
+  tagSuggestions = [],
   initialTargetVineId,
   isPending,
   uploadProgress,
@@ -60,6 +78,7 @@ export function VineEventForm({
   const [targetVineIds, setTargetVineIds] = useState<string[]>(
     initialTargetVineId ? [initialTargetVineId] : [],
   );
+  const [isTargetPickerOpen, setIsTargetPickerOpen] = useState(false);
   const [photos, setPhotos] = useState<readonly SelectedPhoto[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   // A lecsatoláskori felszabadításhoz kell az aktuális lista effekten kívül is.
@@ -77,6 +96,9 @@ export function VineEventForm({
   const selectedType = useWatch({ control, name: 'type' });
   const selectableIds = useMemo(() => new Set(targetVines.map((vine) => vine.id)), [targetVines]);
   const selectedTargetIds = targetVineIds.filter((vineId) => selectableIds.has(vineId));
+  // A dialógus nélkül is látszódjon, *mely* tőkék a célok. Sorszámmal, mert az
+  // rövid; sok kijelölésnél a maradék már csak számként jelenik meg.
+  const selectedTargetSummary = summarizeTargets(targetVines, selectedTargetIds);
 
   // A kiválasztás elhagyása után nem maradhat felszabadítatlan objectURL.
   useEffect(() => () => releaseSelectedPhotos(photosRef.current), []);
@@ -95,17 +117,6 @@ export function VineEventForm({
   const removePhoto = (index: number) => {
     applyPhotos(removeSelectedPhotoAt(photos, index));
     setPhotoError(null);
-  };
-
-  const selectAllTargets = () => {
-    const allTargetIds = targetVines.map((vine) => vine.id);
-    const error = getVineEventTargetError(allTargetIds.length);
-    if (error && allTargetIds.length > 0) {
-      setTargetError(error);
-      return;
-    }
-    setTargetVineIds(allTargetIds);
-    setTargetError(null);
   };
 
   const submit = handleSubmit(async (values) => {
@@ -186,33 +197,45 @@ export function VineEventForm({
           )}
 
           <div className="mt-3 space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <span className={FIELD_LABEL_CLASS}>Érintett tőkék</span>
-              <div className="flex items-center gap-2 text-xs">
-                <button type="button" onClick={selectAllTargets} disabled={isPending} className="rounded-lg border border-vine-200 bg-white px-2 py-1 text-vine-700 transition-colors hover:bg-vine-50 disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800">Mind</button>
-                <button type="button" onClick={() => { setTargetVineIds([]); setTargetError(null); }} disabled={isPending} className="rounded-lg border border-vine-200 bg-white px-2 py-1 text-vine-700 transition-colors hover:bg-vine-50 disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800">Törlés</button>
+            <span className={`block ${FIELD_LABEL_CLASS}`}>Érintett tőkék</span>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 dark:border-vine-700 dark:bg-vine-900">
+              <div className="min-w-0">
+                <p className="text-sm text-vine-800 dark:text-vine-100">
+                  {selectedTargetIds.length} tőke kiválasztva
+                </p>
+                {selectedTargetSummary && (
+                  <p className="truncate text-xs text-vine-500 dark:text-vine-300">
+                    {selectedTargetSummary}
+                  </p>
+                )}
               </div>
-            </div>
-
-            <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-vine-200 bg-white p-2 dark:border-vine-700 dark:bg-vine-900">
-              {targetVines.map((vine) => (
-                <label key={vine.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm text-vine-800 hover:bg-vine-50 dark:text-vine-100 dark:hover:bg-vine-800">
-                  <input
-                    type="checkbox"
-                    checked={selectedTargetIds.includes(vine.id)}
-                    disabled={isPending}
-                    onChange={() => {
-                      setTargetVineIds((current) => current.includes(vine.id) ? current.filter((id) => id !== vine.id) : [...current, vine.id]);
-                      setTargetError(null);
-                    }}
-                    className="h-4 w-4 rounded border-vine-300 text-vine-600 focus:ring-vine-500"
-                  />
-                  <span>#{vine.serialNumber} - {vine.variety}</span>
-                  {vine.status !== 'active' && <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(vine.status)}`}>{statusLabel(vine.status)}</span>}
-                </label>
-              ))}
+              <button
+                type="button"
+                onClick={() => setIsTargetPickerOpen(true)}
+                disabled={isPending}
+                className="shrink-0 rounded-lg border border-vine-200 bg-white px-2.5 py-1.5 text-xs font-medium text-vine-700 transition-colors hover:bg-vine-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
+              >
+                Kiválasztás…
+              </button>
             </div>
           </div>
+
+          {/* A dialógus portálon, az űrlapon kívül jelenik meg: a DOM-ban
+              belülre rendelt overlay érvénytelen beágyazott formot és véletlen
+              submitot adna. */}
+          {isTargetPickerOpen && (
+            <VineTargetPickerDialog
+              vines={targetVines}
+              tagSuggestions={tagSuggestions}
+              selectedVineIds={selectedTargetIds}
+              onCancel={() => setIsTargetPickerOpen(false)}
+              onConfirm={(vineIds) => {
+                setTargetVineIds(vineIds);
+                setTargetError(null);
+                setIsTargetPickerOpen(false);
+              }}
+            />
+          )}
         </>
       )}
 

@@ -98,7 +98,11 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
   await expect(form.getByRole('button', { name: 'Kép kiválasztása' })).toBeVisible();
   await expect(form.getByRole('button', { name: 'Fotózás' })).toHaveCount(0);
   await expect(form.getByText('Legfeljebb 6 fotó választható ki.')).toBeVisible();
-  await expect(form.getByRole('checkbox')).toHaveCount(2);
+  // A célválasztó dialógusban van, az űrlapon csak az összefoglaló sor és a
+  // nyitó gomb: a nyitott tőke előre ki van jelölve, dialógus nélkül mentődik.
+  await expect(form.getByRole('checkbox')).toHaveCount(0);
+  await expect(form.getByText('1 tőke kiválasztva')).toBeVisible();
+  await expect(form.getByText('#1', { exact: true })).toBeVisible();
   await expect(form.getByRole('button', { name: 'Esemény mentése (1)' })).toBeVisible();
   await expect(page).toHaveScreenshot('toke-esemeny-urlap-desktop.png', {
     fullPage: true,
@@ -116,8 +120,42 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
   });
 
   await page.setViewportSize({ width: 1280, height: 1100 });
-  await form.getByRole('checkbox', { name: '#1 - Kékfrankos' }).uncheck();
-  await form.getByRole('checkbox', { name: '#2 - Irsai Olivér' }).check();
+
+  // A célválasztó dialógus: a tőkelista szűrőivel, checkboxos kártyasorokkal.
+  await form.getByRole('button', { name: 'Kiválasztás…' }).click();
+  const targetPicker = page.getByRole('dialog', { name: 'Érintett tőkék kiválasztása' });
+  await expect(targetPicker).toHaveAttribute('aria-modal', 'true');
+  // A nyitva tartás alatt a háttéroldal nem görgethető.
+  await expect(page.locator('body')).toHaveCSS('overflow', 'hidden');
+  // A sorok a bélyeget töltik lustán, nem az 1280 px-es képet.
+  const pickerCover = targetPicker
+    .getByTestId('vine-target-row')
+    .filter({ hasText: '#1' })
+    .locator('img');
+  await expect(pickerCover).toHaveAttribute('src', SEED_PHOTO_THUMBNAIL_URL);
+  await expect(pickerCover).toHaveAttribute('loading', 'lazy');
+  await expect(page).toHaveScreenshot('toke-celvalaszto-desktop.png', {
+    fullPage: true,
+    animations: 'disabled',
+  });
+
+  // A dialógus szűrése nem szivárog ki: sem a lap szűrőpaneljébe, sem az URL-be.
+  await targetPicker.getByLabel('Keresés').fill('irsai');
+  await expect(targetPicker.getByTestId('vine-target-row')).toHaveCount(1);
+  await expect(page.locator('aside').getByLabel('Keresés')).toHaveValue('');
+  await expect(page).toHaveURL(/\/tokek\/vine-e2e-1$/);
+  await targetPicker.getByRole('button', { name: 'Alaphelyzet' }).click();
+  await expect(targetPicker.getByTestId('vine-target-row')).toHaveCount(2);
+
+  await targetPicker.getByRole('checkbox', { name: '#1 - Kékfrankos' }).uncheck();
+  await targetPicker.getByRole('checkbox', { name: '#2 - Irsai Olivér' }).check();
+  await expect(targetPicker.getByText('1 kiválasztva')).toBeVisible();
+  await targetPicker.getByRole('button', { name: 'Kész' }).click();
+  await expect(targetPicker).toHaveCount(0);
+  await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
+  await expect(form.getByText('1 tőke kiválasztva')).toBeVisible();
+  await expect(form.getByText('#2', { exact: true })).toBeVisible();
+
   const pixel = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlU9WQAAAAASUVORK5CYII=',
     'base64',

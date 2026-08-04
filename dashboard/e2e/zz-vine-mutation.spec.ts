@@ -117,9 +117,17 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
 
   await page.getByRole('button', { name: 'Új esemény' }).click();
   const addEventForm = page.getByRole('form', { name: 'Új tőkeesemény' });
-  const firstVineTarget = addEventForm.getByRole('checkbox', { name: '#1 - Kékfrankos' });
+  // A második célt a dialógusban jelöljük ki; a nyitott tőke már be van jelölve.
+  await expect(addEventForm.getByText('1 tőke kiválasztva')).toBeVisible();
+  await addEventForm.getByRole('button', { name: 'Kiválasztás…' }).click();
+  const targetPicker = page.getByRole('dialog', { name: 'Érintett tőkék kiválasztása' });
+  const firstVineTarget = targetPicker.getByRole('checkbox', { name: '#1 - Kékfrankos' });
   await firstVineTarget.check();
   await expect(firstVineTarget).toBeChecked();
+  await expect(targetPicker.getByText('2 kiválasztva')).toBeVisible();
+  await targetPicker.getByRole('button', { name: 'Kész' }).click();
+  await expect(targetPicker).toHaveCount(0);
+  await expect(addEventForm.getByText('2 tőke kiválasztva')).toBeVisible();
   await addEventForm.locator('[name="type"]').selectOption('pruning');
   await addEventForm.locator('[name="title"]').fill('Közös metszés');
   await addEventForm.locator('[name="notes"]').fill('Két külön eseménypéldány.');
@@ -295,9 +303,23 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await page.getByRole('button', { name: /#3 Ismeretlen/ }).click();
   await page.getByRole('button', { name: 'Új esemény' }).click();
   const ceasedEventForm = page.getByRole('form', { name: 'Új tőkeesemény' });
-  await expect(ceasedEventForm.getByText('#3 - Ismeretlen')).toBeVisible();
-  await expect(ceasedEventForm.getByText('#2 - Irsai Olivér')).toBeVisible();
-  await expect(ceasedEventForm.getByText('#1 - Kékfrankos')).toBeVisible();
+  // A megszűnt tőke előre ki van jelölve, pedig a dialógus alapszűrője `Aktív`.
+  await expect(ceasedEventForm.getByText('1 tőke kiválasztva')).toBeVisible();
+  await ceasedEventForm.getByRole('button', { name: 'Kiválasztás…' }).click();
+  const ceasedPicker = page.getByRole('dialog', { name: 'Érintett tőkék kiválasztása' });
+  // A lap `Mind` állapotszűrője nem szivárog be: a dialógus alaphelyzetből indul.
+  await expect(ceasedPicker.getByLabel('Állapot')).toHaveValue('active');
+  await expect(ceasedPicker.getByRole('checkbox', { name: '#3 - Ismeretlen' })).toHaveCount(0);
+  await ceasedPicker.getByRole('checkbox', { name: 'Csak a kiválasztottak' }).check();
+  await expect(ceasedPicker.getByTestId('vine-target-row')).toHaveCount(1);
+  await expect(ceasedPicker.getByRole('checkbox', { name: '#3 - Ismeretlen' })).toBeChecked();
+  await ceasedPicker.getByRole('checkbox', { name: 'Csak a kiválasztottak' }).uncheck();
+  // Megszűnt tőke is választható célnak, ha az állapotszűrő engedi.
+  await ceasedPicker.getByLabel('Állapot').selectOption('all');
+  await expect(ceasedPicker.getByTestId('vine-target-row')).toHaveCount(4);
+  await ceasedPicker.getByRole('button', { name: 'Mégse' }).click();
+  await expect(ceasedPicker).toHaveCount(0);
+  await expect(ceasedEventForm.getByText('1 tőke kiválasztva')).toBeVisible();
   await ceasedEventForm.locator('[name="title"]').fill('Utólagos állapotfelmérés');
   await ceasedEventForm.getByRole('button', { name: 'Esemény mentése (1)' }).click();
   await expect(page.getByText('Utólagos állapotfelmérés')).toBeVisible();

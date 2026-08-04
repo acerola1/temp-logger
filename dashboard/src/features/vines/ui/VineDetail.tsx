@@ -164,10 +164,6 @@ export function VineDetail({
     () => (selectedVine ? resolveVineCoverPhoto(selectedVine) : null),
     [selectedVine],
   );
-  const eventTargetVines = useMemo(
-    () => vines.filter((vine) => vine.status === 'active' || vine.id === selectedVine?.id),
-    [selectedVine?.id, vines],
-  );
   // A megnyitott esemény fotói a közös néző formájában. Az eseményt id alapján
   // keressük, hogy egy időközbeni adatfrissítés se ragadjon be a nézőbe.
   const lightboxEvent = useMemo(
@@ -442,7 +438,11 @@ export function VineDetail({
                   <VineEventForm
                     mode="add"
                     defaultValues={defaultEventValues()}
-                    targetVines={eventTargetVines}
+                    // A jelölteket nem szűrjük elő: a célválasztó a teljes
+                    // listát kapja, a szűkítés a dialógus állapotszűrőjén van
+                    // (alapból `Aktív`). Így megszűnt tőke is választható, ha kell.
+                    targetVines={vines}
+                    tagSuggestions={knownTags}
                     initialTargetVineId={selectedVine.id}
                     isPending={isPending}
                     uploadProgress={photoEventId === null ? uploadProgress : null}
