@@ -18,6 +18,15 @@ export type VinePlantingDate =
 // A tőkeeseményfotó ugyanaz a közös fotó-metaadat, mint a dugványfotó.
 export type VineEventPhoto = Photo;
 
+/**
+ * A kijelölt borítókép mutatója. A tőke gyökerén él, nem a fotórekordban: így az
+ * áthelyezés egyetlen mezőt ír, és nem állhat elő két elsődleges kép.
+ */
+export interface VineCoverPhotoRef {
+  eventId: string;
+  photoId: string;
+}
+
 export interface VineEvent {
   id: string;
   type: VineEventType;
@@ -42,6 +51,8 @@ export interface Vine {
   tags: string[];
   notes: string;
   sourceCuttingId: string | null;
+  /** `null` esetén a borító automatikus: a legutóljára fényképezett kép. */
+  coverPhoto: VineCoverPhotoRef | null;
   events: VineEvent[];
   createdAt: IsoDateTimeString;
   updatedAt: IsoDateTimeString;
@@ -105,6 +116,12 @@ export interface EditVineEventPhotoCaptionInput {
   eventId: string;
   photoId: string;
   caption: string;
+}
+
+export interface SetVineCoverPhotoInput {
+  vineId: string;
+  /** `null` a kijelölés visszavonása, azaz visszatérés az automatikus borítóra. */
+  coverPhoto: VineCoverPhotoRef | null;
 }
 
 export const MAX_VINE_EVENT_TARGETS = 400;

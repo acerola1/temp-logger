@@ -25,6 +25,7 @@ function vine(
     tags: [],
     notes: '',
     sourceCuttingId: null,
+    coverPhoto: null,
     events: [],
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: `2026-01-${String(serialNumber).padStart(2, '0')}T00:00:00.000Z`,

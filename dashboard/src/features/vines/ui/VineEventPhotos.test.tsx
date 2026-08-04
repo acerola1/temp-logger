@@ -40,38 +40,47 @@ function renderPhotos({
   photos = [photo(1)],
   isAdmin = true,
   isPending = false,
+  coverPhotoId = null,
+  isCoverPinned = false,
   handlers = {},
 }: {
   photos?: VineEventPhoto[];
   isAdmin?: boolean;
   isPending?: boolean;
+  coverPhotoId?: string | null;
+  isCoverPinned?: boolean;
   handlers?: {
     onAddPhotos?: (files: File[]) => Promise<void>;
     onDeletePhoto?: (photoId: string) => Promise<void>;
     onEditCaption?: (photoId: string, caption: string) => Promise<void>;
     onOpenPhoto?: (index: number) => void;
+    onSetCoverPhoto?: (photoId: string | null) => Promise<void>;
   };
 } = {}) {
   const onAddPhotos = vi.fn(handlers.onAddPhotos ?? (() => Promise.resolve()));
   const onDeletePhoto = vi.fn(handlers.onDeletePhoto ?? (() => Promise.resolve()));
   const onEditCaption = vi.fn(handlers.onEditCaption ?? (() => Promise.resolve()));
   const onOpenPhoto = vi.fn(handlers.onOpenPhoto ?? (() => undefined));
+  const onSetCoverPhoto = vi.fn(handlers.onSetCoverPhoto ?? (() => Promise.resolve()));
 
   render(
     <VineEventPhotos
       event={event(photos)}
       isAdmin={isAdmin}
       isPending={isPending}
+      coverPhotoId={coverPhotoId}
+      isCoverPinned={isCoverPinned}
       uploadProgress={null}
       errorMessage={null}
       onOpenPhoto={onOpenPhoto}
       onAddPhotos={onAddPhotos}
       onDeletePhoto={onDeletePhoto}
       onEditCaption={onEditCaption}
+      onSetCoverPhoto={onSetCoverPhoto}
     />,
   );
 
-  return { onAddPhotos, onDeletePhoto, onEditCaption, onOpenPhoto };
+  return { onAddPhotos, onDeletePhoto, onEditCaption, onOpenPhoto, onSetCoverPhoto };
 }
 
 function fileInput(): HTMLInputElement {
@@ -100,6 +109,7 @@ describe('VineEventPhotos nem admin módban', () => {
     expect(screen.queryByRole('button', { name: /Fotó hozzáadása|Kép kiválasztása/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /fotó törlése/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /képaláírásának szerkesztése/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /borítóképnek/ })).toBeNull();
   });
 
   it('fotó nélküli eseményhez semmit nem rajzol', () => {
@@ -171,6 +181,70 @@ describe('VineEventPhotos fotótörlés', () => {
     await user.click(screen.getByRole('button', { name: 'Első fürtök 1. fotó törlése' }));
 
     expect(onDeletePhoto).not.toHaveBeenCalled();
+  });
+});
+
+describe('VineEventPhotos borítókép', () => {
+  it('a kijelöletlen fotót borítóképnek jelöli', async () => {
+    const user = userEvent.setup();
+    const { onSetCoverPhoto } = renderPhotos({ photos: [photo(1), photo(2)] });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Első fürtök 2. fotó kijelölése borítóképnek' }),
+    );
+
+    expect(onSetCoverPhoto).toHaveBeenCalledWith('photo-2');
+  });
+
+  it('a kijelölt borítón a gomb lenyomott, és a kattintás visszavonja a kijelölést', async () => {
+    const user = userEvent.setup();
+    const { onSetCoverPhoto } = renderPhotos({
+      photos: [photo(1), photo(2)],
+      coverPhotoId: 'photo-2',
+      isCoverPinned: true,
+    });
+    const coverButton = screen.getByRole('button', {
+      name: 'Első fürtök 2. fotó borítóképkijelölésének visszavonása',
+    });
+
+    expect(coverButton.getAttribute('aria-pressed')).toBe('true');
+
+    await user.click(coverButton);
+
+    expect(onSetCoverPhoto).toHaveBeenCalledWith(null);
+  });
+
+  it('másik fotó kijelölése az előzőt külön visszavonás nélkül váltja fel', async () => {
+    const user = userEvent.setup();
+    const { onSetCoverPhoto } = renderPhotos({
+      photos: [photo(1), photo(2)],
+      coverPhotoId: 'photo-1',
+      isCoverPinned: true,
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Első fürtök 2. fotó kijelölése borítóképnek' }),
+    );
+
+    expect(onSetCoverPhoto).toHaveBeenCalledTimes(1);
+    expect(onSetCoverPhoto).toHaveBeenCalledWith('photo-2');
+  });
+
+  it('az automatikus borítót megjelöli, de a gombja kijelölésre hív', async () => {
+    const user = userEvent.setup();
+    const { onSetCoverPhoto } = renderPhotos({
+      photos: [photo(1), photo(2)],
+      coverPhotoId: 'photo-2',
+      isCoverPinned: false,
+    });
+
+    expect(screen.getByText('Automatikus borító')).toBeDefined();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Első fürtök 2. fotó kijelölése borítóképnek' }),
+    );
+
+    expect(onSetCoverPhoto).toHaveBeenCalledWith('photo-2');
   });
 });
 

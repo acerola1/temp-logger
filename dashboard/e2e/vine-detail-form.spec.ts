@@ -8,7 +8,8 @@ test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és
   await expect(page.getByTestId('vine-detail').getByRole('heading', { name: 'Kékfrankos' })).toBeVisible();
   await expect(page.getByText('Déli kerítés mellett')).toBeVisible();
   await expect(page.getByText('Déli fekvésű, rendszeresen termő tőke.')).toBeVisible();
-  await expect(page.getByText('Első fürtök')).toBeVisible();
+  // Az esemény címe a borítókép feliratában is szerepel, ezért a címsorra szűkítünk.
+  await expect(page.getByRole('heading', { name: 'Első fürtök' })).toBeVisible();
   await expect(page.getByText('Egészséges lomb és két fürt.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Első fürtök 1. fotó megnyitása' })).toBeVisible();
   await expect(page.getByText('#1 - Kékfrankos')).toBeVisible();
@@ -17,6 +18,7 @@ test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és
   await expect(page.getByRole('button', { name: 'Új esemény' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Szerkesztés' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Törlés' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /borítóképnek/ })).toHaveCount(0);
 
   // A közös képnéző: eseményen belüli lapozás, számláló, nem körkörös szélek.
   await page.getByRole('button', { name: 'Első fürtök 1. fotó megnyitása' }).click();
@@ -31,6 +33,25 @@ test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és
   await expect(photoViewer.getByText(/Kép 1\/2/)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(photoViewer).toHaveCount(0);
+
+  // A borítókép kijelölés nélkül a legutóljára fényképezett kép. A seed két
+  // fotója közül a `capturedAt` nélküli feltöltése a frissebb, ezért az a
+  // borító — a feliratban a `Feltöltve` ezt ki is mondja.
+  const coverPhoto = page.getByRole('button', { name: 'Borítókép megnyitása' });
+  await expect(coverPhoto).toBeVisible();
+  await expect(
+    page.getByText(/^Automatikus borítókép • Első fürtök • Feltöltve:/),
+  ).toBeVisible();
+  await coverPhoto.click();
+  const coverViewer = page.getByRole('dialog', { name: 'Eseményfotó' });
+  await expect(coverViewer.getByText(/Kép 2\/2/)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(coverViewer).toHaveCount(0);
+
+  // A lista kártyáján ugyanaz a kép jelenik meg bélyegként.
+  await expect(
+    page.getByTestId('vine-card').filter({ hasText: '#1' }).locator('img'),
+  ).toBeVisible();
 
   await page.getByRole('button', { name: '#1 - Kékfrankos' }).click();
   await expect(page).toHaveURL(/\/dugvanyok\/cutting-e2e-1$/);

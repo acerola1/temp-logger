@@ -162,6 +162,20 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   });
   await page.setViewportSize({ width: 375, height: 812 });
   await createdEvent.scrollIntoViewIfNeeded();
+  // A fotónkénti gombsor (borító, aláírás, törlés) 375 px-en sem lóghat ki a
+  // fotókártyából.
+  const buttonOverflow = await eventPhotos
+    .getByRole('listitem')
+    .first()
+    .evaluate((row) => {
+      const rowRight = row.getBoundingClientRect().right;
+      return Math.max(
+        ...[...row.querySelectorAll('button')].map(
+          (button) => button.getBoundingClientRect().right - rowRight,
+        ),
+      );
+    });
+  expect(buttonOverflow).toBeLessThanOrEqual(0);
   await expect(page).toHaveScreenshot('toke-esemeny-fotosor-mobile.png', {
     fullPage: true,
     animations: 'disabled',
@@ -182,16 +196,83 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   // A felirat a megmaradt fotón marad, a törlés nem tolta el a rekordokat.
   await expect(createdEvent.getByText('Utólag pótolt kép', { exact: true })).toBeVisible();
 
+  // Borítókép: kijelölés nélkül automatikus, kijelölés után új fotó sem veszi át.
+  await expect(vineDetail.getByRole('button', { name: 'Borítókép megnyitása' })).toBeVisible();
+  await expect(vineDetail.getByText(/^Automatikus borítókép • Közös metszés/)).toBeVisible();
+  await expect(
+    page.getByTestId('vine-card').filter({ hasText: '#4' }).locator('img'),
+  ).toBeVisible();
+
+  await createdEvent
+    .getByRole('button', { name: 'Közös metszés 1. fotó kijelölése borítóképnek' })
+    .click();
+  const pinnedCoverButton = createdEvent.getByRole('button', {
+    name: 'Közös metszés 1. fotó borítóképkijelölésének visszavonása',
+  });
+  await expect(pinnedCoverButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(vineDetail.getByText(/^Kijelölt borítókép • Közös metszés/)).toBeVisible();
+
+  await createdEvent.locator('input[type="file"]').setInputFiles([
+    { name: 'metszes-5.png', mimeType: 'image/png', buffer: pixel },
+  ]);
+  await expect(createdEvent.getByText('Fotók 4/12')).toBeVisible();
+  await expect(pinnedCoverButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(vineDetail.getByText(/^Kijelölt borítókép • Közös metszés/)).toBeVisible();
+
+  await stabilizeVineTimestamps(createdVineId, vineDetail);
+  await expect(page).toHaveScreenshot('toke-boritokep-desktop.png', {
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  // A mobil részletmodal a desktop görgetési pozíciójával nyílik, ezért a
+  // borítót vissza kell húzni a képbe.
+  await vineDetail.getByRole('button', { name: 'Borítókép megnyitása' }).scrollIntoViewIfNeeded();
+  await expect(page).toHaveScreenshot('toke-boritokep-mobile.png', {
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  // Másik kép kijelölése felváltja az előzőt, külön visszavonás nélkül.
+  await createdEvent
+    .getByRole('button', { name: 'Közös metszés 2. fotó kijelölése borítóképnek' })
+    .click();
+  const secondCoverButton = createdEvent.getByRole('button', {
+    name: 'Közös metszés 2. fotó borítóképkijelölésének visszavonása',
+  });
+  await expect(secondCoverButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(pinnedCoverButton).toHaveCount(0);
+  await expect(vineDetail.getByText(/^Kijelölt borítókép • Közös metszés/)).toBeVisible();
+
+  // A kijelölés visszavonása után újra a legfrissebb fotó a borító.
+  await secondCoverButton.click();
+  await expect(vineDetail.getByText(/^Automatikus borítókép • Közös metszés/)).toBeVisible();
+  await expect(
+    createdEvent.getByRole('button', { name: 'Közös metszés 2. fotó kijelölése borítóképnek' }),
+  ).toBeVisible();
+
+  // A borító törlése után a mutató nem ragad be: a tőke marad automatikus borítón.
+  await createdEvent
+    .getByRole('button', { name: 'Közös metszés 2. fotó kijelölése borítóképnek' })
+    .click();
+  await expect(vineDetail.getByText(/^Kijelölt borítókép • Közös metszés/)).toBeVisible();
+  page.once('dialog', (dialog) => void dialog.accept());
+  await createdEvent.getByRole('button', { name: 'Közös metszés 2. fotó törlése' }).click();
+  await expect(eventPhotos.getByRole('listitem')).toHaveCount(3);
+  await expect(vineDetail.getByText(/^Automatikus borítókép • Közös metszés/)).toBeVisible();
+
   await page.getByRole('button', { name: /#1 Kékfrankos/ }).click();
   const copiedEvent = page.getByTestId('vine-event').filter({ hasText: 'Közös metszés' });
   await copiedEvent.getByRole('button', { name: 'Szerkesztés', exact: true }).click();
   const editEventForm = page.getByRole('form', { name: 'Tőkeesemény szerkesztése' });
   await editEventForm.locator('[name="title"]').fill('Csak az első tőkén szerkesztve');
   await editEventForm.getByRole('button', { name: 'Mentés' }).click();
-  await expect(page.getByText('Csak az első tőkén szerkesztve')).toBeVisible();
+  // A cím a borítókép feliratában is megjelenik, ezért itt is a címsor a horgony.
+  await expect(page.getByRole('heading', { name: 'Csak az első tőkén szerkesztve' })).toBeVisible();
 
   await page.getByRole('button', { name: /#4 Cabernet Franc/ }).click();
-  await expect(page.getByText('Közös metszés')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Közös metszés' })).toBeVisible();
   await expect(page.getByText('Csak az első tőkén szerkesztve')).toHaveCount(0);
 
   await page.getByRole('button', { name: /#1 Kékfrankos/ }).click();

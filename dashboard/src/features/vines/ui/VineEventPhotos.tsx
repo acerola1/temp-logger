@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Images, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Images, Loader2, Pencil, Star, Trash2 } from 'lucide-react';
 // A `photos` almoduljait közvetlenül importáljuk, nem az indexen át: a
 // fotósor így nem húzza be a feltöltő hook Firebase-szingletonját.
 import { photoDateText } from '../../photos/photoMetadata';
@@ -13,11 +13,19 @@ const SMALL_BUTTON_CLASS =
   'inline-flex items-center gap-1 rounded-lg border border-vine-200 bg-white px-2 py-1 text-[11px] font-medium text-vine-700 transition-colors hover:bg-vine-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800';
 const DELETE_BUTTON_CLASS =
   'inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2 py-1 text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-red-900 dark:bg-vine-900 dark:text-red-300 dark:hover:bg-red-950/30';
+// A kijelölt borító gombja lenyomott állapotot mutat, hogy a kijelölés a
+// szövegen kívül is látszódjon.
+const COVER_BUTTON_CLASS =
+  'inline-flex items-center gap-1 rounded-lg border border-vine-500 bg-vine-600 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-vine-700 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-400 dark:bg-vine-600 dark:hover:bg-vine-500';
 
 interface VineEventPhotosProps {
   event: VineEvent;
   isAdmin: boolean;
   isPending: boolean;
+  /** Az esemény azon fotójának azonosítója, ami éppen a tőke borítója. */
+  coverPhotoId: string | null;
+  /** `true`, ha a borítót admin jelölte ki, nem a legfrissebb fotóból adódik. */
+  isCoverPinned: boolean;
   // Csak akkor kap értéket, ha éppen ehhez az eseményhez tölt fel a felhasználó.
   uploadProgress: number | null;
   // Ugyanígy: az adatréteg hibája csak az érintett eseménynél jelenik meg.
@@ -26,6 +34,8 @@ interface VineEventPhotosProps {
   onAddPhotos: (files: File[]) => Promise<void>;
   onDeletePhoto: (photoId: string) => Promise<void>;
   onEditCaption: (photoId: string, caption: string) => Promise<void>;
+  /** `null` a kijelölés visszavonása, azaz visszatérés az automatikus borítóra. */
+  onSetCoverPhoto: (photoId: string | null) => Promise<void>;
 }
 
 // Az egy fotós esemény bélyegének nincs sorszáma, a többfotósnak van: a
@@ -68,15 +78,19 @@ export function VineEventPhotos({
   event,
   isAdmin,
   isPending,
+  coverPhotoId,
+  isCoverPinned,
   uploadProgress,
   errorMessage,
   onOpenPhoto,
   onAddPhotos,
   onDeletePhoto,
   onEditCaption,
+  onSetCoverPhoto,
 }: VineEventPhotosProps) {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const [coveringPhotoId, setCoveringPhotoId] = useState<string | null>(null);
   const [captionPhotoId, setCaptionPhotoId] = useState<string | null>(null);
   const [captionDraft, setCaptionDraft] = useState('');
   const [isSavingCaption, setIsSavingCaption] = useState(false);
@@ -107,6 +121,22 @@ export function VineEventPhotos({
       console.error('Vine event photo delete error:', error);
     } finally {
       setDeletingPhotoId(null);
+    }
+  };
+
+  // A lenyomott gomb visszavonja a kijelölést, a többi kép gombja átveszi a
+  // borítót — külön visszavonás nélkül.
+  const setCoverPhoto = async (photoId: string, isPinnedCover: boolean) => {
+    if (coveringPhotoId) return;
+
+    setPhotoError(null);
+    setCoveringPhotoId(photoId);
+    try {
+      await onSetCoverPhoto(isPinnedCover ? null : photoId);
+    } catch (error) {
+      console.error('Vine cover photo error:', error);
+    } finally {
+      setCoveringPhotoId(null);
     }
   };
 
@@ -172,6 +202,8 @@ export function VineEventPhotos({
         <ul aria-label={`${event.title} fotói`} className="space-y-2">
           {photos.map((photo, photoIndex) => {
             const isEditingCaption = captionPhotoId === photo.id;
+            const isCover = coverPhotoId === photo.id;
+            const isPinnedCover = isCover && isCoverPinned;
 
             return (
               <li
@@ -228,10 +260,39 @@ export function VineEventPhotos({
                     </p>
                   )}
 
+                  {isCover && !isCoverPinned && (
+                    <p className="text-[11px] font-medium text-vine-600 dark:text-vine-300">
+                      Automatikus borító
+                    </p>
+                  )}
+
                   <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-vine-500 dark:text-vine-300">
                     <span>{photoDateText(photo)}</span>
                     {!isEditingCaption && (
-                      <div className="flex items-center gap-1.5">
+                      // Három gomb már nem fér ki 375 px-en egy sorba: a csoport
+                      // maga is tördel, különben kilóg a kártyából.
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => void setCoverPhoto(photo.id, isPinnedCover)}
+                          disabled={isPending || coveringPhotoId === photo.id}
+                          aria-pressed={isPinnedCover}
+                          aria-label={
+                            isPinnedCover
+                              ? `${event.title} ${photoIndex + 1}. fotó borítóképkijelölésének visszavonása`
+                              : `${event.title} ${photoIndex + 1}. fotó kijelölése borítóképnek`
+                          }
+                          className={isPinnedCover ? COVER_BUTTON_CLASS : SMALL_BUTTON_CLASS}
+                        >
+                          {coveringPhotoId === photo.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Star
+                              className={`h-3 w-3 ${isPinnedCover ? 'fill-current' : ''}`}
+                            />
+                          )}
+                          Borító
+                        </button>
                         <button
                           type="button"
                           onClick={() => openCaptionEditor(photo)}

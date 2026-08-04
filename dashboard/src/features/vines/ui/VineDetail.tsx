@@ -1,9 +1,15 @@
 import { useMemo, useState } from 'react';
 import { CalendarDays, Loader2, ExternalLink, X } from 'lucide-react';
 import { formatDate, formatDateTime, toDateTimeLocalValue } from '../../../lib/dateFormat';
-import { PhotoLightbox, photoLightboxCaption, type PhotoLightboxImage } from '../../photos';
+import {
+  PhotoLightbox,
+  photoDateText,
+  photoLightboxCaption,
+  type PhotoLightboxImage,
+} from '../../photos';
 import type { VineEventFormValues, VineFormValues } from '../forms';
 import type { Vine, VineEvent, VinePlantingDate } from '../model';
+import { resolveVineCoverPhoto } from '../vineCoverPhoto';
 import { VineEventForm } from './VineEventForm';
 import { VineEventPhotos } from './VineEventPhotos';
 import { VineForm, type VineCuttingOption } from './VineForm';
@@ -37,6 +43,7 @@ interface VineDetailProps {
   onAddEventPhotos: (eventId: string, photos: File[]) => Promise<void>;
   onDeleteEventPhoto: (eventId: string, photoId: string) => Promise<void>;
   onEditEventPhotoCaption: (eventId: string, photoId: string, caption: string) => Promise<void>;
+  onSetCoverPhoto: (eventId: string, photoId: string | null) => Promise<void>;
   onClearMutationError: () => void;
   onOpenCutting: (cuttingId: string) => void;
 }
@@ -106,6 +113,7 @@ export function VineDetail({
   onAddEventPhotos,
   onDeleteEventPhoto,
   onEditEventPhotoCaption,
+  onSetCoverPhoto,
   onClearMutationError,
   onOpenCutting,
 }: VineDetailProps) {
@@ -147,6 +155,12 @@ export function VineDetail({
           (left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime(),
         )
       : [],
+    [selectedVine],
+  );
+  // A borító ugyanabból a feloldásból jön, mint a lista bélyege: kijelölt kép,
+  // vagy — kijelölés nélkül — a legutóljára fényképezett.
+  const coverPhoto = useMemo(
+    () => (selectedVine ? resolveVineCoverPhoto(selectedVine) : null),
     [selectedVine],
   );
   const eventTargetVines = useMemo(
@@ -254,6 +268,42 @@ export function VineDetail({
                   {statusLabel(selectedVine.status)}
                 </span>
               </div>
+
+              {coverPhoto && (
+                <figure className="space-y-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLightbox({
+                        eventId: coverPhoto.event.id,
+                        index: coverPhoto.event.photos.findIndex(
+                          (photo) => photo.id === coverPhoto.photo.id,
+                        ),
+                      })
+                    }
+                    aria-label="Borítókép megnyitása"
+                    className="block w-full overflow-hidden rounded-2xl border border-vine-200 bg-vine-100 dark:border-vine-700 dark:bg-vine-800"
+                  >
+                    {/* Kötött magasságú, vágás nélküli keret: a telefonnal álló
+                        helyzetben fotózott tőke is egészben látszik, a fekvő kép
+                        nem lóg ki, és a borító mobilon sem tolja el az adatokat. */}
+                    <img
+                      src={coverPhoto.photo.downloadUrl}
+                      alt=""
+                      className="h-48 w-full object-contain sm:h-56"
+                    />
+                  </button>
+                  <figcaption className="text-[11px] text-vine-500 dark:text-vine-300">
+                    {[
+                      coverPhoto.isPinned ? 'Kijelölt borítókép' : 'Automatikus borítókép',
+                      coverPhoto.event.title,
+                      photoDateText(coverPhoto.photo),
+                    ]
+                      .filter(Boolean)
+                      .join(' • ')}
+                  </figcaption>
+                </figure>
+              )}
 
               <dl className="grid gap-4 rounded-2xl bg-vine-50 px-4 py-4 sm:grid-cols-2 dark:bg-vine-800/50">
                 <MetaRow label="Telepítési idő">{formatPlantingDate(selectedVine.plantingDate)}</MetaRow>
@@ -444,6 +494,10 @@ export function VineDetail({
                                 event={event}
                                 isAdmin={isAdmin}
                                 isPending={isPending}
+                                coverPhotoId={
+                                  coverPhoto?.event.id === event.id ? coverPhoto.photo.id : null
+                                }
+                                isCoverPinned={coverPhoto?.isPinned ?? false}
                                 uploadProgress={photoEventId === event.id ? uploadProgress : null}
                                 errorMessage={photoEventId === event.id ? mutationError : null}
                                 onOpenPhoto={(photoIndex) => setLightbox({ eventId: event.id, index: photoIndex })}
@@ -456,6 +510,11 @@ export function VineDetail({
                                 onEditCaption={(photoId, caption) =>
                                   runPhotoMutation(event.id, () =>
                                     onEditEventPhotoCaption(event.id, photoId, caption),
+                                  )
+                                }
+                                onSetCoverPhoto={(photoId) =>
+                                  runPhotoMutation(event.id, () =>
+                                    onSetCoverPhoto(event.id, photoId),
                                   )
                                 }
                               />

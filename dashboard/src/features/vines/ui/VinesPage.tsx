@@ -213,6 +213,14 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
     await catalog.editEventPhotoCaption({ vineId: selectedVine.id, eventId, photoId, caption });
   };
 
+  const handleSetCoverPhoto = async (eventId: string, photoId: string | null) => {
+    if (!selectedVine) return;
+    await catalog.setCoverPhoto({
+      vineId: selectedVine.id,
+      coverPhoto: photoId ? { eventId, photoId } : null,
+    });
+  };
+
   const handleOpenCutting = (cuttingId: string) => {
     window.history.pushState({}, '', `/dugvanyok/${encodeURIComponent(cuttingId)}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
@@ -364,6 +372,7 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
           onAddEventPhotos={handleAddEventPhotos}
           onDeleteEventPhoto={handleDeleteEventPhoto}
           onEditEventPhotoCaption={handleEditEventPhotoCaption}
+          onSetCoverPhoto={handleSetCoverPhoto}
           onClearMutationError={catalog.clearMutationError}
           onOpenCutting={handleOpenCutting}
         />

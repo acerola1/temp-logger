@@ -26,6 +26,7 @@ import {
   editEvent,
   editEventPhotoCaption,
   editVine,
+  setCoverPhoto,
   subscribeToVines,
 } from './firestoreVines';
 
@@ -192,6 +193,9 @@ describe('Firestore vine catalog', () => {
         tags: ['csemege'],
         notes: 'Erős növekedés',
         sourceCuttingId: 'missing-cutting',
+        // A dokumentum a `coverPhoto` mező előtti alakban van seedelve: a
+        // hiányzó mutató automatikus borítót jelent.
+        coverPhoto: null,
         events: [
           {
             id: 'event-1',
@@ -942,5 +946,150 @@ describe('Firestore vine catalog', () => {
         photos: [invalidFile],
       }),
     ).rejects.toThrow(`${MAX_VINE_EVENT_PHOTOS}`);
+  });
+
+  it('borítóképet jelöl ki, majd a kijelölést vissza is vonja', async () => {
+    const { vine, event } = await seedVineWithEvent(
+      'vine-cover-pin',
+      46,
+      'Borítóválasztás',
+      [testPhoto('elso.png', [7, 7, 7]), testPhoto('masodik.png', [8, 8, 8])],
+    );
+    const pinnedPhoto = event.photos[0];
+
+    await setCoverPhoto(adminClientDb, {
+      vineId: vine.id,
+      coverPhoto: { eventId: event.id, photoId: pinnedPhoto?.id ?? '' },
+    });
+
+    const pinned = await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((candidate) => candidate.id === vine.id)?.coverPhoto !== null,
+    );
+    const pinnedVine = pinned.find((candidate) => candidate.id === vine.id);
+    expect(pinnedVine?.coverPhoto).toEqual({ eventId: event.id, photoId: pinnedPhoto?.id });
+    expect(pinnedVine?.updatedAt).not.toBe(vine.updatedAt);
+    // A kijelölés a fotók adatait nem írja át.
+    expect(pinnedVine?.events[0]?.photos.map((photo) => photo.id)).toEqual(
+      event.photos.map((photo) => photo.id),
+    );
+    expect(pinnedVine?.events[0]?.updatedAt).toBe(event.updatedAt);
+
+    await setCoverPhoto(adminClientDb, { vineId: vine.id, coverPhoto: null });
+
+    const cleared = await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((candidate) => candidate.id === vine.id)?.coverPhoto === null,
+    );
+    expect(cleared.find((candidate) => candidate.id === vine.id)?.coverPhoto).toBeNull();
+  });
+
+  it('nem létező eseményre és fotóra nem ír borítómutatót', async () => {
+    const { vine, event } = await seedVineWithEvent(
+      'vine-cover-missing',
+      47,
+      'Hibás borító',
+      [testPhoto('egyetlen.png', [9, 9, 9])],
+    );
+
+    await expect(
+      setCoverPhoto(adminClientDb, {
+        vineId: vine.id,
+        coverPhoto: { eventId: 'nincs-ilyen-esemeny', photoId: event.photos[0]?.id ?? '' },
+      }),
+    ).rejects.toThrow('Az esemény nem található.');
+    await expect(
+      setCoverPhoto(adminClientDb, {
+        vineId: vine.id,
+        coverPhoto: { eventId: event.id, photoId: 'nincs-ilyen-foto' },
+      }),
+    ).rejects.toThrow('A fotó nem található.');
+
+    const snapshot = await adminDb.collection('vines').doc(vine.id).get();
+    expect(snapshot.data()?.coverPhoto ?? null).toBeNull();
+  });
+
+  it('a kijelölt borító törlésekor a mutató is eltűnik, a többi fotó törlésekor megmarad', async () => {
+    const { vine, event } = await seedVineWithEvent(
+      'vine-cover-delete-photo',
+      48,
+      'Borító törlése',
+      [testPhoto('borito.png', [10, 10, 10]), testPhoto('masik.png', [11, 11, 11])],
+    );
+    const coverPhotoId = event.photos[0]?.id ?? '';
+    const otherPhotoId = event.photos[1]?.id ?? '';
+
+    await setCoverPhoto(adminClientDb, {
+      vineId: vine.id,
+      coverPhoto: { eventId: event.id, photoId: coverPhotoId },
+    });
+    await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((candidate) => candidate.id === vine.id)?.coverPhoto?.photoId ===
+        coverPhotoId,
+    );
+
+    // A másik fotó törlése nem nyúl a mutatóhoz.
+    await deleteEventPhoto(adminClientDb, adminClientStorage, {
+      vineId: vine.id,
+      eventId: event.id,
+      photoId: otherPhotoId,
+    });
+    const afterOtherDelete = await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((candidate) => candidate.id === vine.id)?.events[0]?.photos.length === 1,
+    );
+    expect(
+      afterOtherDelete.find((candidate) => candidate.id === vine.id)?.coverPhoto?.photoId,
+    ).toBe(coverPhotoId);
+
+    await deleteEventPhoto(adminClientDb, adminClientStorage, {
+      vineId: vine.id,
+      eventId: event.id,
+      photoId: coverPhotoId,
+    });
+    const afterCoverDelete = await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((candidate) => candidate.id === vine.id)?.events[0]?.photos.length === 0,
+    );
+    expect(
+      afterCoverDelete.find((candidate) => candidate.id === vine.id)?.coverPhoto,
+    ).toBeNull();
+  });
+
+  it('a kijelölt borítót tartalmazó esemény törlésekor a mutató is eltűnik', async () => {
+    const { vine, event } = await seedVineWithEvent(
+      'vine-cover-delete-event',
+      49,
+      'Borító eseménnyel',
+      [testPhoto('esemenyfoto.png', [12, 12, 12])],
+    );
+
+    await setCoverPhoto(adminClientDb, {
+      vineId: vine.id,
+      coverPhoto: { eventId: event.id, photoId: event.photos[0]?.id ?? '' },
+    });
+    await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((candidate) => candidate.id === vine.id)?.coverPhoto !== null,
+    );
+
+    await deleteEvent(adminClientDb, adminClientStorage, {
+      vineId: vine.id,
+      eventId: event.id,
+    });
+
+    const afterDelete = await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((candidate) => candidate.id === vine.id)?.events.length === 0,
+    );
+    expect(afterDelete.find((candidate) => candidate.id === vine.id)?.coverPhoto).toBeNull();
   });
 });

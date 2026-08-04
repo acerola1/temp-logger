@@ -26,7 +26,9 @@ import type {
   EditVineInput,
   EditVineEventInput,
   EditVineEventPhotoCaptionInput,
+  SetVineCoverPhotoInput,
   Vine,
+  VineCoverPhotoRef,
   VineEvent,
   VineEventPhoto,
   VineEventType,
@@ -102,6 +104,17 @@ function mapEvent(value: DocumentData): VineEvent {
   };
 }
 
+// A borítómutató csak a 15-es issue óta létezik, és el is avulhat: hiányzó vagy
+// hibás alak esetén `null`, azaz automatikus borító.
+function mapCoverPhoto(value: unknown): VineCoverPhotoRef | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const { eventId, photoId } = value as Record<string, unknown>;
+  return typeof eventId === 'string' && eventId && typeof photoId === 'string' && photoId
+    ? { eventId, photoId }
+    : null;
+}
+
 function mapVine(snapshot: QueryDocumentSnapshot<DocumentData>): Vine {
   const value = snapshot.data();
 
@@ -123,6 +136,7 @@ function mapVine(snapshot: QueryDocumentSnapshot<DocumentData>): Vine {
     notes: typeof value.notes === 'string' ? value.notes : '',
     sourceCuttingId:
       typeof value.sourceCuttingId === 'string' ? value.sourceCuttingId : null,
+    coverPhoto: mapCoverPhoto(value.coverPhoto),
     events: Array.isArray(value.events) ? value.events.map(mapEvent) : [],
     createdAt: timestampToIso(value.createdAt),
     updatedAt: timestampToIso(value.updatedAt),
@@ -154,6 +168,7 @@ export async function createVine(
   const reference = await addDoc(collection(firestore, 'vines'), {
     ...editableFields(input),
     serialNumber,
+    coverPhoto: null,
     events: [],
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -427,22 +442,65 @@ async function updateEventPhotos<T>(
       throw new Error('A tőke nem található.');
     }
 
-    const existingEvents = mapStoredEvents(snapshot.data());
+    const data = snapshot.data();
+    const existingEvents = mapStoredEvents(data);
     const event = existingEvents.find((candidate) => candidate.id === eventId);
     if (!event) {
       throw new Error('Az esemény nem található.');
     }
 
     const { photos, result } = apply(event.photos);
+    // A kijelölt borító törlésekor a mutató ugyanebben az írásban tűnik el, hogy
+    // a tőkén ne maradjon árva hivatkozás.
+    const coverPhoto = mapCoverPhoto(data.coverPhoto);
+    const isCoverRemoved =
+      coverPhoto?.eventId === eventId &&
+      !photos.some((candidate) => candidate.id === coverPhoto.photoId);
     const now = Timestamp.now().toDate().toISOString();
     transaction.update(vineReference, {
       events: existingEvents.map((candidate) =>
         candidate.id === eventId ? { ...candidate, photos, updatedAt: now } : candidate,
       ),
+      ...(isCoverRemoved ? { coverPhoto: null } : {}),
       updatedAt: serverTimestamp(),
     });
 
     return result;
+  });
+}
+
+/**
+ * A borítókép kijelölése, illetve `null`-lal a kijelölés visszavonása. A mutató
+ * csak létező eseményre és fotóra állhat, ezért a tranzakció ellenőrzi.
+ */
+export async function setCoverPhoto(
+  firestore: Firestore,
+  input: SetVineCoverPhotoInput,
+): Promise<void> {
+  await runTransaction(firestore, async (transaction) => {
+    const vineReference = doc(firestore, 'vines', input.vineId);
+    const snapshot = await transaction.get(vineReference);
+    if (!snapshot.exists()) {
+      throw new Error('A tőke nem található.');
+    }
+
+    if (input.coverPhoto) {
+      const event = mapStoredEvents(snapshot.data()).find(
+        (candidate) => candidate.id === input.coverPhoto?.eventId,
+      );
+      if (!event) {
+        throw new Error('Az esemény nem található.');
+      }
+
+      if (!event.photos.some((candidate) => candidate.id === input.coverPhoto?.photoId)) {
+        throw new Error('A fotó nem található.');
+      }
+    }
+
+    transaction.update(vineReference, {
+      coverPhoto: input.coverPhoto,
+      updatedAt: serverTimestamp(),
+    });
   });
 }
 
@@ -584,8 +642,11 @@ export async function deleteEvent(
       throw new Error('Az esemény nem található.');
     }
 
+    // Az esemény fotóival a borítómutató is elveszti az alapját.
+    const coverPhoto = mapCoverPhoto(data.coverPhoto);
     transaction.update(vineReference, {
       events: existingEvents.filter((candidate) => candidate.id !== input.eventId),
+      ...(coverPhoto?.eventId === input.eventId ? { coverPhoto: null } : {}),
       updatedAt: serverTimestamp(),
     });
     return event.photos;

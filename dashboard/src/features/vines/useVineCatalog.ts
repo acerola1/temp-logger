@@ -11,6 +11,7 @@ import {
   editEvent as editFirestoreEvent,
   editEventPhotoCaption as editFirestoreEventPhotoCaption,
   editVine as editFirestoreVine,
+  setCoverPhoto as setFirestoreCoverPhoto,
   subscribeToVines,
 } from './firestoreVines';
 import type {
@@ -22,6 +23,7 @@ import type {
   EditVineEventInput,
   EditVineEventPhotoCaptionInput,
   EditVineInput,
+  SetVineCoverPhotoInput,
   Vine,
 } from './model';
 
@@ -45,6 +47,7 @@ export interface VineCatalog {
   addEventPhotos(input: AddVineEventPhotosInput): Promise<void>;
   deleteEventPhoto(input: DeleteVineEventPhotoInput): Promise<void>;
   editEventPhotoCaption(input: EditVineEventPhotoCaptionInput): Promise<void>;
+  setCoverPhoto(input: SetVineCoverPhotoInput): Promise<void>;
   clearMutationError(): void;
 }
 
@@ -214,6 +217,15 @@ export function useVineCatalog(): VineCatalog {
     [runMutation],
   );
 
+  const setCoverPhoto = useCallback(
+    (input: SetVineCoverPhotoInput) =>
+      runMutation(
+        () => setFirestoreCoverPhoto(db, input),
+        'Nem sikerült menteni a borítóképet.',
+      ),
+    [runMutation],
+  );
+
   const tagSuggestions = useMemo(() => getVineTagSuggestions(vines), [vines]);
   const clearMutationError = useCallback(() => {
     setMutation((current) => current.error ? { ...current, error: null } : current);
@@ -233,6 +245,7 @@ export function useVineCatalog(): VineCatalog {
     addEventPhotos,
     deleteEventPhoto,
     editEventPhotoCaption,
+    setCoverPhoto,
     clearMutationError,
   };
 }

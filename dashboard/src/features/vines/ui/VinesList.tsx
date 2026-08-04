@@ -1,4 +1,6 @@
+import { Sprout } from 'lucide-react';
 import type { Vine } from '../model';
+import { resolveVineCoverPhoto } from '../vineCoverPhoto';
 import {
   ROOT_TYPE_PRESENTATION,
   statusBadgeClass,
@@ -36,7 +38,7 @@ function LoadingCards() {
       {[0, 1, 2].map((index) => (
         <div
           key={index}
-          className="h-[94px] animate-pulse rounded-3xl border border-vine-200 bg-white/60 dark:border-vine-700 dark:bg-vine-900/40"
+          className="h-[104px] animate-pulse rounded-3xl border border-vine-200 bg-white/60 dark:border-vine-700 dark:bg-vine-900/40"
         />
       ))}
       <span className="sr-only">Tőkék betöltése...</span>
@@ -62,6 +64,7 @@ export function VinesList({
       {vines.map((vine) => {
         const isSelected = selectedVineId === vine.id;
         const rootTypePresentation = ROOT_TYPE_PRESENTATION[vine.rootType];
+        const coverPhoto = resolveVineCoverPhoto(vine);
 
         return (
           <button
@@ -76,29 +79,45 @@ export function VinesList({
                 : 'border-vine-200 bg-white/80 hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900/40 dark:hover:bg-vine-800/70'
             }`}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-vine-500 dark:text-vine-300">
-                  #{vine.serialNumber}
-                </div>
-                <h3 className="truncate text-sm font-semibold text-vine-900 dark:text-vine-50">
-                  {vine.variety}
-                </h3>
+            <div className="flex gap-3">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-vine-100 dark:bg-vine-800">
+                {coverPhoto ? (
+                  <img
+                    src={coverPhoto.photo.downloadUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <Sprout className="h-8 w-8 text-vine-400 dark:text-vine-300" />
+                )}
               </div>
-              <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-medium ${statusBadgeClass(vine.status)}`}>
-                {statusLabel(vine.status)}
-              </span>
-            </div>
 
-            <div className="mt-2 flex flex-wrap gap-1">
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${rootTypePresentation.badgeClass}`}>
-                {rootTypePresentation.label}
-              </span>
-              {vine.tags.map((tag) => (
-                <span key={tag} className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${tagBadgeClass(tag)}`}>
-                  {tag}
-                </span>
-              ))}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-vine-500 dark:text-vine-300">
+                      #{vine.serialNumber}
+                    </div>
+                    <h3 className="truncate text-sm font-semibold text-vine-900 dark:text-vine-50">
+                      {vine.variety}
+                    </h3>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-medium ${statusBadgeClass(vine.status)}`}>
+                    {statusLabel(vine.status)}
+                  </span>
+                </div>
+
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${rootTypePresentation.badgeClass}`}>
+                    {rootTypePresentation.label}
+                  </span>
+                  {vine.tags.map((tag) => (
+                    <span key={tag} className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${tagBadgeClass(tag)}`}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </button>
         );
