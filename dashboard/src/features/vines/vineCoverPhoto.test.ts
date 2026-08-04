@@ -9,6 +9,7 @@ function photo(id: string, overrides: Partial<VineEventPhoto> = {}): VineEventPh
     downloadUrl: `https://example.test/${id}.jpg`,
     width: 800,
     height: 600,
+    thumbnail: null,
     capturedAt: null,
     uploadedAt: '2026-08-01T10:00:00.000Z',
     caption: '',

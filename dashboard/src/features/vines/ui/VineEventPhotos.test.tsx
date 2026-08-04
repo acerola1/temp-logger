@@ -12,6 +12,7 @@ function photo(index: number, overrides: Partial<VineEventPhoto> = {}): VineEven
     downloadUrl: `https://example.test/photo-${index}.jpg`,
     width: 800,
     height: 600,
+    thumbnail: null,
     capturedAt: null,
     uploadedAt: '2026-08-01T10:00:00.000Z',
     caption: '',

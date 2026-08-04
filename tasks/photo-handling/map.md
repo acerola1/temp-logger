@@ -16,14 +16,20 @@ Források:
 | [11](../issues/11-kozos-kepnezo-lightbox.md) | Közös képnéző gesztusokkal, tőke adatlap bekötése | 09 | done |
 | [12](../issues/12-egyseges-foto-metaadat.md) | Egységes fotó-metaadat és valódi készítési idő | 09 | done |
 | [13](../issues/13-tokeesemeny-fotoinak-utolagos-kezelese.md) | Tőkeesemény fotóinak utólagos kezelése | 10, 11 | done |
+| [15](../issues/15-toke-boritokep-a-listaban-es-az-adatlapon.md) | Tőke borítóképe a listában és az adatlapon | 12, 13 | done |
+| [17](../issues/17-foto-belyegkep-a-tokelistahoz.md) | Fotó-bélyegkép: a tőkelista ne töltse le a nagy képeket | 15 | done |
 
 ## Végrehajtási sorrend
 
 ```text
-09 ┬→ 10 ┬→ 13
-   ├→ 11 ┘
-   └→ 12
+09 ┬→ 10 ┬→ 13 ┬→ 15 → 17
+   ├→ 11 ┘     │
+   └→ 12 ──────┘
 ```
+
+A `17` a `15` után jön, mert a lista borítókeretét és a közös borítófeloldást
+már készen találja: csak a kép változatát cseréli le, a feloldás logikáját nem
+érinti.
 
 A `10`, `11` és `12` a `09` lezárása után párhuzamosan végezhető: külön
 fájlokat érintenek, közös metszetük csak a `features/photos` publikus felülete.

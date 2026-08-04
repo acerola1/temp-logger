@@ -99,7 +99,7 @@ export function useCuttings() {
                   return null;
                 }
 
-                return {
+                const mappedPhoto: CuttingPhoto = {
                   id: legacyPhoto.id ?? `${snapshotDoc.id}-photo-${index}`,
                   storagePath: legacyPhoto.storagePath ?? '',
                   downloadUrl: url,
@@ -107,8 +107,13 @@ export function useCuttings() {
                   uploadedAt: legacyPhoto.uploadedAt ?? new Date(0).toISOString(),
                   width: legacyPhoto.width ?? 0,
                   height: legacyPhoto.height ?? 0,
+                  // A dugványfotókhoz nem készül bélyeg: a galéria a nagy képet
+                  // tölti, ahogy eddig is.
+                  thumbnail: null,
                   caption: legacyPhoto.caption ?? '',
-                } satisfies CuttingPhoto;
+                };
+
+                return mappedPhoto;
               })
               .filter((photo): photo is CuttingPhoto => photo !== null)
           : [];

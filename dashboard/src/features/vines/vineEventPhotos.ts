@@ -16,6 +16,10 @@ import type { VineEventPhoto } from './model';
 // részletek (rügy, metszés, betegségtünet) 1000 px-en már elmosódtak.
 const VINE_EVENT_PHOTO_MAX_SIDE = 1280;
 
+// A tőkelista és az eseménykártya 80 px-es keretei ezt töltik le a nagy kép
+// helyett: 320 px 3× DPR-en is éles marad, viszont a tizede az adatforgalomnak.
+export const VINE_EVENT_PHOTO_THUMBNAIL_MAX_SIDE = 320;
+
 export type PreparedVineEventPhoto = PreparedPhoto;
 
 export type VineEventPhotoUploadProgress = PhotoUploadProgress;
@@ -33,7 +37,12 @@ export async function prepareVineEventPhotos(
   files: readonly File[],
 ): Promise<PreparedVineEventPhoto[]> {
   return Promise.all(
-    files.map((file) => prepareImageUpload(file, { maxImageSide: VINE_EVENT_PHOTO_MAX_SIDE })),
+    files.map((file) =>
+      prepareImageUpload(file, {
+        maxImageSide: VINE_EVENT_PHOTO_MAX_SIDE,
+        thumbnailMaxSide: VINE_EVENT_PHOTO_THUMBNAIL_MAX_SIDE,
+      }),
+    ),
   );
 }
 
@@ -65,8 +74,10 @@ export async function deleteVineEventPhotos(
 ): Promise<void> {
   await deletePhotoObjects(
     storage,
+    // A bélyeg önálló Storage-objektum: a nagy képpel együtt kell mennie,
+    // különben árva marad.
     photos
-      .map((photo) => photo.storagePath)
-      .filter((storagePath): storagePath is string => storagePath.length > 0),
+      .flatMap((photo) => [photo.storagePath, photo.thumbnail?.storagePath ?? ''])
+      .filter((storagePath) => storagePath.length > 0),
   );
 }

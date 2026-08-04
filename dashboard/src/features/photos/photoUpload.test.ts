@@ -8,6 +8,8 @@ interface StorageRef {
 
 const deletedPaths: string[] = [];
 const failingPaths = new Set<string>();
+// A bélyeg útjában véletlen `photoId` van, ezért a hibát végződésre is lehet kérni.
+const failingSuffixes = new Set<string>();
 
 vi.mock('firebase/storage', () => ({
   ref: (_storage: unknown, path: string): StorageRef => ({ path }),
@@ -24,7 +26,10 @@ vi.mock('firebase/storage', () => ({
     ) => {
       onSnapshot({ bytesTransferred: blob.size / 2 });
 
-      if (failingPaths.has(storageRef.path)) {
+      const shouldFail =
+        failingPaths.has(storageRef.path) ||
+        [...failingSuffixes].some((suffix) => storageRef.path.endsWith(suffix));
+      if (shouldFail) {
         onError(new Error(`upload failed: ${storageRef.path}`));
         return;
       }
@@ -44,6 +49,18 @@ function makePreparedPhoto(bytes: number, capturedAt: string | null = null): Pre
     height: 80,
     contentType: 'image/jpeg',
     capturedAt,
+    thumbnail: null,
+  };
+}
+
+function withThumbnail(photo: PreparedPhoto, bytes: number): PreparedPhoto {
+  return {
+    ...photo,
+    thumbnail: {
+      blob: new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' }),
+      width: 40,
+      height: 32,
+    },
   };
 }
 
@@ -54,6 +71,7 @@ function buildStoragePath({ index, extension }: { index: number; extension: stri
 beforeEach(() => {
   deletedPaths.length = 0;
   failingPaths.clear();
+  failingSuffixes.clear();
 });
 
 describe('uploadPreparedPhotos', () => {
@@ -119,5 +137,78 @@ describe('uploadPreparedPhotos', () => {
 
     deleteObjectSpy.mockRestore();
     warnSpy.mockRestore();
+  });
+});
+
+describe('uploadPreparedPhotos bélyeggel', () => {
+  function buildPhotoIdPath({
+    index,
+    photoId,
+    extension,
+  }: {
+    index: number;
+    photoId: string;
+    extension: string;
+  }) {
+    return `photos/${index}/${photoId}.${extension}`;
+  }
+
+  it('a nagy kép után a bélyeget is feltölti, ugyanabba a mappába', async () => {
+    const uploads = await uploadPreparedPhotos({
+      storage,
+      photos: [withThumbnail(makePreparedPhoto(300), 40)],
+      buildStoragePath: buildPhotoIdPath,
+    });
+
+    const { photoId, storagePath, thumbnail } = uploads[0];
+    expect(storagePath).toBe(`photos/0/${photoId}.jpg`);
+    expect(thumbnail).toEqual({
+      storagePath: `photos/0/${photoId}_thumb.jpg`,
+      downloadUrl: `https://storage.test/photos/0/${photoId}_thumb.jpg`,
+      width: 40,
+      height: 32,
+    });
+  });
+
+  it('a bélyeg bájtjait is beleszámolja, így a folyamatjelző nem ugrik vissza', async () => {
+    const onProgress = vi.fn();
+
+    await uploadPreparedPhotos({
+      storage,
+      photos: [withThumbnail(makePreparedPhoto(300), 100)],
+      buildStoragePath: buildPhotoIdPath,
+      onProgress,
+    });
+
+    const reported = onProgress.mock.calls.map(([uploadedBytes]) => uploadedBytes as number);
+    expect(onProgress.mock.calls.every(([, totalBytes]) => totalBytes === 400)).toBe(true);
+    expect(reported).toEqual([...reported].sort((left, right) => left - right));
+    expect(reported.at(-1)).toBe(400);
+  });
+
+  it('bélyeg nélküli előkészítéshez nem tölt fel második objektumot', async () => {
+    const uploads = await uploadPreparedPhotos({
+      storage,
+      photos: [makePreparedPhoto(300)],
+      buildStoragePath: buildPhotoIdPath,
+    });
+
+    expect(uploads[0].thumbnail).toBeNull();
+    expect(deletedPaths).toEqual([]);
+  });
+
+  it('a bélyeg hibáján a hozzá tartozó nagy kép sem marad a Storage-ban', async () => {
+    failingSuffixes.add('_thumb.jpg');
+
+    await expect(
+      uploadPreparedPhotos({
+        storage,
+        photos: [withThumbnail(makePreparedPhoto(100), 20)],
+        buildStoragePath: buildPhotoIdPath,
+      }),
+    ).rejects.toThrow('upload failed');
+
+    expect(deletedPaths).toHaveLength(2);
+    expect(deletedPaths[1]).toBe(`${deletedPaths[0].replace(/\.jpg$/, '')}_thumb.jpg`);
   });
 });

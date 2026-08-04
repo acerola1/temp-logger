@@ -4,12 +4,29 @@
 import { formatDateTime } from '../../lib/dateFormat';
 import type { IsoDateTimeString } from '../../types/datetime';
 
+/**
+ * A kép kicsi változata: a 80 px-es keretek ezt töltik le a nagy kép helyett.
+ * A rekord beágyazott mezője, nem kikövetkeztetett Storage-út — az útból képzett
+ * URL letöltési tokent, azaz futásidejű `getDownloadURL`-t igényelne kártyánként.
+ */
+export interface PhotoThumbnail {
+  storagePath: string;
+  downloadUrl: string;
+  width: number;
+  height: number;
+}
+
 export interface Photo {
   id: string;
   storagePath: string;
   downloadUrl: string;
   width: number;
   height: number;
+  /**
+   * A kis változat, vagy `null`: a bélyeg előtti rekordokban és a már eleve
+   * kicsi képeknél hiányzik. Nem hiba, csak a régi viselkedés.
+   */
+  thumbnail: PhotoThumbnail | null;
   /**
    * A kép EXIF-ből kiolvasott készítési ideje. `null`, ha a fájlban nem volt
    * `DateTimeOriginal` — a régi rekordokban is ez van.
@@ -36,11 +53,20 @@ export function toPhotoRecord(upload: PhotoUploadResult, uploadedAt: IsoDateTime
     downloadUrl: upload.downloadUrl,
     width: upload.width,
     height: upload.height,
+    thumbnail: upload.thumbnail,
     capturedAt: upload.capturedAt,
     uploadedAt,
     // A feliratot a felület tölti meg, a feltöltés nem tud róla semmit.
     caption: '',
   };
+}
+
+/**
+ * A kis keretek képforrása: a bélyeg URL-je, hiányában a nagy képé. A hiányzó
+ * bélyeg így sosem üres keret, csak több letöltött bájt.
+ */
+export function photoThumbnailUrl(photo: Pick<Photo, 'downloadUrl' | 'thumbnail'>): string {
+  return photo.thumbnail?.downloadUrl || photo.downloadUrl;
 }
 
 export interface PhotoDateLabel {

@@ -49,8 +49,13 @@ function waitForVines(
   });
 }
 
+// A bélyeg bájtjai: a nagy képtől megkülönböztethető tartalom, hogy a
+// Storage-ban látszódjon, melyik objektum melyik változat.
+const THUMBNAIL_BYTES = [9, 9, 9];
+
 async function withTestImage<T>(operation: () => Promise<T>): Promise<T> {
   const originalImage = globalThis.Image;
+  const originalDocument = globalThis.document;
   class TestImage {
     naturalWidth = 640;
     naturalHeight = 480;
@@ -62,11 +67,23 @@ async function withTestImage<T>(operation: () => Promise<T>): Promise<T> {
     }
   }
   globalThis.Image = TestImage as unknown as typeof Image;
+  // A 640×480-as tesztkép a nagy kép korlátja alatt van, a bélyegméret fölött:
+  // az átméretezés vászna emiatt itt is kell, csak a rajzolás nélkül.
+  globalThis.document = {
+    createElement: () => ({
+      width: 0,
+      height: 0,
+      getContext: () => ({ setTransform: () => {}, drawImage: () => {} }),
+      toBlob: (callback: (blob: Blob) => void, contentType: string) =>
+        callback(new Blob([new Uint8Array(THUMBNAIL_BYTES)], { type: contentType })),
+    }),
+  } as unknown as Document;
 
   try {
     return await operation();
   } finally {
     globalThis.Image = originalImage;
+    globalThis.document = originalDocument;
   }
 }
 
@@ -1091,5 +1108,146 @@ describe('Firestore vine catalog', () => {
         nextVines.find((candidate) => candidate.id === vine.id)?.events.length === 0,
     );
     expect(afterDelete.find((candidate) => candidate.id === vine.id)?.coverPhoto).toBeNull();
+  });
+
+  it('a fotó mellé bélyeget is feltölt, és a fotó törlésével azt is elviszi', async () => {
+    const { vine, event } = await seedVineWithEvent(
+      'vine-thumbnail-photo',
+      50,
+      'Bélyeges fotózás',
+      [testPhoto('belyeges.png', [13, 13, 13])],
+    );
+    const photo = event.photos[0];
+    const thumbnailPath = photo?.thumbnail?.storagePath ?? '';
+
+    // A bélyeg a nagy kép mellett, ugyanabban a mappában, `_thumb` utótaggal él.
+    expect(thumbnailPath).toBe(photo?.storagePath.replace(/\.png$/, '_thumb.png'));
+    // A 640×480-as tesztkép a 320 px-es bélyegméretre, arányosan.
+    expect(photo?.thumbnail).toMatchObject({ width: 320, height: 240 });
+    expect(
+      new Uint8Array(await getBytes(ref(adminClientStorage, thumbnailPath))),
+    ).toEqual(new Uint8Array(THUMBNAIL_BYTES));
+
+    await deleteEventPhoto(adminClientDb, adminClientStorage, {
+      vineId: vine.id,
+      eventId: event.id,
+      photoId: photo?.id ?? '',
+    });
+
+    await waitForVines(
+      adminClientDb,
+      (nextVines) =>
+        nextVines.find((candidate) => candidate.id === vine.id)?.events[0]?.photos.length === 0,
+    );
+    await expect(getBytes(ref(adminClientStorage, thumbnailPath))).rejects.toMatchObject({
+      code: 'storage/object-not-found',
+    });
+    await expect(
+      getBytes(ref(adminClientStorage, photo?.storagePath ?? '')),
+    ).rejects.toMatchObject({ code: 'storage/object-not-found' });
+  });
+
+  it('az esemény törlésekor minden hozzá tartozó bélyeg is eltűnik', async () => {
+    const { vine, event } = await seedVineWithEvent(
+      'vine-thumbnail-event',
+      51,
+      'Két bélyeges fotó',
+      [testPhoto('elso.png', [14, 14, 14]), testPhoto('masodik.png', [15, 15, 15])],
+    );
+    const thumbnailPaths = event.photos.map((photo) => photo.thumbnail?.storagePath ?? '');
+
+    expect(thumbnailPaths.every((path) => path.endsWith('_thumb.png'))).toBe(true);
+
+    await deleteEvent(adminClientDb, adminClientStorage, {
+      vineId: vine.id,
+      eventId: event.id,
+    });
+
+    await waitForVines(
+      adminClientDb,
+      (nextVines) => nextVines.find((candidate) => candidate.id === vine.id)?.events.length === 0,
+    );
+    await Promise.all(
+      thumbnailPaths.map((path) =>
+        expect(getBytes(ref(adminClientStorage, path))).rejects.toMatchObject({
+          code: 'storage/object-not-found',
+        }),
+      ),
+    );
+  });
+
+  it('a hiányzó vagy hibás alakú bélyegmezőt bélyeg nélküli fotóként olvassa', async () => {
+    const uploadedAt = AdminTimestamp.fromDate(new Date('2026-08-04T08:00:00.000Z'));
+    await adminDb.collection('vines').doc('vine-thumbnail-legacy').set(
+      vineDocument(adminUid, {
+        serialNumber: 52,
+        events: [
+          {
+            id: 'legacy-event',
+            type: 'observation',
+            occurredAt: uploadedAt,
+            title: 'Régi fotók',
+            notes: '',
+            photos: [
+              {
+                id: 'legacy-with-thumbnail',
+                storagePath: 'vines/vine-thumbnail-legacy/events/legacy-event/photos/a.jpg',
+                downloadUrl: 'https://example.test/a.jpg',
+                width: 1280,
+                height: 960,
+                thumbnail: {
+                  storagePath:
+                    'vines/vine-thumbnail-legacy/events/legacy-event/photos/a_thumb.jpg',
+                  downloadUrl: 'https://example.test/a_thumb.jpg',
+                  width: 320,
+                  height: 240,
+                },
+                uploadedAt,
+                caption: '',
+              },
+              // A bélyeg előtti rekordban nincs is ilyen mező.
+              {
+                id: 'legacy-without-thumbnail',
+                storagePath: 'vines/vine-thumbnail-legacy/events/legacy-event/photos/b.jpg',
+                downloadUrl: 'https://example.test/b.jpg',
+                width: 1280,
+                height: 960,
+                uploadedAt,
+                caption: '',
+              },
+              // Hibás alak: letöltési URL nélkül a bélyeg használhatatlan.
+              {
+                id: 'legacy-broken-thumbnail',
+                storagePath: 'vines/vine-thumbnail-legacy/events/legacy-event/photos/c.jpg',
+                downloadUrl: 'https://example.test/c.jpg',
+                width: 1280,
+                height: 960,
+                thumbnail: { width: 320 },
+                uploadedAt,
+                caption: '',
+              },
+            ],
+            createdAt: uploadedAt,
+            updatedAt: uploadedAt,
+          },
+        ],
+      }),
+    );
+
+    const vines = await waitForVines(adminClientDb, (nextVines) =>
+      nextVines.some((vine) => vine.id === 'vine-thumbnail-legacy'),
+    );
+    const photos = vines.find((vine) => vine.id === 'vine-thumbnail-legacy')?.events[0]?.photos;
+
+    expect(photos?.map((photo) => photo.thumbnail)).toEqual([
+      {
+        storagePath: 'vines/vine-thumbnail-legacy/events/legacy-event/photos/a_thumb.jpg',
+        downloadUrl: 'https://example.test/a_thumb.jpg',
+        width: 320,
+        height: 240,
+      },
+      null,
+      null,
+    ]);
   });
 });

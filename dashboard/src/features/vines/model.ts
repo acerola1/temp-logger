@@ -1,4 +1,4 @@
-import type { Photo } from '../photos/photoMetadata';
+import type { Photo, PhotoThumbnail } from '../photos/photoMetadata';
 import type { IsoDateString, IsoDateTimeString } from '../../types/datetime';
 
 export const VINE_STATUSES = ['active', 'ceased'] as const;
@@ -17,6 +17,9 @@ export type VinePlantingDate =
 
 // A tőkeeseményfotó ugyanaz a közös fotó-metaadat, mint a dugványfotó.
 export type VineEventPhoto = Photo;
+
+// A fotó kis változata: a lista és a fotósor 80 px-es kerete ezt tölti le.
+export type VineEventPhotoThumbnail = PhotoThumbnail;
 
 /**
  * A kijelölt borítókép mutatója. A tőke gyökerén él, nem a fotórekordban: így az

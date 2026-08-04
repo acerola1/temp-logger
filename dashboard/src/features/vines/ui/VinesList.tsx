@@ -1,4 +1,7 @@
 import { Sprout } from 'lucide-react';
+// A `photos` almodulját közvetlenül importáljuk, nem az indexen át: a lista így
+// nem húzza be a feltöltő hook Firebase-szingletonját.
+import { photoThumbnailUrl } from '../../photos/photoMetadata';
 import type { Vine } from '../model';
 import { resolveVineCoverPhoto } from '../vineCoverPhoto';
 import {
@@ -82,9 +85,15 @@ export function VinesList({
             <div className="flex gap-3">
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-vine-100 dark:bg-vine-800">
                 {coverPhoto ? (
+                  // A keret 80 px-es, ezért a bélyeg elég ide. A fix méret és a
+                  // lusta töltés együtt tartja alacsonyan a lista forgalmát: a
+                  // képernyőn kívüli kártyák képe csak görgetésre jön le.
                   <img
-                    src={coverPhoto.photo.downloadUrl}
+                    src={photoThumbnailUrl(coverPhoto.photo)}
                     alt=""
+                    width={80}
+                    height={80}
+                    loading="lazy"
                     className="h-full w-full object-cover"
                   />
                 ) : (

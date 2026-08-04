@@ -10,6 +10,19 @@ import { getFileExtension, type PreparedImageUpload } from './imagePreparation';
 
 export type PreparedPhoto = PreparedImageUpload;
 
+/**
+ * A bélyeg a nagy kép mellé, ugyanabba a mappába kerül, `_thumb` utótaggal: a
+ * `storage.rules` `photos/{fileName}` mintája így változtatás nélkül érvényes rá.
+ */
+export const PHOTO_THUMBNAIL_SUFFIX = '_thumb';
+
+export interface UploadedPhotoThumbnailObject {
+  storagePath: string;
+  downloadUrl: string;
+  width: number;
+  height: number;
+}
+
 export interface UploadedPhotoObject {
   photoId: string;
   storagePath: string;
@@ -19,12 +32,18 @@ export interface UploadedPhotoObject {
   contentType: string;
   /** Az előkészítéskor kiolvasott EXIF-készítési idő, továbbadva a rekordnak. */
   capturedAt: IsoDateTimeString | null;
+  /** A feltöltött bélyeg, vagy `null`, ha az előkészítés nem készített. */
+  thumbnail: UploadedPhotoThumbnailObject | null;
 }
 
 export type PhotoUploadProgress = (uploadedBytes: number, totalBytes: number) => void;
 
 export interface BuildPhotoStoragePathParams {
   index: number;
+  /**
+   * A fájlnév törzse. A bélyegnél ugyanaz az azonosító, `_thumb` utótaggal —
+   * a hívó tehát fájlnévként használja, ne fotóazonosítóként.
+   */
   photoId: string;
   extension: string;
 }
@@ -60,44 +79,80 @@ export async function uploadPreparedPhotos({
   buildStoragePath,
   onProgress,
 }: UploadPreparedPhotosRequest): Promise<UploadedPhotoObject[]> {
-  const totalBytes = photos.reduce((sum, photo) => sum + photo.blob.size, 0);
+  // A bélyegek bájtjai is benne vannak az összegben, hogy a folyamatjelző ne
+  // ugorjon vissza, amikor a kis kép feltöltése következik.
+  const totalBytes = photos.reduce(
+    (sum, photo) => sum + photo.blob.size + (photo.thumbnail?.blob.size ?? 0),
+    0,
+  );
   let uploadedBytes = 0;
   const uploadedPaths: string[] = [];
   const uploads: UploadedPhotoObject[] = [];
+
+  const uploadBlob = async (
+    storagePath: string,
+    blob: Blob,
+    contentType: string,
+  ): Promise<string> => {
+    const storageRef = ref(storage, storagePath);
+    uploadedPaths.push(storagePath);
+
+    await new Promise<void>((resolve, reject) => {
+      const uploadTask = uploadBytesResumable(storageRef, blob, { contentType });
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => onProgress?.(uploadedBytes + snapshot.bytesTransferred, totalBytes),
+        reject,
+        () => {
+          uploadedBytes += blob.size;
+          onProgress?.(uploadedBytes, totalBytes);
+          resolve();
+        },
+      );
+    });
+
+    return getDownloadURL(storageRef);
+  };
 
   try {
     for (const [index, prepared] of photos.entries()) {
       const photoId = crypto.randomUUID();
       const extension = getFileExtension(prepared.contentType);
       const storagePath = buildStoragePath({ index, photoId, extension });
-      const storageRef = ref(storage, storagePath);
-      uploadedPaths.push(storagePath);
+      const downloadUrl = await uploadBlob(storagePath, prepared.blob, prepared.contentType);
 
-      await new Promise<void>((resolve, reject) => {
-        const uploadTask = uploadBytesResumable(storageRef, prepared.blob, {
-          contentType: prepared.contentType,
+      // A bélyeg a nagy kép után megy fel: a `photoId` ugyanaz, csak a fájlnév
+      // kap `_thumb` utótagot, így a hívó útvonalképzése változatlan marad.
+      let thumbnail: UploadedPhotoThumbnailObject | null = null;
+      if (prepared.thumbnail) {
+        const thumbnailPath = buildStoragePath({
+          index,
+          photoId: `${photoId}${PHOTO_THUMBNAIL_SUFFIX}`,
+          extension,
         });
 
-        uploadTask.on(
-          'state_changed',
-          (snapshot) => onProgress?.(uploadedBytes + snapshot.bytesTransferred, totalBytes),
-          reject,
-          () => {
-            uploadedBytes += prepared.blob.size;
-            onProgress?.(uploadedBytes, totalBytes);
-            resolve();
-          },
-        );
-      });
+        thumbnail = {
+          storagePath: thumbnailPath,
+          downloadUrl: await uploadBlob(
+            thumbnailPath,
+            prepared.thumbnail.blob,
+            prepared.contentType,
+          ),
+          width: prepared.thumbnail.width,
+          height: prepared.thumbnail.height,
+        };
+      }
 
       uploads.push({
         photoId,
         storagePath,
-        downloadUrl: await getDownloadURL(storageRef),
+        downloadUrl,
         width: prepared.width,
         height: prepared.height,
         contentType: prepared.contentType,
         capturedAt: prepared.capturedAt,
+        thumbnail,
       });
     }
 

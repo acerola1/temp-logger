@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
 
+// A `scripts/seed-e2e-data.mjs` két különböző képpontot használ a nagy képhez és
+// a bélyeghez, hogy itt eldönthető legyen, melyik változat töltődik le.
+const SEED_PHOTO_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlU9WQAAAAASUVORK5CYII=';
+const SEED_PHOTO_THUMBNAIL_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAC0lEQVR4nGNgQAcAABIAAXfx+gAAAAAASUVORK5CYII=';
+
 test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és csak olvasható', async ({ page }) => {
   await page.goto('/tokek/vine-e2e-1?q=k%C3%A9k');
 
@@ -48,10 +55,26 @@ test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és
   await page.keyboard.press('Escape');
   await expect(coverViewer).toHaveCount(0);
 
-  // A lista kártyáján ugyanaz a kép jelenik meg bélyegként.
+  // A lista kártyáján ugyanaz a fotó jelenik meg, de a kis bélyegváltozatában: a
+  // 80 px-es keret nem tölti le az eredetit, és a képernyőn kívüli kártyák képe
+  // csak görgetésre jön le.
+  const listCover = page.getByTestId('vine-card').filter({ hasText: '#1' }).locator('img');
+  await expect(listCover).toBeVisible();
+  await expect(listCover).toHaveAttribute('src', SEED_PHOTO_THUMBNAIL_URL);
+  await expect(listCover).toHaveAttribute('loading', 'lazy');
+
+  // Az adatlap fejlécének borítója viszont a nagy képet tartja: egy 320 px-es
+  // bélyeg ezen a méreten már mosott lenne.
+  await expect(coverPhoto.locator('img')).toHaveAttribute('src', SEED_PHOTO_URL);
+
+  // Az eseménykártya fotósora is a bélyeget mutatja, ahol van; a bélyeg nélküli
+  // seed-fotó a nagy képre esik vissza, hibaüzenet és üres keret nélkül.
   await expect(
-    page.getByTestId('vine-card').filter({ hasText: '#1' }).locator('img'),
-  ).toBeVisible();
+    page.getByRole('button', { name: 'Első fürtök 1. fotó megnyitása' }).locator('img'),
+  ).toHaveAttribute('src', SEED_PHOTO_URL);
+  await expect(
+    page.getByRole('button', { name: 'Első fürtök 2. fotó megnyitása' }).locator('img'),
+  ).toHaveAttribute('src', SEED_PHOTO_THUMBNAIL_URL);
 
   await page.getByRole('button', { name: '#1 - Kékfrankos' }).click();
   await expect(page).toHaveURL(/\/dugvanyok\/cutting-e2e-1$/);

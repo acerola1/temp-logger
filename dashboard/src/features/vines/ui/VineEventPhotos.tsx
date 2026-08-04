@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Images, Loader2, Pencil, Star, Trash2 } from 'lucide-react';
 // A `photos` almoduljait közvetlenül importáljuk, nem az indexen át: a
 // fotósor így nem húzza be a feltöltő hook Firebase-szingletonját.
-import { photoDateText } from '../../photos/photoMetadata';
+import { photoDateText, photoThumbnailUrl } from '../../photos/photoMetadata';
 import { PhotoPickerButtons } from '../../photos/ui/PhotoPickerButtons';
 import { selectVineEventPhotos } from '../forms';
 import { MAX_VINE_EVENT_PHOTOS, type VineEvent, type VineEventPhoto } from '../model';
@@ -60,11 +60,13 @@ function PhotoThumbnail({
       className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-vine-200 dark:border-vine-700"
       aria-label={label}
     >
+      {/* A 80 px-es keretbe a bélyeg is elég; a nagyítás nyitja a nagy képet. */}
       <img
-        src={photo.downloadUrl}
+        src={photoThumbnailUrl(photo)}
         alt=""
         width={photo.width || undefined}
         height={photo.height || undefined}
+        loading="lazy"
         className="h-full w-full object-cover"
       />
     </button>

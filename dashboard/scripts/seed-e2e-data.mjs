@@ -160,6 +160,12 @@ async function seed() {
   const vineIso = (hours) => new Date(Date.UTC(2026, 6, 1, 12 + hours)).toISOString()
   const seedPhotoUrl =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlU9WQAAAAASUVORK5CYII='
+  // A bélyeg ugyanúgy átlátszó, mint a nagy kép — a képernyőképek így nem
+  // változnak tőle —, de más bájtokból áll: az E2E ebből tudja eldönteni,
+  // melyik változatot tölti le a felület. Az `e2e/vine-detail-form.spec.ts`
+  // ugyanezt a két URL-t várja.
+  const seedPhotoThumbnailUrl =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAC0lEQVR4nGNgQAcAABIAAXfx+gAAAAAASUVORK5CYII='
 
   await Promise.all([
     db.doc('vines/vine-e2e-1').set({
@@ -194,13 +200,20 @@ async function seed() {
             },
             // Két fotó kell, hogy az eseményen belüli lapozás is látszódjon. Ez a
             // rekord szándékosan a `capturedAt` előtti alakban marad, hogy a régi
-            // fotók megjelenítése is fedve legyen.
+            // fotók megjelenítése is fedve legyen. Bélyege viszont van: ez a
+            // legfrissebb fotó, tehát ez a tőke automatikus borítója is.
             {
               id: 'vine-event-photo-seed-2',
               storagePath: '',
               downloadUrl: seedPhotoUrl,
               width: 1,
               height: 1,
+              thumbnail: {
+                storagePath: '',
+                downloadUrl: seedPhotoThumbnailUrl,
+                width: 2,
+                height: 2,
+              },
               uploadedAt: vineIso(1),
             },
           ],

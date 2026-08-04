@@ -107,6 +107,7 @@ describe('prepareImageUpload', () => {
     expect(prepared.width).toBe(800);
     expect(prepared.height).toBe(600);
     expect(prepared.contentType).toBe('image/jpeg');
+    expect(prepared.thumbnail).toBeNull();
     expect(canvasCalls).toHaveLength(0);
   });
 
@@ -221,6 +222,96 @@ describe('prepareImageUpload', () => {
     expect(prepared.blob).toBe(file);
     expect([prepared.width, prepared.height]).toEqual([600, 900]);
     expect(canvasCalls).toHaveLength(0);
+  });
+});
+
+describe('prepareImageUpload bélyeg', () => {
+  it('a nagy kép után a bélyeget is megrajzolja, azonos képaránnyal', async () => {
+    naturalSize = { width: 4000, height: 3000 };
+
+    const prepared = await prepareImageUpload(makeFile('image/jpeg'), {
+      maxImageSide: 1280,
+      thumbnailMaxSide: 320,
+    });
+
+    expect([prepared.width, prepared.height]).toEqual([1280, 960]);
+    expect(prepared.thumbnail).toMatchObject({ width: 320, height: 240 });
+    expect(prepared.thumbnail?.blob.type).toBe('image/jpeg');
+    // A fájl egyszer dekódolódik, a két rajzolás ugyanabból a képből megy.
+    expect(canvasCalls.map((call) => [call.width, call.height])).toEqual([
+      [1280, 960],
+      [320, 240],
+    ]);
+  });
+
+  it('a nagy képnél kicsi, de a bélyegnél nagyobb eredetihez is készít bélyeget', async () => {
+    naturalSize = { width: 640, height: 480 };
+    const file = makeFile('image/jpeg');
+
+    const prepared = await prepareImageUpload(file, {
+      maxImageSide: 1280,
+      thumbnailMaxSide: 320,
+    });
+
+    // Az eredeti fájl változatlanul megy tovább, a bélyeg viszont elkészül.
+    expect(prepared.blob).toBe(file);
+    expect(prepared.thumbnail).toMatchObject({ width: 320, height: 240 });
+    expect(canvasCalls).toHaveLength(1);
+  });
+
+  it('a bélyegméretnél nem nagyobb képhez nem készít külön bélyeget', async () => {
+    naturalSize = { width: 320, height: 200 };
+
+    const prepared = await prepareImageUpload(makeFile('image/jpeg'), {
+      maxImageSide: 1280,
+      thumbnailMaxSide: 320,
+    });
+
+    expect(prepared.thumbnail).toBeNull();
+    expect(canvasCalls).toHaveLength(0);
+  });
+
+  it('bélyegméret nélkül nem készül bélyeg', async () => {
+    naturalSize = { width: 4000, height: 3000 };
+
+    const prepared = await prepareImageUpload(makeFile('image/jpeg'), { maxImageSide: 1280 });
+
+    expect(prepared.thumbnail).toBeNull();
+    expect(canvasCalls).toHaveLength(1);
+  });
+
+  it('a bélyegbe is beleégeti az EXIF-forgatást', async () => {
+    decoderProbe.appliesOrientation = false;
+    // A nyers kép fekvő, az orientáció szerint állóvá kell fordulnia.
+    naturalSize = { width: 4000, height: 3000 };
+
+    const prepared = await prepareImageUpload(makeExifFile({ orientation: 6 }), {
+      maxImageSide: 1280,
+      thumbnailMaxSide: 320,
+    });
+
+    expect(prepared.thumbnail).toMatchObject({ width: 240, height: 320 });
+    expect(canvasCalls[1]).toEqual({
+      width: 240,
+      height: 320,
+      contentType: 'image/jpeg',
+      quality: 0.9,
+      drawnWidth: 320,
+      drawnHeight: 240,
+      transform: [0, 1, -1, 0, 240, 0],
+    });
+  });
+
+  it('png forrásból png bélyeget készít, hogy az átlátszóság megmaradjon', async () => {
+    naturalSize = { width: 2000, height: 2000 };
+
+    const prepared = await prepareImageUpload(makeFile('image/png'), {
+      maxImageSide: 1280,
+      thumbnailMaxSide: 320,
+    });
+
+    expect(prepared.thumbnail?.blob.type).toBe('image/png');
+    expect(canvasCalls[1]).toMatchObject({ contentType: 'image/png', quality: undefined });
   });
 });
 

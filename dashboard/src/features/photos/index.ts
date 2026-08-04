@@ -4,25 +4,30 @@ export {
   photoDateLabel,
   photoDateText,
   photoLightboxCaption,
+  photoThumbnailUrl,
   toPhotoRecord,
   type Photo,
   type PhotoDateLabel,
   type PhotoDates,
+  type PhotoThumbnail,
 } from './photoMetadata';
 export {
   DEFAULT_MAX_IMAGE_SIDE,
   getFileExtension,
   prepareImageUpload,
+  type PreparedImageThumbnail,
   type PreparedImageUpload,
   type PrepareImageUploadOptions,
 } from './imagePreparation';
 export {
   deletePhotoObjects,
   uploadPreparedPhotos,
+  PHOTO_THUMBNAIL_SUFFIX,
   type BuildPhotoStoragePathParams,
   type PhotoUploadProgress,
   type PreparedPhoto,
   type UploadedPhotoObject,
+  type UploadedPhotoThumbnailObject,
   type UploadPreparedPhotosRequest,
 } from './photoUpload';
 export {

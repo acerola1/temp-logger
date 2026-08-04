@@ -31,6 +31,7 @@ import type {
   VineCoverPhotoRef,
   VineEvent,
   VineEventPhoto,
+  VineEventPhotoThumbnail,
   VineEventType,
   VinePlantingDate,
   VineRootType,
@@ -78,6 +79,23 @@ function optionalTimestampToIso(value: unknown): string | null {
   return value instanceof Timestamp || typeof value === 'string' ? timestampToIso(value) : null;
 }
 
+// A bélyeg csak a 17-es issue óta készül, és a régi fotókhoz nincs is: hiányzó
+// vagy hibás alak esetén `null`, azaz a felület a nagy képre esik vissza.
+function mapPhotoThumbnail(value: unknown): VineEventPhotoThumbnail | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const { storagePath, downloadUrl, width, height } = value as Record<string, unknown>;
+  // A letöltési URL nélkül a bélyeg használhatatlan, ezért ilyenkor nincs bélyeg.
+  if (typeof downloadUrl !== 'string' || !downloadUrl) return null;
+
+  return {
+    storagePath: typeof storagePath === 'string' ? storagePath : '',
+    downloadUrl,
+    width: typeof width === 'number' ? width : 0,
+    height: typeof height === 'number' ? height : 0,
+  };
+}
+
 function mapPhoto(value: DocumentData): VineEventPhoto {
   return {
     id: typeof value.id === 'string' ? value.id : '',
@@ -85,6 +103,7 @@ function mapPhoto(value: DocumentData): VineEventPhoto {
     downloadUrl: typeof value.downloadUrl === 'string' ? value.downloadUrl : '',
     width: typeof value.width === 'number' ? value.width : 0,
     height: typeof value.height === 'number' ? value.height : 0,
+    thumbnail: mapPhotoThumbnail(value.thumbnail),
     capturedAt: optionalTimestampToIso(value.capturedAt),
     uploadedAt: timestampToIso(value.uploadedAt),
     caption: typeof value.caption === 'string' ? value.caption : '',
