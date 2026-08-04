@@ -210,6 +210,12 @@ export function VineDetail({
 
   if (isMobileLayout && !selectedVine) return null;
 
+  // Az `editMode` csak a gomb állapota; a szerkesztő tényleges nyitottsága az
+  // admin jogtól és a betöltött értékektől is függ. Egy jelzőn vezetjük az űrlap
+  // megjelenítését és az olvasó nézet elrejtését, hogy a kettő ne csúszhasson
+  // szét (pl. ha a jog elvész nyitott szerkesztő mellett).
+  const isEditingBasics = editMode && isAdmin && editFormValues !== null;
+
   const wrapperClass = isMobileLayout
     ? 'fixed inset-0 z-[110] bg-black/65 p-3'
     : 'rounded-3xl border border-vine-200 bg-white/80 p-5 shadow-sm dark:border-vine-700 dark:bg-vine-900/40';
@@ -305,51 +311,63 @@ export function VineDetail({
                 </figure>
               )}
 
-              <dl className="grid gap-4 rounded-2xl bg-vine-50 px-4 py-4 sm:grid-cols-2 dark:bg-vine-800/50">
-                <MetaRow label="Telepítési idő">{formatPlantingDate(selectedVine.plantingDate)}</MetaRow>
-                <MetaRow label="Termett már">{selectedVine.hasFruited ? 'Igen' : 'Nem'}</MetaRow>
-                <MetaRow label="Alanyfajta">
-                  {selectedVine.rootstockVariety || <span className="text-vine-500 dark:text-vine-300">Nincs megadva</span>}
-                </MetaRow>
-                <MetaRow label="Eredeti dugvány">
-                  {!selectedVine.sourceCuttingId ? (
-                    <span className="text-vine-500 dark:text-vine-300">Nincs hivatkozás</span>
-                  ) : cuttingOptionsLoading ? (
-                    <span role="status" className="text-vine-500 dark:text-vine-300">
-                      Hivatkozott dugvány betöltése…
-                    </span>
-                  ) : cuttingOptionsError ? (
-                    <span role="alert" className="text-red-700 dark:text-red-300">
-                      A hivatkozott dugvány ellenőrzése sikertelen
-                    </span>
-                  ) : sourceCutting ? (
-                    <button
-                      type="button"
-                      onClick={() => onOpenCutting(sourceCutting.id)}
-                      className="inline-flex items-center gap-1 font-medium text-vine-700 underline underline-offset-2 hover:text-vine-900 dark:text-vine-200 dark:hover:text-vine-50"
-                    >
-                      {sourceCutting.label}
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </button>
-                  ) : (
-                    <span role="status" className="text-amber-700 dark:text-amber-300">
-                      A hivatkozott dugvány nem elérhető
-                    </span>
-                  )}
-                </MetaRow>
-                <div className="sm:col-span-2">
-                  <MetaRow label="Területleírás">{selectedVine.areaDescription}</MetaRow>
-                </div>
-                <MetaRow label="Létrehozva">{formatDateTime(selectedVine.createdAt)}</MetaRow>
-                <MetaRow label="Módosítva">{formatDateTime(selectedVine.updatedAt)}</MetaRow>
-              </dl>
+              {/* Szerkesztés közben a metaadat-rács és a jegyzet ugyanazt az adatot
+                  mutatná, amit az űrlap szerkeszthetően — ezért ilyenkor kimarad. */}
+              {!isEditingBasics && (
+                <>
+                  <dl
+                    data-testid="vine-meta"
+                    className="grid gap-4 rounded-2xl bg-vine-50 px-4 py-4 sm:grid-cols-2 dark:bg-vine-800/50"
+                  >
+                    <MetaRow label="Telepítési idő">{formatPlantingDate(selectedVine.plantingDate)}</MetaRow>
+                    <MetaRow label="Termett már">{selectedVine.hasFruited ? 'Igen' : 'Nem'}</MetaRow>
+                    <MetaRow label="Alanyfajta">
+                      {selectedVine.rootstockVariety || <span className="text-vine-500 dark:text-vine-300">Nincs megadva</span>}
+                    </MetaRow>
+                    <MetaRow label="Eredeti dugvány">
+                      {!selectedVine.sourceCuttingId ? (
+                        <span className="text-vine-500 dark:text-vine-300">Nincs hivatkozás</span>
+                      ) : cuttingOptionsLoading ? (
+                        <span role="status" className="text-vine-500 dark:text-vine-300">
+                          Hivatkozott dugvány betöltése…
+                        </span>
+                      ) : cuttingOptionsError ? (
+                        <span role="alert" className="text-red-700 dark:text-red-300">
+                          A hivatkozott dugvány ellenőrzése sikertelen
+                        </span>
+                      ) : sourceCutting ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenCutting(sourceCutting.id)}
+                          className="inline-flex items-center gap-1 font-medium text-vine-700 underline underline-offset-2 hover:text-vine-900 dark:text-vine-200 dark:hover:text-vine-50"
+                        >
+                          {sourceCutting.label}
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <span role="status" className="text-amber-700 dark:text-amber-300">
+                          A hivatkozott dugvány nem elérhető
+                        </span>
+                      )}
+                    </MetaRow>
+                    <div className="sm:col-span-2">
+                      <MetaRow label="Területleírás">{selectedVine.areaDescription}</MetaRow>
+                    </div>
+                    <MetaRow label="Létrehozva">{formatDateTime(selectedVine.createdAt)}</MetaRow>
+                    <MetaRow label="Módosítva">{formatDateTime(selectedVine.updatedAt)}</MetaRow>
+                  </dl>
 
-              <div className="rounded-2xl bg-vine-50 px-4 py-3 text-sm text-vine-700 dark:bg-vine-800/60 dark:text-vine-100">
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-vine-500 dark:text-vine-300">
-                  Általános jegyzet
-                </div>
-                {selectedVine.notes || <span className="text-vine-500 dark:text-vine-300">Nincs jegyzet.</span>}
-              </div>
+                  <div
+                    data-testid="vine-notes"
+                    className="rounded-2xl bg-vine-50 px-4 py-3 text-sm text-vine-700 dark:bg-vine-800/60 dark:text-vine-100"
+                  >
+                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-vine-500 dark:text-vine-300">
+                      Általános jegyzet
+                    </div>
+                    {selectedVine.notes || <span className="text-vine-500 dark:text-vine-300">Nincs jegyzet.</span>}
+                  </div>
+                </>
+              )}
 
               {isAdmin && (
                 <div className="flex items-center justify-end">
@@ -368,7 +386,7 @@ export function VineDetail({
                 </div>
               )}
 
-              {editMode && isAdmin && editFormValues && (
+              {isEditingBasics && editFormValues && (
                 <VineForm
                   serialNumber={selectedVine.serialNumber}
                   defaultValues={editFormValues}

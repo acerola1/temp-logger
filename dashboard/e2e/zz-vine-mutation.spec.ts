@@ -75,6 +75,16 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await editForm.getByRole('button', { name: 'Mentés' }).click();
   await expect(editForm).toHaveCount(0);
   await expect(page.getByTestId('vine-detail').getByText('Megszűnt', { exact: true })).toBeVisible();
+  // Sikeres mentés után az olvasó nézet hiánytalanul visszatér, a mentett értékkel
+  // és egy frissült `Módosítva` időponttal.
+  await expect(vineDetail.getByTestId('vine-meta')).toBeVisible();
+  await expect(vineDetail.getByTestId('vine-notes')).toBeVisible();
+  await expect(vineDetail.getByRole('heading', { name: 'Cabernet Franc' })).toBeVisible();
+  // A szerver írja az `updatedAt`-ot, ezért a formátumra horgonyzunk: a perces
+  // felbontáson a mentés előtti érték is ugyanaz lehetne.
+  await expect(
+    vineDetail.locator('dt', { hasText: 'Módosítva' }).locator('xpath=following-sibling::dd'),
+  ).toHaveText(/^\d{4}\.\d{2}\.\d{2}\. \d{2}:\d{2}$/);
 
   await page.getByRole('button', { name: 'Alapadatok szerkesztése' }).click();
   editForm = page.getByRole('form', { name: 'Szőlőtőke #4 űrlap' });

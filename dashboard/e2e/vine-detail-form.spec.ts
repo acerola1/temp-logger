@@ -194,6 +194,10 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
   const editForm = page.getByRole('form', { name: 'Tőkeesemény szerkesztése' });
   await expect(editForm).toBeVisible();
   await expect(editForm.locator('input[type="file"]')).toHaveCount(0);
+  // A `Szerkesztés` gomb kattintása görget, a dev módban futó devtools-gomb
+  // viszont fix pozíciójú: a görgetést nullázni kell, különben a teljes lapos
+  // képen a gomb máshova esik futásonként.
+  await page.evaluate(() => window.scrollTo(0, 0));
   await expect(page).toHaveScreenshot('toke-esemeny-urlap-szerkesztes-desktop.png', {
     fullPage: true,
     animations: 'disabled',
@@ -206,6 +210,73 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
     fullPage: true,
     animations: 'disabled',
   });
+});
+
+test('az alapadat-szerkesztő elrejti az olvasó nézet duplikált blokkjait', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1280, height: 1100 });
+  await page.goto('/tokek/vine-e2e-1');
+
+  const detail = page.getByTestId('vine-detail');
+  const meta = detail.getByTestId('vine-meta');
+  const notes = detail.getByTestId('vine-notes');
+  await expect(meta).toBeVisible();
+  await expect(notes).toBeVisible();
+
+  await page.getByRole('button', { name: 'Teszt admin belépés' }).click();
+  await page.getByRole('button', { name: 'Alapadatok szerkesztése' }).click();
+
+  // Szerkesztés közben a metaadat-rács és a jegyzet blokk kiesik, az azonosító
+  // fejléc viszont marad, hogy látszódjon, melyik tőkét szerkesztjük.
+  const editForm = page.getByRole('form', { name: 'Szőlőtőke #1 űrlap' });
+  await expect(editForm).toBeVisible();
+  await expect(meta).toHaveCount(0);
+  await expect(notes).toHaveCount(0);
+  await expect(detail.getByText('Szőlőtőke #1')).toBeVisible();
+  await expect(detail.getByRole('heading', { name: 'Kékfrankos' })).toBeVisible();
+  // Az űrlap `Állapot` legördülőjében is szerepel az `Aktív` szöveg, ezért a
+  // fejléc badge-ére a span-re szűkítve horgonyzunk.
+  await expect(detail.locator('span', { hasText: /^Aktív$/ })).toBeVisible();
+  // A címkebadge szövege csak itt fordul elő szövegként: az űrlapon input értéke.
+  await expect(detail.getByText('öreg tőke')).toBeVisible();
+  // Az eseménynapló nem duplikálja az űrlapot, ezért nyitott szerkesztő mellett is marad.
+  await expect(detail.getByTestId('vine-event').first()).toBeVisible();
+  await expect(page).toHaveScreenshot('toke-alapadat-szerkeszto-desktop.png', {
+    fullPage: true,
+    animations: 'disabled',
+  });
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(detail).toHaveCSS('position', 'fixed');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(page).toHaveScreenshot('toke-alapadat-szerkeszto-mobile.png', {
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 1280, height: 1100 });
+
+  // Sikertelen mentés: az űrlap a hibaüzenettel nyitva marad, az olvasó nézet
+  // ekkor sem jön vissza a szerkesztő mellé.
+  await editForm.locator('[name="variety"]').fill('   ');
+  await editForm.getByRole('button', { name: 'Mentés' }).click();
+  await expect(editForm.getByRole('alert')).toHaveText('A fajta megadása kötelező.');
+  await expect(editForm).toBeVisible();
+  await expect(meta).toHaveCount(0);
+  await expect(notes).toHaveCount(0);
+
+  // `Mégse` után az olvasó nézet hiánytalanul visszatér, mentés nélkül.
+  await editForm.getByRole('button', { name: 'Mégse' }).click();
+  await expect(editForm).toHaveCount(0);
+  await expect(meta).toBeVisible();
+  await expect(notes).toBeVisible();
+  await expect(detail.getByRole('heading', { name: 'Kékfrankos' })).toBeVisible();
+
+  // `Szerkesztő bezárása` ugyanúgy visszaadja az olvasó nézetet.
+  await page.getByRole('button', { name: 'Alapadatok szerkesztése' }).click();
+  await expect(meta).toHaveCount(0);
+  await page.getByRole('button', { name: 'Szerkesztő bezárása' }).click();
+  await expect(meta).toBeVisible();
+  await expect(notes).toBeVisible();
 });
 
 test('a hiányzó forrásdugvány érthető állapotként jelenik meg', async ({ page }) => {
