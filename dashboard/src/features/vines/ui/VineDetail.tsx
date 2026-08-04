@@ -5,6 +5,7 @@ import {
   PhotoLightbox,
   photoDateText,
   photoLightboxCaption,
+  photoThumbnailUrl,
   type PhotoLightboxImage,
 } from '../../photos';
 import type { VineEventFormValues, VineFormValues } from '../forms';
@@ -292,9 +293,13 @@ export function VineDetail({
                   >
                     {/* Kötött magasságú, vágás nélküli keret: a telefonnal álló
                         helyzetben fotózott tőke is egészben látszik, a fekvő kép
-                        nem lóg ki, és a borító mobilon sem tolja el az adatokat. */}
+                        nem lóg ki, és a borító mobilon sem tolja el az adatokat.
+                        A forrás itt is a bélyeg: az adatlap megnyitása mobilon
+                        se töltsön le nagy képet. A részletes változat egy
+                        koppintásra, a képnézőben jön le — a borító ezért lágyabb
+                        ebben a nagyobb keretben. */}
                     <img
-                      src={coverPhoto.photo.downloadUrl}
+                      src={photoThumbnailUrl(coverPhoto.photo)}
                       alt=""
                       className="h-48 w-full object-contain sm:h-56"
                     />

@@ -16,9 +16,11 @@ import type { VineEventPhoto } from './model';
 // részletek (rügy, metszés, betegségtünet) 1000 px-en már elmosódtak.
 const VINE_EVENT_PHOTO_MAX_SIDE = 1280;
 
-// A tőkelista és az eseménykártya 80 px-es keretei ezt töltik le a nagy kép
-// helyett: 320 px 3× DPR-en is éles marad, viszont a tizede az adatforgalomnak.
-export const VINE_EVENT_PHOTO_THUMBNAIL_MAX_SIDE = 320;
+// A bélyeg a mobiladat kímélésére a lehető legkisebb: 120 px a 80 px-es
+// listakeretet 1,5× DPR-ig élesen kitölti. Az adatlap fejléce ennél nagyobb
+// keret, ott a bélyeg lágyabb — a részletes kép egy koppintásra, a képnézőben
+// jön le, cserébe a lista és az adatlap megnyitása alig fogyaszt adatot.
+export const VINE_EVENT_PHOTO_THUMBNAIL_MAX_SIDE = 120;
 
 export type PreparedVineEventPhoto = PreparedPhoto;
 

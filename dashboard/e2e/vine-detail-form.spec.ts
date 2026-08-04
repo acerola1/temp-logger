@@ -63,9 +63,10 @@ test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és
   await expect(listCover).toHaveAttribute('src', SEED_PHOTO_THUMBNAIL_URL);
   await expect(listCover).toHaveAttribute('loading', 'lazy');
 
-  // Az adatlap fejlécének borítója viszont a nagy képet tartja: egy 320 px-es
-  // bélyeg ezen a méreten már mosott lenne.
-  await expect(coverPhoto.locator('img')).toHaveAttribute('src', SEED_PHOTO_URL);
+  // Az adatlap fejlécének borítója is a bélyeget tölti: az adatlap megnyitása
+  // mobilon se hozzon le nagy képet. A részletes változat csak koppintásra, a
+  // képnézőben jön le.
+  await expect(coverPhoto.locator('img')).toHaveAttribute('src', SEED_PHOTO_THUMBNAIL_URL);
 
   // Az eseménykártya fotósora is a bélyeget mutatja, ahol van; a bélyeg nélküli
   // seed-fotó a nagy képre esik vissza, hibaüzenet és üres keret nélkül.

@@ -63,12 +63,14 @@ soros hurkában megy, hibára a részleges eredményt takarítja
 - **A már kicsi kép nem kap bélyeget.** Ha az eredeti hosszabbik oldala nem
   nagyobb a bélyegméretnél, `thumbnail: null` marad, és a fallback maga a
   nagy kép — ami ilyenkor már eleve kicsi.
-- **A bélyeg csak a kis keretekben jelenik meg.** A tőke adatlap fejlécének
-  borítója (`h-48 sm:h-56`,
+- **A nagy kép csak koppintásra jön le.** A tőkelista, az eseménykártya
+  fotósora és a tőke adatlap fejlécének borítója (`h-48 sm:h-56`,
   [VineDetail.tsx:290-294](../../dashboard/src/features/vines/ui/VineDetail.tsx#L290-L294))
-  és a `PhotoLightbox` a nagy képet tartja: egy 320 px-es bélyeg ezeken már
-  látványosan mosott lenne. A `15` „az adatlap ugyanazt a képet mutatja, mint a
-  lista" kritériuma emiatt nem sérül: ugyanaz a fotó, csak más változata.
+  is a bélyeget tölti; az eredeti méret egyedül a `PhotoLightbox`-ban, azaz a
+  felhasználó szándékos koppintására töltődik le. A fejléc keretében a bélyeg
+  emiatt lágyabb — ez a mobiladat ára, tudatosan vállalva. A `15` „az adatlap
+  ugyanazt a képet mutatja, mint a lista" kritériuma nem sérül: ugyanaz a fotó,
+  csak más változata.
 - **A dugványoldal ebben az issue-ban nem változik.** Az új opció opt-in a
   `prepareImageUpload`-on, a `usePhotoUpload` hívói
   ([usePhotoUpload.ts:74](../../dashboard/src/features/photos/usePhotoUpload.ts#L74))
@@ -87,8 +89,8 @@ soros hurkában megy, hibára a részleges eredményt takarítja
 - a bélyegbe is bele kell égetni az EXIF-forgatást, mert az átméretezett kép nem
   hordoz EXIF-et — a nagy képnél már ez a szabály
 - a tőkeeseményfotó bélyegmérete a `vineEventPhotos.ts`-ben van kimondva a
-  1280 px mellé: `VINE_EVENT_PHOTO_THUMBNAIL_MAX_SIDE = 320` (a 80 px-es keret
-  3× DPR-en is éles)
+  1280 px mellé: `VINE_EVENT_PHOTO_THUMBNAIL_MAX_SIDE = 120` (a 80 px-es keret
+  1,5× DPR-ig éles)
 - `uploadPreparedPhotos` a bélyeget a nagy kép után, ugyanazzal a `photoId`-val,
   `_thumb` utótaggal tölti fel; a visszatérő `UploadedPhotoObject` egy
   `thumbnail: { storagePath; downloadUrl; width; height } | null` mezőt is ad
@@ -114,11 +116,11 @@ soros hurkában megy, hibára a részleges eredményt takarítja
 - [x] Új tőkeeseményfotó feltöltése után a Storage-ban két objektum van
       (`{photoId}.jpg` és `{photoId}_thumb.jpg`), és a fotórekord `thumbnail`
       mezője a kisebbre mutat.
-- [x] A bélyeg hosszabbik oldala 320 px, a képaránya megegyezik a nagy képével.
+- [x] A bélyeg hosszabbik oldala 120 px, a képaránya megegyezik a nagy képével.
 - [x] Álló, EXIF-forgatást igénylő fotó bélyege is a helyes állásban van, nem
       fekszik el.
 - [x] Png forrásból png bélyeg készül, és az átlátszó háttér nem lesz fekete.
-- [x] 320 px-nél nem nagyobb eredeti kép esetén nem készül külön bélyeg, a
+- [x] 120 px-nél nem nagyobb eredeti kép esetén nem készül külön bélyeg, a
       rekord `thumbnail` mezője `null`, és a felület a nagy képet mutatja.
 - [x] A tőkelista kártyáin az `img` a bélyegre hivatkozik, bélyeg nélküli fotónál
       a nagy képre, hibaüzenet és üres keret nélkül.
@@ -127,8 +129,8 @@ soros hurkában megy, hibára a részleges eredményt takarítja
       px-esek nem.
 - [x] A képernyőn kívüli kártyák képei nem töltődnek le, amíg a felhasználó nem
       görget odáig.
-- [x] A tőke adatlap fejlécének borítója és a `PhotoLightbox` továbbra is a nagy
-      képet tölti.
+- [x] A tőke adatlap fejlécének borítója is a bélyeget tölti; a nagy kép csak a
+      `PhotoLightbox`-ban, koppintás után jön le.
 - [x] Az eseménykártya fotósora is a bélyeget mutatja, a nagyítás viszont a nagy
       képet nyitja.
 - [x] Fotó törlésekor a bélyeg objektuma is törlődik; esemény törlésekor az
@@ -165,12 +167,20 @@ soros hurkában megy, hibára a részleges eredményt takarítja
 - `dashboard/src/features/vines/firestoreVines.ts`
 - `dashboard/src/features/vines/firestoreVines.integration.test.ts`
 - `dashboard/src/features/vines/ui/VinesList.tsx`
+- `dashboard/src/features/vines/ui/VineDetail.tsx`
 - `dashboard/src/features/vines/ui/VineEventPhotos.tsx`
 - `dashboard/scripts/seed-e2e-data.mjs`
 - `dashboard/e2e/vines-list.spec.ts`
 
 ## Comments
 
+- 2026-08-04: Utólagos szigorítás a mobiladatra: a bélyegméret 320 px helyett
+  120 px, és az adatlap fejlécének borítója is a bélyeget tölti. A nagy kép így
+  egyedül a képnézőben, a felhasználó koppintására jön le. Cserébe a fejléc
+  keretében (`h-48 sm:h-56`) a bélyeg ~1,6–1,9× nagyításban, retina telefonon
+  3–5× eszközpixelben látszik, tehát láthatóan lágy — ez tudatos csere. Ha
+  később mégis élesebb fejléc kell, egy közepes (például 640 px-es) második
+  változat a mostani `thumbnail` mező mintájára felvehető.
 - 2026-08-04: A `15` kommentje már kimondta, hogy a lista nem igényel új
   Firestore-olvasást, viszont a bélyeg helyett az 1280 px-es képet töltené le, és
   hogy a kisebb változat generálása külön feladat — ez az az issue.

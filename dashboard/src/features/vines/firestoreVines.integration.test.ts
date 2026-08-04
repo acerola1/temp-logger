@@ -1122,8 +1122,8 @@ describe('Firestore vine catalog', () => {
 
     // A bélyeg a nagy kép mellett, ugyanabban a mappában, `_thumb` utótaggal él.
     expect(thumbnailPath).toBe(photo?.storagePath.replace(/\.png$/, '_thumb.png'));
-    // A 640×480-as tesztkép a 320 px-es bélyegméretre, arányosan.
-    expect(photo?.thumbnail).toMatchObject({ width: 320, height: 240 });
+    // A 640×480-as tesztkép a 120 px-es bélyegméretre, arányosan.
+    expect(photo?.thumbnail).toMatchObject({ width: 120, height: 90 });
     expect(
       new Uint8Array(await getBytes(ref(adminClientStorage, thumbnailPath))),
     ).toEqual(new Uint8Array(THUMBNAIL_BYTES));
