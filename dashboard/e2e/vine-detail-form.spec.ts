@@ -134,8 +134,10 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
     .locator('img');
   await expect(pickerCover).toHaveAttribute('src', SEED_PHOTO_THUMBNAIL_URL);
   await expect(pickerCover).toHaveAttribute('loading', 'lazy');
-  await expect(page).toHaveScreenshot('toke-celvalaszto-desktop.png', {
-    fullPage: true,
+  // Itt szándékosan a dialógus elemére, nem `fullPage`-re fényképezünk: a
+  // `fixed` overlay a teljes lapos kompozitban a pillanatnyi görgetési
+  // pozíciótól függő helyre esik, ami környezetenként elmozdul.
+  await expect(targetPicker).toHaveScreenshot('toke-celvalaszto-desktop.png', {
     animations: 'disabled',
   });
 
