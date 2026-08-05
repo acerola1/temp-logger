@@ -217,8 +217,13 @@ A fotó nem tartalmaz `eventId`-t. Az esemény és a fotó műveletei és
   eseményfotó-parancs, a `MAX_VINE_EVENT_PHOTOS` és az űrlapok fotóválasztása.
   Ellenőrizve: `npm test` (177 teszt), `npm run test:integration` (46 teszt),
   `npm run lint`, `npm run build`, teljes Playwright E2E (20 teszt,
-  képernyőképek újragenerálva). Az éles migráció a `20` runbookja szerint a
-  deployjal együtt fut, még nem futott le.
+  képernyőképek újragenerálva).
+- 2026-08-05: Éles cutover megtörtént. A `20` migrációja lefutott a `g-temp-log`
+  projekten (6 tőke, 15 fotó, nulla hibás `--verify`), majd
+  `firebase deploy --only hosting,storage`. A publikus adatlap éles ellenőrzése
+  zöld: a `Fotók (N)` galéria, a bélyegrács és a fejlécborító a migrált fotókat
+  mutatja, a képek a régi eseményes Storage-útvonalról töltődnek le
+  hibaüzenet és konzolhiba nélkül, az eseménykártyákon pedig nincs fotósor.
 - A cutover szándékosan egy issue: a modellel együtt kell eltűnnie az eseményes
   UI-nak és megjelennie a tőkegalériának, különben valamelyik köztes commit nem
   fordulna vagy a felhasználó fotói átmenetileg elérhetetlenné válnának.

@@ -138,5 +138,14 @@ A tesztfixture legalább ezeket fedje:
   (`~/firestore-backups/restore-vines.js`). Emulátoron végigment a teljes kör: a
   mentés bitre azonosan visszaáll, a migráció az éles dokumentumalakokon zöld,
   és utána a mentés még mindig visszaállítja az eredeti állapotot.
-  Az éles `--apply` szándékosan **nem** futott le: a 21-es cutover előtt a régi
-  dashboard nem találná a tőkefotókat. A migráció a 21-es deployjával együtt fut.
+  Az éles `--apply` ekkor szándékosan **nem** futott le: a 21-es cutover előtt a
+  régi dashboard nem találná a tőkefotókat. A migráció a 21-es deployjával együtt
+  futott le, lásd a következő bejegyzést.
+- 2026-08-05: Éles futás megtörtént a `g-temp-log` projekten, a 21-es cutover
+  deployjával egy ablakban. `--apply --backup-verified=~/firestore-backups/g-temp-log-vines-2026-08-05.json`:
+  6 vizsgált tőke, 6 migrált, 15 fotó, 0 ütközés, 0 hibás rekord, 0 törött borító,
+  0 hiba. Az utána futó `--verify` nulla hibával, `already-migrated: 6` eredménnyel
+  zárt. Storage-objektum nem mozdult.
+  A futás közben derült ki, hogy az npm scriptek nem adták meg a `--project`-et, a
+  gép gcloud-alapértelmezése pedig egy másik projekt: a scriptek most a célpontot
+  magukban hordozzák, és a script megáll, ha a projektazonosító ismeretlen.
