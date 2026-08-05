@@ -10,7 +10,13 @@ import {
   type DocumentData,
   type QuerySnapshot,
 } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { db, storage } from '../../lib/firebase';
+import {
+  addCuttingPhotos as addCuttingPhotosTransaction,
+  deleteCuttingPhoto as deleteCuttingPhotoTransaction,
+  editCuttingPhotoCaption as editCuttingPhotoCaptionTransaction,
+  mapCuttingPhotos,
+} from '../../features/cuttings/firestoreCuttingPhotos';
 import type {
   CreateCuttingInput,
   Cutting,
@@ -34,18 +40,6 @@ interface FirestoreCutting {
   createdAt?: string;
   updatedAt?: string;
   createdByUid?: string | null;
-}
-
-interface LegacyFirestoreCuttingPhoto {
-  id?: string;
-  storagePath?: string;
-  downloadUrl?: string;
-  url?: string;
-  capturedAt?: string | null;
-  uploadedAt?: string;
-  width?: number;
-  height?: number;
-  caption?: string;
 }
 
 interface LegacyFirestoreCuttingWateringLog {
@@ -91,34 +85,7 @@ export function useCuttingsQuery() {
     (snapshot: QuerySnapshot<DocumentData>) =>
       snapshot.docs.map((snapshotDoc) => {
         const data = snapshotDoc.data() as FirestoreCutting;
-        const mappedPhotos = Array.isArray(data.photos)
-          ? data.photos
-              .map((photo, index) => {
-                const legacyPhoto = photo as LegacyFirestoreCuttingPhoto;
-                const url = legacyPhoto.url ?? legacyPhoto.downloadUrl ?? '';
-
-                if (!url) {
-                  return null;
-                }
-
-                const mappedPhoto: CuttingPhoto = {
-                  id: legacyPhoto.id ?? `${snapshotDoc.id}-photo-${index}`,
-                  storagePath: legacyPhoto.storagePath ?? '',
-                  downloadUrl: url,
-                  capturedAt: legacyPhoto.capturedAt ?? null,
-                  uploadedAt: legacyPhoto.uploadedAt ?? new Date(0).toISOString(),
-                  width: legacyPhoto.width ?? 0,
-                  height: legacyPhoto.height ?? 0,
-                  // A dugványfotókhoz nem készül bélyeg: a galéria a nagy képet
-                  // tölti, ahogy eddig is.
-                  thumbnail: null,
-                  caption: legacyPhoto.caption ?? '',
-                };
-
-                return mappedPhoto;
-              })
-              .filter((photo): photo is CuttingPhoto => photo !== null)
-          : [];
+        const mappedPhotos = mapCuttingPhotos(data.photos, snapshotDoc.id);
 
         return {
           id: snapshotDoc.id,
@@ -198,16 +165,67 @@ export function useCuttingsQuery() {
     },
   });
 
+  const addPhotosMutation = useMutation({
+    mutationFn: async ({ cuttingId, photos }: { cuttingId: string; photos: CuttingPhoto[] }) => {
+      await addCuttingPhotosTransaction(db, storage, cuttingId, photos);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [...queryKey] });
+    },
+  });
+
+  const editPhotoCaptionMutation = useMutation({
+    mutationFn: async ({
+      cuttingId,
+      photoId,
+      caption,
+    }: {
+      cuttingId: string;
+      photoId: string;
+      caption: string;
+    }) => {
+      await editCuttingPhotoCaptionTransaction(db, cuttingId, photoId, caption);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [...queryKey] });
+    },
+  });
+
+  const deletePhotoMutation = useMutation({
+    mutationFn: async ({ cuttingId, photoId }: { cuttingId: string; photoId: string }) => {
+      await deleteCuttingPhotoTransaction(db, storage, cuttingId, photoId);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [...queryKey] });
+    },
+  });
+
+  const photoMutationPending =
+    addPhotosMutation.isPending ||
+    editPhotoCaptionMutation.isPending ||
+    deletePhotoMutation.isPending;
+  const photoMutationError =
+    addPhotosMutation.error ?? editPhotoCaptionMutation.error ?? deletePhotoMutation.error;
+
+  const resetPhotoErrors = () => {
+    addPhotosMutation.reset();
+    editPhotoCaptionMutation.reset();
+    deletePhotoMutation.reset();
+  };
+
   return {
     data,
     loading,
     error,
     isCreating: createCuttingMutation.isPending,
-    isUpdating: updateCuttingMutation.isPending,
+    isUpdating: updateCuttingMutation.isPending || photoMutationPending,
     createError: createCuttingMutation.error,
-    updateError: updateCuttingMutation.error,
+    updateError: photoMutationError ?? updateCuttingMutation.error,
     resetCreateError: createCuttingMutation.reset,
-    resetUpdateError: updateCuttingMutation.reset,
+    resetUpdateError: () => {
+      updateCuttingMutation.reset();
+      resetPhotoErrors();
+    },
     createCutting: async (cuttingId: string, input: CreateCuttingInput) => {
       createCuttingMutation.reset();
       return createCuttingMutation.mutateAsync({ cuttingId, input });
@@ -215,6 +233,18 @@ export function useCuttingsQuery() {
     updateCutting: async (cuttingId: string, updates: Partial<Omit<Cutting, 'id'>>) => {
       updateCuttingMutation.reset();
       return updateCuttingMutation.mutateAsync({ cuttingId, updates });
+    },
+    addCuttingPhotos: async (cuttingId: string, photos: CuttingPhoto[]) => {
+      addPhotosMutation.reset();
+      return addPhotosMutation.mutateAsync({ cuttingId, photos });
+    },
+    editCuttingPhotoCaption: async (cuttingId: string, photoId: string, caption: string) => {
+      editPhotoCaptionMutation.reset();
+      return editPhotoCaptionMutation.mutateAsync({ cuttingId, photoId, caption });
+    },
+    deleteCuttingPhoto: async (cuttingId: string, photoId: string) => {
+      deletePhotoMutation.reset();
+      return deletePhotoMutation.mutateAsync({ cuttingId, photoId });
     },
   };
 }

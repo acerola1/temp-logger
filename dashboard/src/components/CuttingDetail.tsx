@@ -19,7 +19,7 @@ import {
 } from './cuttingsViewUtils';
 import { formatDate, formatDateTime, toDateTimeLocalValue } from '../lib/dateFormat';
 import { cuttingEventFormSchema } from '../lib/schemas';
-import type { Cutting, CuttingEventType } from '../types/cutting';
+import type { Cutting, CuttingEventType, CuttingPhoto } from '../types/cutting';
 import type { CuttingEventFormValues, CuttingFormValues } from '../types/forms';
 
 const EVENT_TYPE_OPTIONS: CuttingEventType[] = [
@@ -39,6 +39,13 @@ interface CuttingDetailProps {
   isUpdating: boolean;
   onCloseSelectedCutting: () => void;
   onUpdateCutting: (cuttingId: string, updates: Partial<Omit<Cutting, 'id'>>) => Promise<void>;
+  onAddCuttingPhotos: (cuttingId: string, photos: CuttingPhoto[]) => Promise<void>;
+  onDeleteCuttingPhoto: (cuttingId: string, photoId: string) => Promise<void>;
+  onEditCuttingPhotoCaption: (
+    cuttingId: string,
+    photoId: string,
+    caption: string,
+  ) => Promise<void>;
   updateErrorMessage: string | null;
   onClearUpdateError: () => void;
 }
@@ -70,6 +77,9 @@ export function CuttingDetail({
   isUpdating,
   onCloseSelectedCutting,
   onUpdateCutting,
+  onAddCuttingPhotos,
+  onDeleteCuttingPhoto,
+  onEditCuttingPhotoCaption,
   updateErrorMessage,
   onClearUpdateError,
 }: CuttingDetailProps) {
@@ -417,7 +427,10 @@ export function CuttingDetail({
             <CuttingPhotoGallery
               cutting={selectedCutting}
               isAdmin={isAdmin}
-              onUpdateCutting={onUpdateCutting}
+              isUpdating={isUpdating}
+              onAddPhotos={onAddCuttingPhotos}
+              onDeletePhoto={onDeleteCuttingPhoto}
+              onEditCaption={onEditCuttingPhotoCaption}
               updateErrorMessage={updateErrorMessage}
               onClearUpdateError={onClearUpdateError}
               highlightedPhotoId={highlightedId}

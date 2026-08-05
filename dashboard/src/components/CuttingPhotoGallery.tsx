@@ -1,370 +1,75 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { deleteObject, ref } from 'firebase/storage';
-import {
-  Camera,
-  ChevronLeft,
-  ChevronRight,
-  ImagePlus,
-  Loader2,
-  Sprout,
-  Trash2,
-} from 'lucide-react';
-import { storage } from '../lib/firebase';
-import { formatMonthDay } from '../lib/dateFormat';
-import {
-  PhotoLightbox,
-  photoDateLabel,
-  photoDateText,
-  photoLightboxCaption,
-  usePhotoPicker,
-  usePhotoUpload,
-  type PhotoLightboxImage,
-} from '../features/photos';
-import type { Cutting } from '../types/cutting';
+import { DEFAULT_MAX_IMAGE_SIDE, PhotoGallery, usePhotoUpload } from '../features/photos';
+import type { Cutting, CuttingPhoto } from '../types/cutting';
 import { toCuttingPhotos } from './cuttingsViewUtils';
 
 interface CuttingPhotoGalleryProps {
   cutting: Cutting;
   isAdmin: boolean;
-  onUpdateCutting: (cuttingId: string, updates: Partial<Omit<Cutting, 'id'>>) => Promise<void>;
+  isUpdating: boolean;
+  onAddPhotos: (cuttingId: string, photos: CuttingPhoto[]) => Promise<void>;
+  onDeletePhoto: (cuttingId: string, photoId: string) => Promise<void>;
+  onEditCaption: (cuttingId: string, photoId: string, caption: string) => Promise<void>;
   updateErrorMessage: string | null;
   onClearUpdateError: () => void;
   highlightedPhotoId?: string | null;
 }
 
+/** A dugvány saját felelőssége csak a Storage-feltöltés és a domain callbackek bekötése. */
 export function CuttingPhotoGallery({
   cutting,
   isAdmin,
-  onUpdateCutting,
+  isUpdating,
+  onAddPhotos,
+  onDeletePhoto,
+  onEditCaption,
   updateErrorMessage,
   onClearUpdateError,
   highlightedPhotoId = null,
 }: CuttingPhotoGalleryProps) {
-  const [photoDeletingId, setPhotoDeletingId] = useState<string | null>(null);
-  const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
-  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
-  const detailFileInputRef = useRef<HTMLInputElement>(null);
-  const latestPhotosRef = useRef(cutting.photos);
-  const { isMobileDevice, openPicker } = usePhotoPicker();
   const {
     upload: uploadPhotos,
     uploading: photoUploading,
     error: photoUploadError,
   } = usePhotoUpload();
 
-  const activePhoto =
-    cutting.photos.find((photo) => photo.id === activePhotoId) ?? cutting.photos.at(-1) ?? null;
-  const totalPhotos = cutting.photos.length;
-  const activePhotoIndex = activePhoto
-    ? cutting.photos.findIndex((photo) => photo.id === activePhoto.id)
-    : -1;
-
-  // A bélyegek dátumcímkéi: a feltöltés-progressz miatt sűrűn újrarendelünk,
-  // ezért a dátumformázás nem futhat minden rendernél.
-  const photoDateBadges = useMemo(
-    () =>
-      new Map(
-        cutting.photos.map((photo) => {
-          const label = photoDateLabel(photo);
-
-          return [
-            photo.id,
-            {
-              isCaptured: label.isCaptured,
-              badge: formatMonthDay(label.value),
-              title: photoDateText(photo),
-            },
-          ];
-        }),
-      ),
-    [cutting.photos],
-  );
-
-  const goToPreviousPhoto = useCallback(() => {
-    if (totalPhotos <= 1 || activePhotoIndex < 0) {
-      return;
-    }
-    const previousIndex = (activePhotoIndex - 1 + totalPhotos) % totalPhotos;
-    setActivePhotoId(cutting.photos[previousIndex]?.id ?? null);
-  }, [activePhotoIndex, cutting.photos, totalPhotos]);
-
-  const goToNextPhoto = useCallback(() => {
-    if (totalPhotos <= 1 || activePhotoIndex < 0) {
-      return;
-    }
-    const nextIndex = (activePhotoIndex + 1) % totalPhotos;
-    setActivePhotoId(cutting.photos[nextIndex]?.id ?? null);
-  }, [activePhotoIndex, cutting.photos, totalPhotos]);
-
-  // A teljes képernyős nézőt a közös `PhotoLightbox` adja; itt csak a képlistát
-  // fordítjuk le neki.
-  const lightboxImages = useMemo<PhotoLightboxImage[]>(
-    () =>
-      cutting.photos.map((photo) => ({
-        id: photo.id,
-        url: photo.downloadUrl,
-        alt: cutting.variety,
-        caption: photoLightboxCaption(photo),
-      })),
-    [cutting.photos, cutting.variety],
-  );
-
-  // A nézőben lapozás az oldal aktív képét is átállítja, így záráskor ott
-  // maradunk, ahol abbahagytuk.
-  const handleLightboxIndexChange = useCallback(
-    (index: number) => setActivePhotoId(cutting.photos[index]?.id ?? null),
-    [cutting.photos],
-  );
-
-  useEffect(() => {
-    latestPhotosRef.current = cutting.photos;
-  }, [cutting.photos]);
-
-  useEffect(() => {
-    setActivePhotoId(cutting.photos.at(-1)?.id ?? null);
-    setIsPhotoViewerOpen(false);
-  }, [cutting.id, cutting.photos]);
-
-  const handleAddPhotos = async (files: FileList | null) => {
-    if (!files || !isAdmin) {
-      return;
-    }
+  const handleAddPhotos = async (files: File[]) => {
+    if (!isAdmin) return;
     onClearUpdateError();
 
-    try {
-      const uploads = await uploadPhotos({
-        files,
-        storagePathPrefix: `cuttings/${cutting.id}/photos`,
-      });
-      const newPhotos = toCuttingPhotos(uploads);
-      const mergedPhotos = [...latestPhotosRef.current];
-      for (const photo of newPhotos) {
-        if (!mergedPhotos.some((item) => item.id === photo.id)) {
-          mergedPhotos.push(photo);
-        }
-      }
-      latestPhotosRef.current = mergedPhotos;
-      await onUpdateCutting(cutting.id, {
-        photos: mergedPhotos,
-      });
-    } catch (error) {
-      console.error('Cutting photo add error:', error);
-    }
+    const uploads = await uploadPhotos({
+      files,
+      storagePathPrefix: `cuttings/${cutting.id}/photos`,
+      maxImageSide: DEFAULT_MAX_IMAGE_SIDE,
+    });
+    await onAddPhotos(cutting.id, toCuttingPhotos(uploads));
   };
 
-  const handleDeletePhoto = async () => {
-    if (!activePhoto || !isAdmin || photoDeletingId) {
-      return;
-    }
-
-    const confirmed = window.confirm('Biztosan törlöd ezt a képet?');
-    if (!confirmed) {
-      return;
-    }
-
-    setPhotoDeletingId(activePhoto.id);
+  const handleDeletePhoto = async (photoId: string) => {
+    if (!isAdmin) return;
     onClearUpdateError();
+    await onDeletePhoto(cutting.id, photoId);
+  };
 
-    try {
-      if (activePhoto.storagePath) {
-        await deleteObject(ref(storage, activePhoto.storagePath));
-      }
-
-      const remainingPhotos = cutting.photos.filter((item) => item.id !== activePhoto.id);
-      await onUpdateCutting(cutting.id, {
-        photos: remainingPhotos,
-      });
-      setActivePhotoId(remainingPhotos.at(-1)?.id ?? null);
-    } catch (error) {
-      console.error('Cutting photo delete error:', error);
-    } finally {
-      setPhotoDeletingId(null);
-    }
+  const handleEditCaption = async (photoId: string, caption: string) => {
+    if (!isAdmin) return;
+    onClearUpdateError();
+    await onEditCaption(cutting.id, photoId, caption);
   };
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium text-vine-700 dark:text-vine-200">
-          <Sprout className="h-4 w-4" />
-          Fotók
-        </div>
-
-        {isAdmin && (
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              ref={detailFileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(event) => void handleAddPhotos(event.target.files)}
-              className="hidden"
-            />
-            {isMobileDevice ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => openPicker(detailFileInputRef, 'camera')}
-                  disabled={photoUploading}
-                  className="inline-flex items-center gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
-                >
-                  {photoUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                  Fotózás
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openPicker(detailFileInputRef, 'gallery')}
-                  disabled={photoUploading}
-                  className="inline-flex items-center gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
-                >
-                  <ImagePlus className="h-4 w-4" />
-                  Galéria
-                </button>
-              </>
-            ) : (
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800">
-                {photoUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-                Fotó hozzáadása
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(event) => void handleAddPhotos(event.target.files)}
-                  className="hidden"
-                />
-              </label>
-            )}
-          </div>
-        )}
-      </div>
-
-      {(photoUploadError || updateErrorMessage) && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-          {photoUploadError ?? updateErrorMessage}
-        </div>
-      )}
-
-      {cutting.photos.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-vine-300 px-4 py-8 text-center text-sm text-vine-500 dark:border-vine-700 dark:text-vine-300">
-          Ehhez a dugványhoz még nincs feltöltött kép.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {activePhoto && (
-            <div className="overflow-hidden rounded-3xl border border-vine-300/90 bg-vine-50 p-1.5 shadow-[0_8px_20px_-12px_rgba(15,23,42,0.45)] dark:border-vine-500/70 dark:bg-vine-800/55 dark:shadow-[0_10px_26px_-14px_rgba(0,0,0,0.75)]">
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsPhotoViewerOpen(true)}
-                  className="group block w-full text-left"
-                  title="Teljes képernyős nézet"
-                >
-                  <img
-                    src={activePhoto.downloadUrl}
-                    alt={cutting.variety}
-                    className="h-72 w-full rounded-[1.2rem] border border-vine-200/90 object-cover shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)] transition-transform duration-200 group-hover:scale-[1.01] dark:border-vine-600/80 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] sm:h-80"
-                  />
-                </button>
-
-                {totalPhotos > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={goToPreviousPhoto}
-                      className="absolute left-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-black/45 text-white transition-colors hover:bg-black/60"
-                      aria-label="Előző kép"
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={goToNextPhoto}
-                      className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-black/45 text-white transition-colors hover:bg-black/60"
-                      aria-label="Következő kép"
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                  </>
-                )}
-              </div>
-              <div className="flex items-center justify-between gap-3 px-4 py-3 text-xs text-vine-500 dark:text-vine-300">
-                <div className="flex items-center gap-3">
-                  <span>Kép {activePhotoIndex + 1}/{totalPhotos}</span>
-                  <span>{photoDateText(activePhoto)}</span>
-                </div>
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => void handleDeletePhoto()}
-                    disabled={photoDeletingId === activePhoto.id}
-                    className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-red-900 dark:bg-vine-900 dark:text-red-300 dark:hover:bg-red-950/30"
-                  >
-                    {photoDeletingId === activePhoto.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                    Törlés
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-6">
-            {cutting.photos.map((photo) => {
-              const isActive = photo.id === activePhoto?.id;
-              const isHighlighted = photo.id === highlightedPhotoId;
-              const dateBadge = photoDateBadges.get(photo.id);
-
-              return (
-                <button
-                  key={photo.id}
-                  data-photo-id={photo.id}
-                  type="button"
-                  onClick={() => setActivePhotoId(photo.id)}
-                  className={`relative overflow-hidden rounded-2xl border bg-white/90 p-1 text-left shadow-sm transition-all duration-200 dark:bg-vine-900/60 ${
-                    isHighlighted
-                      ? 'border-amber-500 ring-2 ring-amber-300 dark:border-amber-400 dark:ring-amber-500/60'
-                      : isActive
-                        ? 'border-vine-500 ring-2 ring-vine-300 dark:border-vine-300 dark:ring-vine-700'
-                        : 'border-vine-300/90 hover:border-vine-400 dark:border-vine-600 dark:hover:border-vine-500'
-                  }`}
-                >
-                  <img
-                    src={photo.downloadUrl}
-                    alt={cutting.variety}
-                    className="h-24 w-full rounded-xl border border-vine-200/80 object-cover dark:border-vine-700/70"
-                  />
-                  {/* Készítési idő nélkül a bélyeg a feltöltés napját mutatja, de
-                      `↑`-lal és dőlt szedéssel jelzi, hogy nem a felvétel ideje. */}
-                  {dateBadge && (
-                    <span
-                      title={dateBadge.title}
-                      className={`pointer-events-none absolute left-1.5 top-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white ${
-                        dateBadge.isCaptured ? '' : 'italic'
-                      }`}
-                    >
-                      {dateBadge.isCaptured ? '' : '↑'}
-                      {dateBadge.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {isPhotoViewerOpen && activePhoto && (
-        <PhotoLightbox
-          images={lightboxImages}
-          initialIndex={activePhotoIndex}
-          onClose={() => setIsPhotoViewerOpen(false)}
-          onIndexChange={handleLightboxIndexChange}
-          label="Dugványfotó"
-        />
-      )}
-    </section>
+    <PhotoGallery
+      galleryId={cutting.id}
+      photos={cutting.photos}
+      alt={cutting.variety}
+      isAdmin={isAdmin}
+      busy={photoUploading || isUpdating}
+      errorMessage={photoUploadError ?? updateErrorMessage}
+      highlightedPhotoId={highlightedPhotoId}
+      emptyMessage="Ehhez a dugványhoz még nincs feltöltött kép."
+      lightboxLabel="Dugványfotók"
+      onAddPhotos={handleAddPhotos}
+      onDeletePhoto={handleDeletePhoto}
+      onEditCaption={handleEditCaption}
+    />
   );
 }

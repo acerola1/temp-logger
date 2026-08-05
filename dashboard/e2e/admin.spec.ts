@@ -76,10 +76,8 @@ test('admin CRUD: uj dugvany + foto + ontozesi log + session esemeny', async ({ 
     .click()
   await expect(page.getByRole('button', { name: 'Alapadatok szerkesztése' })).toBeVisible()
 
-  await page
-    .locator('label:has-text("Fotó hozzáadása") input[type="file"]')
-    .first()
-    .setInputFiles([
+  const photoGallery = page.getByRole('region', { name: 'Fotók' })
+  await photoGallery.locator('input[type="file"]').setInputFiles([
       {
         name: 'upload.png',
         mimeType: 'image/png',
@@ -91,21 +89,26 @@ test('admin CRUD: uj dugvany + foto + ontozesi log + session esemeny', async ({ 
         buffer: onePixelPng,
       },
     ])
-  await expect(page.getByText(/Kép 2\/2/)).toBeVisible()
-  await page.getByTitle('Teljes képernyős nézet').click()
-  const photoViewer = page.getByRole('dialog', { name: 'Dugványfotó' })
+  await expect(photoGallery.getByText(/Kép 1\/2/)).toBeVisible()
+  await photoGallery.getByRole('button', { name: 'Képaláírás szerkesztése' }).click()
+  await photoGallery.getByRole('textbox', { name: 'Képaláírás' }).fill('E2E képaláírás')
+  await photoGallery.getByRole('button', { name: 'Mentés' }).click()
+  await expect(photoGallery.getByText('E2E képaláírás')).toBeVisible()
+
+  await photoGallery.getByTitle('Teljes képernyős nézet').click()
+  const photoViewer = page.getByRole('dialog', { name: 'Dugványfotók' })
   await expect(photoViewer).toBeVisible()
-  // A néző nem körkörös: az utolsó képen a továbblapozás tiltott.
-  await expect(photoViewer.getByRole('button', { name: 'Következő kép' })).toBeDisabled()
-  await photoViewer.getByRole('button', { name: 'Előző kép' }).click()
-  await expect(photoViewer.getByText(/Kép 1\/2/)).toBeVisible()
+  // A néző nem körkörös, és a közös rendezés legújabb elemén nyílik.
+  await expect(photoViewer.getByRole('button', { name: 'Előző kép' })).toBeDisabled()
+  await photoViewer.getByRole('button', { name: 'Következő kép' }).click()
+  await expect(photoViewer.getByText(/Kép 2\/2/)).toBeVisible()
   await photoViewer.getByRole('button', { name: 'Bezárás' }).click()
   // A nézőben lapozás az oldal aktív képét is átállította.
-  await expect(page.getByText(/Kép 1\/2/)).toBeVisible()
-  await page.getByRole('button', { name: 'Törlés', exact: true }).first().click()
-  await expect(page.getByText(/Kép 1\/1/)).toBeVisible()
-  await page.getByRole('button', { name: 'Törlés', exact: true }).first().click()
-  await expect(page.getByText('Ehhez a dugványhoz még nincs feltöltött kép.')).toBeVisible()
+  await expect(photoGallery.getByText(/Kép 2\/2/)).toBeVisible()
+  await photoGallery.getByRole('button', { name: 'Törlés', exact: true }).click()
+  await expect(photoGallery.getByText(/Kép 1\/1/)).toBeVisible()
+  await photoGallery.getByRole('button', { name: 'Törlés', exact: true }).click()
+  await expect(photoGallery.getByText('Ehhez a dugványhoz még nincs feltöltött kép.')).toBeVisible()
 
   await page.getByRole('button', { name: 'Új esemény' }).click()
   await page.getByPlaceholder('pl. Permetezés').fill(wateringTitle)

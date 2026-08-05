@@ -119,7 +119,7 @@ async function seed() {
     serialNumber: 1,
     variety: 'Kékfrankos',
     plantType: 'cutting',
-    plantedAt: iso(-24 * 60 * 60 * 1000),
+    plantedAt: '2026-07-01',
     status: 'active',
     notes: 'Seedelt dugvány',
     photos: [
@@ -128,8 +128,8 @@ async function seed() {
         storagePath: '',
         downloadUrl:
           'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlU9WQAAAAASUVORK5CYII=',
-        capturedAt: iso(-3 * 60 * 60 * 1000),
-        uploadedAt: iso(-3 * 60 * 60 * 1000),
+        capturedAt: '2026-07-02T09:00:00.000Z',
+        uploadedAt: '2026-07-02T09:05:00.000Z',
         width: 1,
         height: 1,
         caption: 'seed',
@@ -139,12 +139,12 @@ async function seed() {
       {
         id: 'cutting-event-1',
         title: 'Öntözés',
-        occurredAt: iso(-2 * 60 * 60 * 1000),
+        occurredAt: '2026-07-02T10:00:00.000Z',
         notes: 'E2E seed',
       },
     ],
-    createdAt: iso(-24 * 60 * 60 * 1000),
-    updatedAt: iso(-2 * 60 * 60 * 1000),
+    createdAt: '2026-07-01T08:00:00.000Z',
+    updatedAt: '2026-07-02T10:00:00.000Z',
     createdByUid: null,
   })
 

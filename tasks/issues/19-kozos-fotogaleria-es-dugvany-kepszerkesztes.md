@@ -2,7 +2,7 @@
 
 Feature: vine-photo-model
 Type: refactor
-Status: ready-for-agent
+Status: done
 Blocked by: –
 
 Forrás: [A tőkefotók önálló modellje](../vine-photo-model/spec.md).
@@ -84,41 +84,41 @@ ténylegesen változó képességeket kis, opcionális interface-ek fejezik ki.
 
 ## Elfogadási kritériumok
 
-- [ ] A közös galéria nem importál Firebase SDK-t, tőke- vagy dugványtípust.
-- [ ] A dugványoldal a közös galériát és a meglévő közös `PhotoLightbox`-ot
+- [x] A közös galéria nem importál Firebase SDK-t, tőke- vagy dugványtípust.
+- [x] A dugványoldal a közös galériát és a meglévő közös `PhotoLightbox`-ot
       használja, nem marad második teljes galéria-implementáció.
-- [ ] A galéria és a lightbox legújabb → legrégebbi sorrendű, és ugyanazt a
+- [x] A galéria és a lightbox legújabb → legrégebbi sorrendű, és ugyanazt a
       determinisztikus rendezőfüggvényt használja.
-- [ ] A nagy aktív kép + bélyegrács layout mobilon és desktopon is használható;
+- [x] A nagy aktív kép + bélyegrács layout mobilon és desktopon is használható;
       az adminműveletek az aktív kép műveleti sávjában vannak, nem fotónkénti
       külön sorokban.
-- [ ] EXIF nélküli fotó a `uploadedAt` értékével kerül a sorrendbe, és a felület
+- [x] EXIF nélküli fotó a `uploadedAt` értékével kerül a sorrendbe, és a felület
       továbbra is `Feltöltve` címkével jelzi ezt.
-- [ ] Valódi készítési és feltöltési idő nélküli legacy dugványfotó a dátumozott
+- [x] Valódi készítési és feltöltési idő nélküli legacy dugványfotó a dátumozott
       képek után marad, az ilyen fotók relatív sorrendje nem változik, és a
       dugvány létrehozási ideje nem válik fotóidőponttá.
-- [ ] Admin a dugványfotó képaláírását szerkesztheti és üresre is törölheti.
-- [ ] A képaláírás mentése nem módosítja a fotó más metaadatát, és frissíti a
+- [x] Admin a dugványfotó képaláírását szerkesztheti és üresre is törölheti.
+- [x] A képaláírás mentése nem módosítja a fotó más metaadatát, és frissíti a
       dugvány `updatedAt` értékét.
-- [ ] Párhuzamos képaláírás-mentés és fotófeltöltés nem veszít el fotórekordot;
+- [x] Párhuzamos képaláírás-mentés és fotófeltöltés nem veszít el fotórekordot;
       ezt Firestore-tranzakciós teszt fedi.
-- [ ] A dugványfotó hozzáadása és egyenkénti, megerősített törlése változatlanul
+- [x] A dugványfotó hozzáadása és egyenkénti, megerősített törlése változatlanul
       működik.
-- [ ] Dugványfotó törlésekor előbb a Firestore-metaadat tűnik el, majd
+- [x] Dugványfotó törlésekor előbb a Firestore-metaadat tűnik el, majd
       best-effort a Storage-objektum; Storage-hiba nem hagy törött publikus
       fotórekordot.
-- [ ] Egy kiválasztásból alapértelmezésben legfeljebb hat kép jut az
+- [x] Egy kiválasztásból alapértelmezésben legfeljebb hat kép jut az
       `onAddPhotos` callbackhez, a kimaradt képekről a felület üzen.
-- [ ] A dugványnál nem jelenik meg borítókép-kijelölő művelet.
-- [ ] Bekapcsolt borító-interface esetén a galéria külön jelöli a rendezésből
+- [x] A dugványnál nem jelenik meg borítókép-kijelölő művelet.
+- [x] Bekapcsolt borító-interface esetén a galéria külön jelöli a rendezésből
       adódó automatikus és a `pinnedPhotoId` által kijelölt borítót.
-- [ ] A dugványképek 1000 px-es korlátja és Storage-útvonala nem változik.
-- [ ] Nem admin felhasználó nem lát írási műveleteket.
-- [ ] Egységteszt fedi a rendezést, a lightbox kezdőindexét, a képaláírás
+- [x] A dugványképek 1000 px-es korlátja és Storage-útvonala nem változik.
+- [x] Nem admin felhasználó nem lát írási műveleteket.
+- [x] Egységteszt fedi a rendezést, a lightbox kezdőindexét, a képaláírás
       szerkesztését és az opcionális borító-interface ki- és bekapcsolását.
-- [ ] A dugványoldal pontos admin és publikus állapota mobilon és desktopon
+- [x] A dugványoldal pontos admin és publikus állapota mobilon és desktopon
       reprodukálva, DOM-mal és képernyőképpel ellenőrizve.
-- [ ] `npm test`, `npm run test:integration`, `npm run lint`, `npm run build`
+- [x] `npm test`, `npm run test:integration`, `npm run lint`, `npm run build`
       és a releváns Playwright E2E zöld.
 
 ## Érintett terület
@@ -143,3 +143,9 @@ ténylegesen változó képességeket kis, opcionális interface-ek fejezik ki.
 - A közös galéria mély modul: a hívó csak a fotólistát és a felhasználói
   szándékokat adja át, a rendezés, kiválasztás, lightbox-állapot és szerkesztő
   viselkedése a modul implementációjában marad.
+- 2026-08-05: Implementálva. A dugvány fotóműveletei tranzakciós
+  read–modify–write műveletek lettek; a törlés Firestore-first, a feltöltés
+  sikertelen metaadatírása kompenzáló Storage-takarítást végez. Ellenőrizve:
+  `npm test` (191 teszt), `npm run test:integration` (30 teszt),
+  `npm run lint`, `npm run build`, valamint a releváns Playwright E2E
+  (admin CRUD, publikus dugványoldal és négy galéria-képernyőkép).

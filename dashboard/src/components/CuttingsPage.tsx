@@ -113,6 +113,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
     error,
     createCutting,
     updateCutting,
+    addCuttingPhotos,
+    deleteCuttingPhoto,
+    editCuttingPhotoCaption,
     isCreating,
     isUpdating,
     createError,
@@ -455,6 +458,9 @@ export function CuttingsPage({ isAdmin }: CuttingsPageProps) {
             isUpdating={isUpdating}
             onCloseSelectedCutting={handleCloseSelectedCutting}
             onUpdateCutting={updateCutting}
+            onAddCuttingPhotos={addCuttingPhotos}
+            onDeleteCuttingPhoto={deleteCuttingPhoto}
+            onEditCuttingPhotoCaption={editCuttingPhotoCaption}
             updateErrorMessage={
               updateError
                 ? getErrorMessage(updateError, 'Nem sikerült menteni a módosításokat.')

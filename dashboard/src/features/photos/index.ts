@@ -46,6 +46,17 @@ export {
   type PhotoSelection,
   type SelectedPhoto,
 } from './photoSelection';
+export {
+  photoDisplayTime,
+  resolvePhotoCover,
+  sortPhotosNewestFirst,
+  type ResolvedPhotoCover,
+} from './photoOrder';
 export { PhotoLightbox, type PhotoLightboxImage } from './ui/PhotoLightbox';
+export {
+  PhotoGallery,
+  type PhotoGalleryCoverControls,
+  type PhotoGalleryProps,
+} from './ui/PhotoGallery';
 export { PhotoPickerButtons } from './ui/PhotoPickerButtons';
 export { PhotoPreviewList } from './ui/PhotoPreviewList';
