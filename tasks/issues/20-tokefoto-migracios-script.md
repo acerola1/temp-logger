@@ -2,7 +2,7 @@
 
 Feature: vine-photo-model
 Type: migration
-Status: ready-for-agent
+Status: done
 Blocked by: –
 
 Forrás: [A tőkefotók önálló modellje – Migráció](../vine-photo-model/spec.md#migráció).
@@ -72,35 +72,35 @@ A tesztfixture legalább ezeket fedje:
 
 ## Elfogadási kritériumok
 
-- [ ] Kapcsoló nélkül a script dry-runban fut és egyetlen dokumentumot sem ír.
-- [ ] A `--verify` mód egyetlen dokumentumot sem ír, összesítve felsorolja a
+- [x] Kapcsoló nélkül a script dry-runban fut és egyetlen dokumentumot sem ír.
+- [x] A `--verify` mód egyetlen dokumentumot sem ír, összesítve felsorolja a
       legacy vagy inkonzisztens tőkéket, és nem nulla kóddal lép ki, ha a
       dashboard cutover még nem biztonságos.
-- [ ] Az `--apply` mód csak a dry-runban is jelzett tőkéket alakítja át.
-- [ ] A migrált `photos[]` minden érvényes régi fotó metaadatát megőrzi,
+- [x] Az `--apply` mód csak a dry-runban is jelzett tőkéket alakítja át.
+- [x] A migrált `photos[]` minden érvényes régi fotó metaadatát megőrzi,
       beleértve a régi Storage- és bélyegkép-útvonalakat.
-- [ ] A script egyetlen Storage-objektumot sem másol, nevez át vagy töröl.
-- [ ] Az eseményekből eltűnik a `photos` mező, más eseményadat nem változik.
-- [ ] Az érvényes kézi borító ugyanarra a fotóra mutató `coverPhotoId` lesz.
-- [ ] Hibás vagy hiányzó borítóhivatkozásból `coverPhotoId: null` lesz.
-- [ ] A migrált dokumentumból a régi `coverPhoto` mező teljesen eltűnik.
-- [ ] Azonosító-ütközésnél minden fotó megmarad, az új azonosítók és a borító
+- [x] A script egyetlen Storage-objektumot sem másol, nevez át vagy töröl.
+- [x] Az eseményekből eltűnik a `photos` mező, más eseményadat nem változik.
+- [x] Az érvényes kézi borító ugyanarra a fotóra mutató `coverPhotoId` lesz.
+- [x] Hibás vagy hiányzó borítóhivatkozásból `coverPhotoId: null` lesz.
+- [x] A migrált dokumentumból a régi `coverPhoto` mező teljesen eltűnik.
+- [x] Azonosító-ütközésnél minden fotó megmarad, az új azonosítók és a borító
       konzisztensek.
-- [ ] Egy tőke vagy teljesen migrálódik, vagy változatlan marad; részleges
+- [x] Egy tőke vagy teljesen migrálódik, vagy változatlan marad; részleges
       dokumentum nem jöhet létre.
-- [ ] Ugyanazon adaton másodszor futtatva nulla további módosítást jelez.
-- [ ] Megszakított futás után a már migrált tőkék érvényesek maradnak, és a
+- [x] Ugyanazon adaton másodszor futtatva nulla további módosítást jelez.
+- [x] Megszakított futás után a már migrált tőkék érvényesek maradnak, és a
       következő futás a hátralévő tőkéktől biztonságosan folytatódik.
-- [ ] Hiba esetén a script nem folytat csendben: nem nulla kilépési kódot és
+- [x] Hiba esetén a script nem folytat csendben: nem nulla kilépési kódot és
       azonosítható tőkét ír ki.
-- [ ] Emulatoros teszt fedi a felsorolt migrációs eseteket és a dry-run
+- [x] Emulatoros teszt fedi a felsorolt migrációs eseteket és a dry-run
       írásmentességét.
-- [ ] A futtatási dokumentáció külön megadja a mentés, admin write-stop,
+- [x] A futtatási dokumentáció külön megadja a mentés, admin write-stop,
       dry-run, `--apply`, `--verify`, dashboard deploy, publikus/admin
       gyorsellenőrzés és write-stop feloldás sorrendjét.
-- [ ] A dokumentáció kimondja, hogy a dashboard csak nulla hibás `--verify`
+- [x] A dokumentáció kimondja, hogy a dashboard csak nulla hibás `--verify`
       eredmény után deployolható.
-- [ ] `node --check` a migrációs scripten, valamint a választott meglévő
+- [x] `node --check` a migrációs scripten, valamint a választott meglévő
       emulátoros tesztparancs zöld.
 
 ## Érintett terület
@@ -120,3 +120,23 @@ A tesztfixture legalább ezeket fedje:
 
 - Az adatbiztonság miatt a dry-run az alapértelmezett, nem opcionális kényelmi
   mód. Az `--apply` szándékos, látható eltérés legyen.
+- 2026-08-05: Implementálva. A script a `functions/scripts/migrate-vine-photos.js`,
+  a futtatási leírás a `docs/runbooks/migrate-vine-photos.md`. A tőkénkénti terv
+  tiszta függvény, amelyet az `--apply` a tranzakciós olvasásból újraszámol: a
+  dry-run és a tényleges írás nem tud eltérni. Az `--apply` csak
+  `--backup-verified=<hivatkozás>` mellett indul, ismeretlen kapcsolóra a script
+  hibázik (elgépelt `--verify` különben zöld cutover-kapunak látszana), és a
+  `--verify` nem szűkíthető `--limit`-tel vagy `--vine`-nal. Ellenőrizve:
+  `node --check`, `npm run test:integration` (47 teszt, ebből 17 migrációs),
+  `npm test` (191 teszt), `npm run lint`, `npm run build`. Az éles futtatás nem
+  része az issue-nak.
+- 2026-08-05: Éles előkészítés megtörtént, írás nélkül. A `g-temp-log` projekt
+  dry-runja 6 tőkét és 15 eseményfotót jelez, ütközés, hibás rekord és törött
+  borító nélkül. Készült ellenőrzött JSON-mentés
+  (`~/firestore-backups/g-temp-log-vines-2026-08-05.json`, 6 tőke, 15 fotó,
+  12 megőrzött Timestamp) és hozzá visszaállító script
+  (`~/firestore-backups/restore-vines.js`). Emulátoron végigment a teljes kör: a
+  mentés bitre azonosan visszaáll, a migráció az éles dokumentumalakokon zöld,
+  és utána a mentés még mindig visszaállítja az eredeti állapotot.
+  Az éles `--apply` szándékosan **nem** futott le: a 21-es cutover előtt a régi
+  dashboard nem találná a tőkefotókat. A migráció a 21-es deployjával együtt fut.
