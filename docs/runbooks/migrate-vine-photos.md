@@ -26,6 +26,11 @@ Forrás: [A tőkefotók önálló modellje – Migráció](../../tasks/vine-phot
 | `npm run migrate:vine-photos:verify` | Cutover-kapu. Semmit nem ír. | `0` csak akkor, ha minden tőke teljesen migrált |
 | `npm run migrate:vine-photos -- --backup-verified=<hivatkozás>` | Tőkénként egy tranzakcióban átalakít. | `0`, ha egyetlen tőke sem hibásodott meg |
 
+A három npm script a `--project=g-temp-log` célpontot magában hordozza: a
+Firestore-kliens `--project` nélkül az ambiens gcloud-alapértelmezésre esne
+vissza, ami könnyen egy másik projekt. A script ezért meg is áll, ha a
+projektazonosító nem állapítható meg.
+
 További kapcsolók: `--project=<id>`, `--page-size=<n>`, `--limit=<n>`,
 `--vine=<vineId>`.
 

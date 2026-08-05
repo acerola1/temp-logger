@@ -558,6 +558,17 @@ async function main() {
   const { db, fieldValue, projectId } = createAdminContext({ projectId: args.projectId });
   const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST || null;
 
+  // An unresolved project id is not a printable warning but a stop: without
+  // --project the Firestore client falls back to the ambient gcloud default,
+  // which can be an entirely different project than the one being migrated.
+  if (projectId === 'unknown') {
+    console.error('Argument error: the project id could not be determined');
+    console.error('Pass --project=<id> (or set GCLOUD_PROJECT).');
+    console.error('Nothing was read or written.');
+    process.exitCode = 1;
+    return;
+  }
+
   // The target has to be unmistakable before anything is read: this script can
   // rewrite every vine document in the project it is pointed at.
   console.log(`Project: ${projectId}`);

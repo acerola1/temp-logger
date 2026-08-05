@@ -14,9 +14,9 @@
     "migrate:legacy-sessions:dry": "node scripts/migrate-legacy-sessions.js",
     "migrate:legacy-sessions:debug": "node scripts/migrate-legacy-sessions.js --debug",
     "migrate:legacy-sessions": "node scripts/migrate-legacy-sessions.js --apply",
-    "migrate:vine-photos:dry": "node scripts/migrate-vine-photos.js",
-    "migrate:vine-photos:verify": "node scripts/migrate-vine-photos.js --verify",
-    "migrate:vine-photos": "node scripts/migrate-vine-photos.js --apply"
+    "migrate:vine-photos:dry": "node scripts/migrate-vine-photos.js --project=g-temp-log",
+    "migrate:vine-photos:verify": "node scripts/migrate-vine-photos.js --project=g-temp-log --verify",
+    "migrate:vine-photos": "node scripts/migrate-vine-photos.js --project=g-temp-log --apply"
   },
   "dependencies": {
     "firebase-admin": "^13.5.0",
