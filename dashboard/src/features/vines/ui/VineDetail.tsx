@@ -3,17 +3,18 @@ import { CalendarDays, Loader2, ExternalLink, X } from 'lucide-react';
 import { formatDate, formatDateTime, toDateTimeLocalValue } from '../../../lib/dateFormat';
 import {
   PhotoLightbox,
-  photoDateText,
-  photoLightboxCaption,
+  PhotoPickerButtons,
+  photoDisplayCaption,
+  photoDisplayDateText,
   photoThumbnailUrl,
   type PhotoLightboxImage,
 } from '../../photos';
 import type { VineEventFormValues, VineFormValues } from '../forms';
 import type { Vine, VineEvent, VinePlantingDate } from '../model';
-import { resolveVineCoverPhoto } from '../vineCoverPhoto';
+import { resolveVineCoverPhoto, sortVinePhotos } from '../vineCoverPhoto';
 import { VineEventForm } from './VineEventForm';
-import { VineEventPhotos } from './VineEventPhotos';
 import { VineForm, type VineCuttingOption } from './VineForm';
+import { VinePhotoSection } from './VinePhotoSection';
 import {
   ROOT_TYPE_PRESENTATION,
   statusBadgeClass,
@@ -38,13 +39,13 @@ interface VineDetailProps {
   mutationError: string | null;
   onClose: () => void;
   onEdit: (vineId: string, values: VineFormValues) => Promise<void>;
-  onAddEvents: (targetVineIds: string[], values: VineEventFormValues, photos: File[]) => Promise<void>;
+  onAddEvents: (targetVineIds: string[], values: VineEventFormValues) => Promise<void>;
   onEditEvent: (eventId: string, values: VineEventFormValues) => Promise<void>;
   onDeleteEvent: (eventId: string) => Promise<void>;
-  onAddEventPhotos: (eventId: string, photos: File[]) => Promise<void>;
-  onDeleteEventPhoto: (eventId: string, photoId: string) => Promise<void>;
-  onEditEventPhotoCaption: (eventId: string, photoId: string, caption: string) => Promise<void>;
-  onSetCoverPhoto: (eventId: string, photoId: string | null) => Promise<void>;
+  onAddPhotos: (photos: File[]) => Promise<void>;
+  onDeletePhoto: (photoId: string) => Promise<void>;
+  onEditPhotoCaption: (photoId: string, caption: string) => Promise<void>;
+  onSetCoverPhoto: (photoId: string | null) => Promise<void>;
   onClearMutationError: () => void;
   onOpenCutting: (cuttingId: string) => void;
 }
@@ -111,9 +112,9 @@ export function VineDetail({
   onAddEvents,
   onEditEvent,
   onDeleteEvent,
-  onAddEventPhotos,
-  onDeleteEventPhoto,
-  onEditEventPhotoCaption,
+  onAddPhotos,
+  onDeletePhoto,
+  onEditPhotoCaption,
   onSetCoverPhoto,
   onClearMutationError,
   onOpenCutting,
@@ -123,10 +124,15 @@ export function VineDetail({
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   // A feltöltési progressz és a hibaüzenet a katalógusban egy közös állapot,
-  // ezért jelöljük, melyik esemény fotóműveletéhez tartozik éppen.
-  const [photoEventId, setPhotoEventId] = useState<string | null>(null);
-  // A néző egy esemény fotóit lapozza, ezért az eseményt és a kezdőindexet tartjuk.
-  const [lightbox, setLightbox] = useState<{ eventId: string; index: number } | null>(null);
+  // ezért jelöljük, hogy a futó művelet fotóművelet-e: az esemény- és
+  // alapadatűrlap különben a fotó hibáját is kiírná.
+  const [isPhotoMutation, setIsPhotoMutation] = useState(false);
+  // Egyetlen tőkére mentett esemény után felajánljuk a fotófelvételt. Ez csak
+  // navigációs kényelem: a fotó nem kap eseményhivatkozást.
+  const [showPhotoQuickAction, setShowPhotoQuickAction] = useState(false);
+  // A fejléc borítójáról nyíló néző a teljes, rendezett tőkefotólistát lapozza —
+  // ugyanabban a sorrendben, mint a galéria.
+  const [coverLightboxIndex, setCoverLightboxIndex] = useState<number | null>(null);
 
   const sourceCutting = useMemo(
     () => cuttingOptions.find((option) => option.id === selectedVine?.sourceCuttingId) ?? null,
@@ -158,42 +164,38 @@ export function VineDetail({
       : [],
     [selectedVine],
   );
-  // A borító ugyanabból a feloldásból jön, mint a lista bélyege: kijelölt kép,
-  // vagy — kijelölés nélkül — a legutóljára fényképezett.
+  // A galéria, a lightbox, a lista bélyege és ez a fejléc ugyanabból a közös
+  // rendezésből és feloldásból dolgozik: nem tudnak eltérő borítót mutatni.
+  const sortedPhotos = useMemo(
+    () => (selectedVine ? sortVinePhotos(selectedVine.photos) : []),
+    [selectedVine],
+  );
   const coverPhoto = useMemo(
     () => (selectedVine ? resolveVineCoverPhoto(selectedVine) : null),
     [selectedVine],
   );
-  // A megnyitott esemény fotói a közös néző formájában. Az eseményt id alapján
-  // keressük, hogy egy időközbeni adatfrissítés se ragadjon be a nézőbe.
-  const lightboxEvent = useMemo(
-    () => (lightbox ? sortedEvents.find((event) => event.id === lightbox.eventId) ?? null : null),
-    [lightbox, sortedEvents],
-  );
   const lightboxImages = useMemo<PhotoLightboxImage[]>(
     () =>
-      lightboxEvent
-        ? lightboxEvent.photos.map((photo) => ({
-            id: photo.id,
-            url: photo.downloadUrl,
-            alt: lightboxEvent.title,
-            caption: photoLightboxCaption(photo, lightboxEvent.title),
-          }))
-        : [],
-    [lightboxEvent],
+      sortedPhotos.map((photo) => ({
+        id: photo.id,
+        url: photo.downloadUrl,
+        alt: selectedVine?.variety ?? '',
+        caption: photoDisplayCaption(photo),
+      })),
+    [selectedVine?.variety, sortedPhotos],
   );
 
   // Minden fotóművelet előtt átállítjuk a jelölést, hogy a progressz és az
-  // esetleges hiba az érintett eseménykártyán jelenjen meg.
-  const runPhotoMutation = async (eventId: string, operation: () => Promise<void>) => {
-    setPhotoEventId(eventId);
+  // esetleges hiba a fotószakaszban jelenjen meg, ne az űrlapokon.
+  const runPhotoMutation = async (operation: () => Promise<void>) => {
+    setIsPhotoMutation(true);
     onClearMutationError();
     await operation();
   };
 
   const deleteEvent = async (eventId: string) => {
-    if (deletingEventId || !window.confirm('Biztosan törlöd ezt az eseményt a fotóival együtt?')) return;
-    setPhotoEventId(null);
+    if (deletingEventId || !window.confirm('Biztosan törlöd ezt az eseményt?')) return;
+    setIsPhotoMutation(false);
     setDeletingEventId(eventId);
     try {
       await onDeleteEvent(eventId);
@@ -277,12 +279,9 @@ export function VineDetail({
                   <button
                     type="button"
                     onClick={() =>
-                      setLightbox({
-                        eventId: coverPhoto.event.id,
-                        index: coverPhoto.event.photos.findIndex(
-                          (photo) => photo.id === coverPhoto.photo.id,
-                        ),
-                      })
+                      setCoverLightboxIndex(
+                        sortedPhotos.findIndex((photo) => photo.id === coverPhoto.photo.id),
+                      )
                     }
                     aria-label="Borítókép megnyitása"
                     className="block w-full overflow-hidden rounded-2xl border border-vine-200 bg-vine-100 dark:border-vine-700 dark:bg-vine-800"
@@ -303,8 +302,8 @@ export function VineDetail({
                   <figcaption className="text-[11px] text-vine-500 dark:text-vine-300">
                     {[
                       coverPhoto.isPinned ? 'Kijelölt borítókép' : 'Automatikus borítókép',
-                      coverPhoto.event.title,
-                      photoDateText(coverPhoto.photo),
+                      coverPhoto.photo.caption,
+                      photoDisplayDateText(coverPhoto.photo),
                     ]
                       .filter(Boolean)
                       .join(' • ')}
@@ -376,7 +375,7 @@ export function VineDetail({
                     type="button"
                     onClick={() => {
                       setEditMode((current) => !current);
-                      setPhotoEventId(null);
+                      setIsPhotoMutation(false);
                       onClearMutationError();
                     }}
                     disabled={isPending}
@@ -408,9 +407,23 @@ export function VineDetail({
                     onClearMutationError();
                   }}
                   className="rounded-2xl border border-vine-200 bg-vine-50/80 p-4 dark:border-vine-700 dark:bg-vine-800/40"
-                  submitError={photoEventId === null ? mutationError : null}
+                  submitError={isPhotoMutation ? null : mutationError}
                 />
               )}
+
+              <VinePhotoSection
+                vine={selectedVine}
+                isAdmin={isAdmin}
+                isPending={isPending}
+                uploadProgress={isPhotoMutation ? uploadProgress : null}
+                mutationError={isPhotoMutation ? mutationError : null}
+                onAddPhotos={(photos) => runPhotoMutation(() => onAddPhotos(photos))}
+                onDeletePhoto={(photoId) => runPhotoMutation(() => onDeletePhoto(photoId))}
+                onEditCaption={(photoId, caption) =>
+                  runPhotoMutation(() => onEditPhotoCaption(photoId, caption))
+                }
+                onSetCoverPhoto={(photoId) => runPhotoMutation(() => onSetCoverPhoto(photoId))}
+              />
 
               <section className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
@@ -423,7 +436,8 @@ export function VineDetail({
                       type="button"
                       onClick={() => {
                         setIsAddEventFormOpen((current) => !current);
-                        setPhotoEventId(null);
+                        setIsPhotoMutation(false);
+                        setShowPhotoQuickAction(false);
                         onClearMutationError();
                       }}
                       disabled={isPending}
@@ -445,18 +459,54 @@ export function VineDetail({
                     tagSuggestions={knownTags}
                     initialTargetVineId={selectedVine.id}
                     isPending={isPending}
-                    uploadProgress={photoEventId === null ? uploadProgress : null}
-                    submitError={photoEventId === null ? mutationError : null}
-                    onSubmit={async (values, targetVineIds, photos) => {
-                      setPhotoEventId(null);
-                      await onAddEvents(targetVineIds, values, photos);
+                    submitError={isPhotoMutation ? null : mutationError}
+                    onSubmit={async (values, targetVineIds) => {
+                      setIsPhotoMutation(false);
+                      await onAddEvents(targetVineIds, values);
                       setIsAddEventFormOpen(false);
+                      // A gyorsművelet a *megnyitott* tőke fotóválasztóját nyitja
+                      // meg, ezért csak akkor jelenik meg, ha az esemény pontosan
+                      // ide került. Több célnál a fotó tőkéje kétértelmű lenne.
+                      setShowPhotoQuickAction(
+                        targetVineIds.length === 1 && targetVineIds[0] === selectedVine.id,
+                      );
                     }}
                     onCancel={() => {
                       setIsAddEventFormOpen(false);
                       onClearMutationError();
                     }}
                   />
+                )}
+
+                {isAdmin && showPhotoQuickAction && (
+                  <div
+                    role="status"
+                    className="flex flex-col gap-2 rounded-2xl border border-vine-200 bg-vine-50 px-4 py-3 text-sm text-vine-700 sm:flex-row sm:items-center sm:justify-between dark:border-vine-700 dark:bg-vine-800/50 dark:text-vine-100"
+                  >
+                    <span>Az esemény mentve.</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <PhotoPickerButtons
+                        // A hibát a fotószakasz írja ki (`isPhotoMutation`),
+                        // ezért itt csak naplózzuk: kezeletlen rejectet nem
+                        // hagyhat maga után a gyorsművelet.
+                        onSelect={(photos) => {
+                          setShowPhotoQuickAction(false);
+                          runPhotoMutation(() => onAddPhotos(photos)).catch((error: unknown) => {
+                            console.error('Vine photo quick action error:', error);
+                          });
+                        }}
+                        disabled={isPending}
+                        singleLabel="Fotó hozzáadása ehhez a tőkéhez"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPhotoQuickAction(false)}
+                        className="rounded-xl border border-vine-200 bg-white px-3 py-2 text-sm text-vine-700 transition-colors hover:bg-vine-50 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
+                      >
+                        Elrejtés
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 {sortedEvents.length === 0 ? (
@@ -477,8 +527,7 @@ export function VineDetail({
                               mode="edit"
                               defaultValues={defaultEventValues(event)}
                               isPending={isPending}
-                              uploadProgress={null}
-                              submitError={photoEventId === null ? mutationError : null}
+                              submitError={isPhotoMutation ? null : mutationError}
                               onSubmit={async (values) => {
                                 await onEditEvent(event.id, values);
                                 setEditingEventId(null);
@@ -489,59 +538,30 @@ export function VineDetail({
                               }}
                             />
                           ) : (
-                            <>
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex min-w-0 gap-3">
-                                  <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${presentation.markerClass}`}>
-                                    <Icon className={`h-4 w-4 ${presentation.iconClass}`} />
-                                  </span>
-                                  <div className="min-w-0">
-                                    <div className="text-xs uppercase tracking-wider text-vine-500 dark:text-vine-300">{presentation.label}</div>
-                                    <h4 className="font-semibold">{event.title}</h4>
-                                    <div className="font-medium">{formatDateTime(event.occurredAt)}</div>
-                                    {event.notes && <div className="mt-1 whitespace-pre-wrap text-vine-500 dark:text-vine-300">{event.notes}</div>}
-                                  </div>
+                            // Az eseménykártya nem tartalmaz fotósort és
+                            // fotóműveletet: a tőke képei a `Fotók` szakaszban élnek.
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex min-w-0 gap-3">
+                                <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${presentation.markerClass}`}>
+                                  <Icon className={`h-4 w-4 ${presentation.iconClass}`} />
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="text-xs uppercase tracking-wider text-vine-500 dark:text-vine-300">{presentation.label}</div>
+                                  <h4 className="font-semibold">{event.title}</h4>
+                                  <div className="font-medium">{formatDateTime(event.occurredAt)}</div>
+                                  {event.notes && <div className="mt-1 whitespace-pre-wrap text-vine-500 dark:text-vine-300">{event.notes}</div>}
                                 </div>
-
-                                {isAdmin && (
-                                  <div className="flex shrink-0 items-center gap-2">
-                                    <button type="button" onClick={() => { setEditingEventId(event.id); setPhotoEventId(null); onClearMutationError(); }} disabled={isPending} className="rounded-lg border border-vine-200 bg-white px-2.5 py-1.5 text-xs font-medium text-vine-700 transition-colors hover:bg-vine-100 disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800">Szerkesztés</button>
-                                    <button type="button" onClick={() => void deleteEvent(event.id)} disabled={isPending || deletingEventId === event.id} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-red-900 dark:bg-vine-900 dark:text-red-300 dark:hover:bg-red-950/30">
-                                      {deletingEventId === event.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Törlés'}
-                                    </button>
-                                  </div>
-                                )}
                               </div>
 
-                              <VineEventPhotos
-                                event={event}
-                                isAdmin={isAdmin}
-                                isPending={isPending}
-                                coverPhotoId={
-                                  coverPhoto?.event.id === event.id ? coverPhoto.photo.id : null
-                                }
-                                isCoverPinned={coverPhoto?.isPinned ?? false}
-                                uploadProgress={photoEventId === event.id ? uploadProgress : null}
-                                errorMessage={photoEventId === event.id ? mutationError : null}
-                                onOpenPhoto={(photoIndex) => setLightbox({ eventId: event.id, index: photoIndex })}
-                                onAddPhotos={(photos) =>
-                                  runPhotoMutation(event.id, () => onAddEventPhotos(event.id, photos))
-                                }
-                                onDeletePhoto={(photoId) =>
-                                  runPhotoMutation(event.id, () => onDeleteEventPhoto(event.id, photoId))
-                                }
-                                onEditCaption={(photoId, caption) =>
-                                  runPhotoMutation(event.id, () =>
-                                    onEditEventPhotoCaption(event.id, photoId, caption),
-                                  )
-                                }
-                                onSetCoverPhoto={(photoId) =>
-                                  runPhotoMutation(event.id, () =>
-                                    onSetCoverPhoto(event.id, photoId),
-                                  )
-                                }
-                              />
-                            </>
+                              {isAdmin && (
+                                <div className="flex shrink-0 items-center gap-2">
+                                  <button type="button" onClick={() => { setEditingEventId(event.id); setIsPhotoMutation(false); onClearMutationError(); }} disabled={isPending} className="rounded-lg border border-vine-200 bg-white px-2.5 py-1.5 text-xs font-medium text-vine-700 transition-colors hover:bg-vine-100 disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800">Szerkesztés</button>
+                                  <button type="button" onClick={() => void deleteEvent(event.id)} disabled={isPending || deletingEventId === event.id} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-red-900 dark:bg-vine-900 dark:text-red-300 dark:hover:bg-red-950/30">
+                                    {deletingEventId === event.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Törlés'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           )}
                         </article>
                       );
@@ -557,12 +577,12 @@ export function VineDetail({
 
       {/* A néző a mobil részletmodal wrapperén kívül van, hogy a benne lévő
           koppintás ne zárja be magát az adatlapot is. */}
-      {lightbox && lightboxImages.length > 0 && (
+      {coverLightboxIndex !== null && lightboxImages.length > 0 && (
         <PhotoLightbox
           images={lightboxImages}
-          initialIndex={lightbox.index}
-          onClose={() => setLightbox(null)}
-          label="Eseményfotó"
+          initialIndex={Math.max(0, coverLightboxIndex)}
+          onClose={() => setCoverLightboxIndex(null)}
+          label="Tőkefotók"
         />
       )}
     </>

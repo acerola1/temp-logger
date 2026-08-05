@@ -10,7 +10,13 @@ import {
 } from 'lucide-react';
 import { formatMonthDay } from '../../../lib/dateFormat';
 import { DEFAULT_MAX_SELECTED_PHOTOS } from '../photoSelection';
-import { photoDisplayTime, resolvePhotoCover, sortPhotosNewestFirst } from '../photoOrder';
+import {
+  photoDisplayCaption,
+  photoDisplayDateText,
+  photoDisplayTime,
+  resolvePhotoCover,
+  sortPhotosNewestFirst,
+} from '../photoOrder';
 import {
   photoDateLabel,
   photoDateText,
@@ -49,14 +55,6 @@ export interface PhotoGalleryProps {
 
 function errorText(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
-}
-
-function galleryDateText(photo: Photo): string {
-  return photoDisplayTime(photo) === null ? 'Időpont ismeretlen' : photoDateText(photo);
-}
-
-function lightboxCaption(photo: Photo): string {
-  return [photo.caption, galleryDateText(photo)].filter(Boolean).join(' • ');
 }
 
 export function PhotoGallery({
@@ -104,7 +102,7 @@ export function PhotoGallery({
         id: photo.id,
         url: photo.downloadUrl,
         alt,
-        caption: lightboxCaption(photo),
+        caption: photoDisplayCaption(photo),
       })),
     [alt, sortedPhotos],
   );
@@ -271,8 +269,10 @@ export function PhotoGallery({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-3">
                     <span>Kép {activePhotoIndex + 1}/{sortedPhotos.length}</span>
-                    <span>{galleryDateText(activePhoto)}</span>
-                    {automaticCover?.id === activePhoto.id && (
+                    <span>{photoDisplayDateText(activePhoto)}</span>
+                    {/* A két állapot kizárja egymást: a legújabb fotó kézi
+                        kijelölésekor a `Kijelölt borító` a pontos állítás. */}
+                    {automaticCover?.id === activePhoto.id && pinnedCover?.id !== activePhoto.id && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                         <Star className="h-3 w-3" />
                         Automatikus borító

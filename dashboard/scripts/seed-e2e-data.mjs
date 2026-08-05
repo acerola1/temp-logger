@@ -151,6 +151,8 @@ async function seed() {
   const vineDefaults = {
     hasFruited: false,
     rootstockVariety: '',
+    photos: [],
+    coverPhotoId: null,
     events: [],
     notes: '',
     sourceCuttingId: null,
@@ -180,6 +182,39 @@ async function seed() {
       status: 'active',
       tags: ['öreg tőke', 'déli sor'],
       notes: 'Déli fekvésű, rendszeresen termő tőke.',
+      // A tőkefotók a gyökérszintű `photos[]` tömbben élnek, eseményhivatkozás
+      // nélkül. A `storagePath` szándékosan a migrált rekordok régi, eseményes
+      // útvonala: az E2E így a cutover utáni valós adatalakot nézi.
+      photos: [
+        {
+          id: 'vine-photo-seed-1',
+          storagePath: 'vines/vine-e2e-1/events/vine-event-seed-1/photos/vine-photo-seed-1.png',
+          downloadUrl: seedPhotoUrl,
+          width: 1,
+          height: 1,
+          capturedAt: vineIso(-2),
+          uploadedAt: vineIso(1),
+          caption: '',
+        },
+        // Két fotó kell, hogy a galéria lapozása is látszódjon. Ez a rekord
+        // szándékosan a `capturedAt` előtti alakban marad, hogy a régi fotók
+        // megjelenítése is fedve legyen. Bélyege viszont van: a feltöltési ideje
+        // szerint ez a legfrissebb fotó, tehát ez a tőke automatikus borítója is.
+        {
+          id: 'vine-photo-seed-2',
+          storagePath: 'vines/vine-e2e-1/photos/vine-photo-seed-2.png',
+          downloadUrl: seedPhotoUrl,
+          width: 1,
+          height: 1,
+          thumbnail: {
+            storagePath: 'vines/vine-e2e-1/photos/vine-photo-seed-2_thumb.png',
+            downloadUrl: seedPhotoThumbnailUrl,
+            width: 2,
+            height: 2,
+          },
+          uploadedAt: vineIso(1),
+        },
+      ],
       events: [
         {
           id: 'vine-event-seed-1',
@@ -187,36 +222,6 @@ async function seed() {
           occurredAt: vineIso(1),
           title: 'Első fürtök',
           notes: 'Egészséges lomb és két fürt.',
-          photos: [
-            {
-              id: 'vine-event-photo-seed-1',
-              storagePath: '',
-              downloadUrl: seedPhotoUrl,
-              width: 1,
-              height: 1,
-              capturedAt: vineIso(-2),
-              uploadedAt: vineIso(1),
-              caption: '',
-            },
-            // Két fotó kell, hogy az eseményen belüli lapozás is látszódjon. Ez a
-            // rekord szándékosan a `capturedAt` előtti alakban marad, hogy a régi
-            // fotók megjelenítése is fedve legyen. Bélyege viszont van: ez a
-            // legfrissebb fotó, tehát ez a tőke automatikus borítója is.
-            {
-              id: 'vine-event-photo-seed-2',
-              storagePath: '',
-              downloadUrl: seedPhotoUrl,
-              width: 1,
-              height: 1,
-              thumbnail: {
-                storagePath: '',
-                downloadUrl: seedPhotoThumbnailUrl,
-                width: 2,
-                height: 2,
-              },
-              uploadedAt: vineIso(1),
-            },
-          ],
           createdAt: vineIso(1),
           updatedAt: vineIso(1),
         },

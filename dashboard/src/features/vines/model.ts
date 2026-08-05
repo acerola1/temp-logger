@@ -15,20 +15,12 @@ export type VinePlantingDate =
   | { precision: 'year'; year: number }
   | { precision: 'unknown' };
 
-// A tőkeeseményfotó ugyanaz a közös fotó-metaadat, mint a dugványfotó.
-export type VineEventPhoto = Photo;
+// A tőkefotó ugyanaz a közös fotó-metaadat, mint a dugványfotó. A fotó nem
+// hordoz eseményhivatkozást: a tőke önálló képe, nem egy esemény melléklete.
+export type VinePhoto = Photo;
 
-// A fotó kis változata: a lista és a fotósor 80 px-es kerete ezt tölti le.
-export type VineEventPhotoThumbnail = PhotoThumbnail;
-
-/**
- * A kijelölt borítókép mutatója. A tőke gyökerén él, nem a fotórekordban: így az
- * áthelyezés egyetlen mezőt ír, és nem állhat elő két elsődleges kép.
- */
-export interface VineCoverPhotoRef {
-  eventId: string;
-  photoId: string;
-}
+// A fotó kis változata: a lista és a bélyegrács kis keretei ezt töltik le.
+export type VinePhotoThumbnail = PhotoThumbnail;
 
 export interface VineEvent {
   id: string;
@@ -36,7 +28,6 @@ export interface VineEvent {
   occurredAt: IsoDateTimeString;
   title: string;
   notes: string;
-  photos: VineEventPhoto[];
   createdAt: IsoDateTimeString;
   updatedAt: IsoDateTimeString;
 }
@@ -54,8 +45,9 @@ export interface Vine {
   tags: string[];
   notes: string;
   sourceCuttingId: string | null;
+  photos: VinePhoto[];
   /** `null` esetén a borító automatikus: a legutóljára fényképezett kép. */
-  coverPhoto: VineCoverPhotoRef | null;
+  coverPhotoId: string | null;
   events: VineEvent[];
   createdAt: IsoDateTimeString;
   updatedAt: IsoDateTimeString;
@@ -84,11 +76,11 @@ export interface VineEventDetailsInput {
   notes: string;
 }
 
+// Az eseményrögzítés nem fogad fotófájlt: a fotó külön tőkeművelet.
 export interface AddVineEventsInput {
   targetVineIds: string[];
   openedVineId?: string;
   event: VineEventDetailsInput;
-  photos: File[];
 }
 
 export interface EditVineEventInput {
@@ -102,21 +94,18 @@ export interface DeleteVineEventInput {
   eventId: string;
 }
 
-export interface AddVineEventPhotosInput {
+export interface AddVinePhotosInput {
   vineId: string;
-  eventId: string;
   photos: File[];
 }
 
-export interface DeleteVineEventPhotoInput {
+export interface DeleteVinePhotoInput {
   vineId: string;
-  eventId: string;
   photoId: string;
 }
 
-export interface EditVineEventPhotoCaptionInput {
+export interface EditVinePhotoCaptionInput {
   vineId: string;
-  eventId: string;
   photoId: string;
   caption: string;
 }
@@ -124,12 +113,12 @@ export interface EditVineEventPhotoCaptionInput {
 export interface SetVineCoverPhotoInput {
   vineId: string;
   /** `null` a kijelölés visszavonása, azaz visszatérés az automatikus borítóra. */
-  coverPhoto: VineCoverPhotoRef | null;
+  photoId: string | null;
 }
 
 export const MAX_VINE_EVENT_TARGETS = 400;
 
-// Eseményenkénti fotókorlát. Egy választásból legfeljebb hat kép jön
-// (`DEFAULT_MAX_SELECTED_PHOTOS`), tehát két teli kör belefér, a fotók viszont a
-// tőke dokumentumába beágyazva élnek: a tömb nem nőhet korlátlanul.
-export const MAX_VINE_EVENT_PHOTOS = 12;
+// Tőkénkénti biztonsági korlát. A fotók a tőke dokumentumába beágyazva élnek,
+// ezért a tömb nem nőhet korlátlanul; a 100 nem használati, hanem
+// dokumentumméret-korlát, ezért csak a kapacitás közelében látszik a felületen.
+export const MAX_VINE_PHOTOS = 100;

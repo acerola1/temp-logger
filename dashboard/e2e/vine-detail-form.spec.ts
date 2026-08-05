@@ -15,21 +15,28 @@ test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és
   await expect(page.getByTestId('vine-detail').getByRole('heading', { name: 'Kékfrankos' })).toBeVisible();
   await expect(page.getByText('Déli kerítés mellett')).toBeVisible();
   await expect(page.getByText('Déli fekvésű, rendszeresen termő tőke.')).toBeVisible();
-  // Az esemény címe a borítókép feliratában is szerepel, ezért a címsorra szűkítünk.
   await expect(page.getByRole('heading', { name: 'Első fürtök' })).toBeVisible();
   await expect(page.getByText('Egészséges lomb és két fürt.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Első fürtök 1. fotó megnyitása' })).toBeVisible();
   await expect(page.getByText('#1 - Kékfrankos')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Alapadatok szerkesztése' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Új tőke' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Új esemény' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Szerkesztés' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Törlés' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /borítóképnek/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Borítóképnek' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Automatikus borító', exact: true })).toHaveCount(0);
 
-  // A közös képnéző: eseményen belüli lapozás, számláló, nem körkörös szélek.
-  await page.getByRole('button', { name: 'Első fürtök 1. fotó megnyitása' }).click();
-  const photoViewer = page.getByRole('dialog', { name: 'Eseményfotó' });
+  // A tőke fotói egyetlen galériában, írási művelet nélkül. Az eseménykártyán
+  // nincs fotósor: a fotó a tőke önálló képe.
+  const gallery = page.getByRole('region', { name: 'Fotók' });
+  await expect(gallery.getByText('Fotók (2)')).toBeVisible();
+  await expect(gallery.getByRole('button', { name: 'Fotó hozzáadása' })).toHaveCount(0);
+  await expect(gallery.getByRole('button', { name: 'Képaláírás szerkesztése' })).toHaveCount(0);
+  await expect(page.getByRole('list', { name: /fotói/ })).toHaveCount(0);
+
+  // A közös képnéző a teljes tőkefotólistát lapozza: számláló, nem körkörös szélek.
+  await gallery.getByTitle('Teljes képernyős nézet').click();
+  const photoViewer = page.getByRole('dialog', { name: 'Tőkefotók' });
   await expect(photoViewer).toBeVisible();
   await expect(photoViewer.getByText(/Kép 1\/2/)).toBeVisible();
   await expect(photoViewer.getByRole('button', { name: 'Előző kép' })).toBeDisabled();
@@ -41,17 +48,16 @@ test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és
   await page.keyboard.press('Escape');
   await expect(photoViewer).toHaveCount(0);
 
-  // A borítókép kijelölés nélkül a legutóljára fényképezett kép. A seed két
-  // fotója közül a `capturedAt` nélküli feltöltése a frissebb, ezért az a
-  // borító — a feliratban a `Feltöltve` ezt ki is mondja.
+  // A borítókép kijelölés nélkül a rendezés első képe. A seed két fotója közül a
+  // `capturedAt` nélküli feltöltése a frissebb, ezért az a borító — a feliratban
+  // a `Feltöltve` ezt ki is mondja. A galéria első képe ugyanez.
   const coverPhoto = page.getByRole('button', { name: 'Borítókép megnyitása' });
   await expect(coverPhoto).toBeVisible();
-  await expect(
-    page.getByText(/^Automatikus borítókép • Első fürtök • Feltöltve:/),
-  ).toBeVisible();
+  await expect(page.getByText(/^Automatikus borítókép • Feltöltve:/)).toBeVisible();
+  await expect(gallery.getByText('Automatikus borító')).toBeVisible();
   await coverPhoto.click();
-  const coverViewer = page.getByRole('dialog', { name: 'Eseményfotó' });
-  await expect(coverViewer.getByText(/Kép 2\/2/)).toBeVisible();
+  const coverViewer = page.getByRole('dialog', { name: 'Tőkefotók' });
+  await expect(coverViewer.getByText(/Kép 1\/2/)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(coverViewer).toHaveCount(0);
 
@@ -68,14 +74,13 @@ test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és
   // képnézőben jön le.
   await expect(coverPhoto.locator('img')).toHaveAttribute('src', SEED_PHOTO_THUMBNAIL_URL);
 
-  // Az eseménykártya fotósora is a bélyeget mutatja, ahol van; a bélyeg nélküli
-  // seed-fotó a nagy képre esik vissza, hibaüzenet és üres keret nélkül.
-  await expect(
-    page.getByRole('button', { name: 'Első fürtök 1. fotó megnyitása' }).locator('img'),
-  ).toHaveAttribute('src', SEED_PHOTO_URL);
-  await expect(
-    page.getByRole('button', { name: 'Első fürtök 2. fotó megnyitása' }).locator('img'),
-  ).toHaveAttribute('src', SEED_PHOTO_THUMBNAIL_URL);
+  // A galéria bélyegrácsa is a bélyeget mutatja, ahol van; a bélyeg nélküli
+  // seed-fotó a nagy képre esik vissza, hibaüzenet és üres keret nélkül. A
+  // sorrend legújabbtól a legrégebbi felé megy, tehát a bélyeges fotó az első.
+  const thumbnails = gallery.getByRole('button', { name: 'Kékfrankos fotó megnyitása' });
+  await expect(thumbnails).toHaveCount(2);
+  await expect(thumbnails.nth(0).locator('img')).toHaveAttribute('src', SEED_PHOTO_THUMBNAIL_URL);
+  await expect(thumbnails.nth(1).locator('img')).toHaveAttribute('src', SEED_PHOTO_URL);
 
   await page.getByRole('button', { name: '#1 - Kékfrankos' }).click();
   await expect(page).toHaveURL(/\/dugvanyok\/cutting-e2e-1$/);
@@ -94,10 +99,9 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
   const form = page.getByRole('form', { name: 'Új tőkeesemény' });
   await expect(form).toBeVisible();
   await form.locator('[name="occurredAt"]').fill('2026-08-02T19:30');
-  // Desktopon (érintés nélküli böngészőben) egyetlen választógomb jelenik meg.
-  await expect(form.getByRole('button', { name: 'Kép kiválasztása' })).toBeVisible();
-  await expect(form.getByRole('button', { name: 'Fotózás' })).toHaveCount(0);
-  await expect(form.getByText('Legfeljebb 6 fotó választható ki.')).toBeVisible();
+  // Az eseményűrlap nem fogad fotót: a fotó külön tőkeművelet.
+  await expect(form.locator('input[type="file"]')).toHaveCount(0);
+  await expect(form.getByText(/fotó választható ki/)).toHaveCount(0);
   // A célválasztó dialógusban van, az űrlapon csak az összefoglaló sor és a
   // nyitó gomb: a nyitott tőke előre ki van jelölve, dialógus nélkül mentődik.
   await expect(form.getByRole('checkbox')).toHaveCount(0);
@@ -157,76 +161,6 @@ test('az admin eseményűrlap desktopon és mobilon a prototípust követi', asy
   await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
   await expect(form.getByText('1 tőke kiválasztva')).toBeVisible();
   await expect(form.getByText('#2', { exact: true })).toBeVisible();
-
-  const pixel = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlU9WQAAAAASUVORK5CYII=',
-    'base64',
-  );
-  await form.locator('input[type="file"]').setInputFiles([
-    { name: 'allapot.png', mimeType: 'image/png', buffer: pixel },
-    { name: 'eltavolitando.png', mimeType: 'image/png', buffer: pixel },
-  ]);
-
-  // A bélyegek látszanak, és a törölt kép a feltöltésbe sem kerül bele.
-  const previews = form.getByRole('list', { name: 'Kiválasztott fotók' });
-  await expect(previews.getByRole('img')).toHaveCount(2);
-  await expect(form.getByText('2/6 fotó kiválasztva')).toBeVisible();
-  await form.getByRole('button', { name: 'eltavolitando.png eltávolítása' }).click();
-  await expect(previews.getByRole('img')).toHaveCount(1);
-  await expect(form.getByText('1/6 fotó kiválasztva')).toBeVisible();
-
-  let releaseUpload!: () => void;
-  const uploadGate = new Promise<void>((resolve) => {
-    releaseUpload = resolve;
-  });
-  await page.route('http://127.0.0.1:9199/**', async (route) => {
-    await uploadGate;
-    await route.fulfill({
-      status: 403,
-      contentType: 'application/json',
-      body: JSON.stringify({ error: { code: 403, message: 'Teszt feltöltési hiba' } }),
-    });
-  });
-
-  await form.getByRole('button', { name: 'Esemény mentése (1)' }).click();
-  try {
-    await expect(form.getByRole('button', { name: 'Esemény mentése (1)' })).toBeDisabled();
-    await expect(form.getByRole('status')).toContainText('Fotók feltöltése');
-    await expect(form.getByRole('progressbar', { name: 'Fotók feltöltése' })).toHaveAttribute('aria-valuenow', '0');
-    await expect(form.getByRole('button', { name: 'Kép kiválasztása' })).toBeDisabled();
-    await expect(form.getByRole('button', { name: 'allapot.png eltávolítása' })).toBeDisabled();
-    await expect(page).toHaveScreenshot('toke-esemeny-urlap-pending-desktop.png', {
-      fullPage: true,
-      animations: 'disabled',
-    });
-
-    await page.setViewportSize({ width: 375, height: 812 });
-    await form.scrollIntoViewIfNeeded();
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await expect(page).toHaveScreenshot('toke-esemeny-urlap-pending-mobile.png', {
-      fullPage: true,
-      animations: 'disabled',
-    });
-  } finally {
-    releaseUpload();
-  }
-  await page.setViewportSize({ width: 1280, height: 1100 });
-  await expect(form.getByRole('alert')).toBeVisible();
-  await expect(form.getByRole('button', { name: 'Esemény mentése (1)' })).toBeEnabled();
-  await expect(form.locator('[name="occurredAt"]')).toHaveValue('2026-08-02T19:30');
-  await expect(page).toHaveScreenshot('toke-esemeny-urlap-hiba-desktop.png', {
-    fullPage: true,
-    animations: 'disabled',
-  });
-
-  await page.setViewportSize({ width: 375, height: 812 });
-  await form.scrollIntoViewIfNeeded();
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await expect(page).toHaveScreenshot('toke-esemeny-urlap-hiba-mobile.png', {
-    fullPage: true,
-    animations: 'disabled',
-  });
-  await page.unroute('http://127.0.0.1:9199/**');
 
   await page.setViewportSize({ width: 1280, height: 1100 });
   await page.getByRole('button', { name: 'Új esemény bezárása' }).click();
@@ -346,8 +280,8 @@ test('a desktop master-detail és a mobil részletmodal a prototípust követi',
   });
 
   // A képnéző a mobil részletmodal fölött nyílik, és a zárása csak őt zárja.
-  await page.getByRole('button', { name: 'Első fürtök 1. fotó megnyitása' }).click();
-  const mobileViewer = page.getByRole('dialog', { name: 'Eseményfotó' });
+  await page.getByRole('button', { name: 'Borítókép megnyitása' }).click();
+  const mobileViewer = page.getByRole('dialog', { name: 'Tőkefotók' });
   await expect(mobileViewer).toBeVisible();
   await mobileViewer.getByRole('button', { name: 'Bezárás' }).click();
   await expect(mobileViewer).toHaveCount(0);

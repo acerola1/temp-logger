@@ -1,4 +1,4 @@
-import type { Photo } from './photoMetadata';
+import { photoDateText, type Photo, type PhotoDates } from './photoMetadata';
 
 const LEGACY_UNKNOWN_TIME = 0;
 
@@ -19,6 +19,23 @@ function timestamp(value: string | null): number | null {
  */
 export function photoDisplayTime(photo: Pick<Photo, 'capturedAt' | 'uploadedAt'>): number | null {
   return timestamp(photo.capturedAt) ?? timestamp(photo.uploadedAt);
+}
+
+/**
+ * A dátumsor a rendezéssel egyező olvasattal: az ismeretlen idejű legacy rekord
+ * nem kap kitalált dátumot. A `photoDateText` nyers epoch-fallbackje ott marad,
+ * ahol a hívó eddig is azt írta ki.
+ */
+export function photoDisplayDateText(photo: PhotoDates): string {
+  return photoDisplayTime(photo) === null ? 'Időpont ismeretlen' : photoDateText(photo);
+}
+
+/**
+ * A galéria és a képnéző feliratsora. Egy helyen, hogy ugyanaz a fotó ne
+ * mutasson más feliratot attól, melyik belépési pontról nyílt meg.
+ */
+export function photoDisplayCaption(photo: PhotoDates & Pick<Photo, 'caption'>): string {
+  return [photo.caption, photoDisplayDateText(photo)].filter(Boolean).join(' • ');
 }
 
 /**

@@ -2,7 +2,7 @@
 
 Feature: vine-photo-model
 Type: feature
-Status: ready-for-agent
+Status: done
 Blocked by: 19, 20
 
 Forrás: [A tőkefotók önálló modellje](../vine-photo-model/spec.md).
@@ -123,56 +123,56 @@ A fotó nem tartalmaz `eventId`-t. Az esemény és a fotó műveletei és
 
 ## Elfogadási kritériumok
 
-- [ ] A `Vine` gyökérszintű `photos[]` és `coverPhotoId` mezőt használ; a
+- [x] A `Vine` gyökérszintű `photos[]` és `coverPhotoId` mezőt használ; a
       `VineEvent` nem tartalmaz fotókat.
-- [ ] A tőke összes fotója egy galériában és egyetlen lightbox-sorrendben
+- [x] A tőke összes fotója egy galériában és egyetlen lightbox-sorrendben
       bejárható, legújabb fotóval elöl.
-- [ ] A galéria első képe, az automatikus borító, a listakártya és az adatlap
+- [x] A galéria első képe, az automatikus borító, a listakártya és az adatlap
       fejléce ugyanabból a közös rendezőfüggvényből származik.
-- [ ] Azonos dátumú régi fotóknál az új tie-break miatt változó automatikus
+- [x] Azonos dátumú régi fotóknál az új tie-break miatt változó automatikus
       borító vállalt, fixture-rel dokumentált cutover-hatás.
-- [ ] EXIF nélküli fotó a feltöltési idejével kerül a sorrendbe, megfelelő
+- [x] EXIF nélküli fotó a feltöltési idejével kerül a sorrendbe, megfelelő
       `Feltöltve` címkével.
-- [ ] Egy műveletben legfeljebb hat új fotó tölthető fel, az új Storage-útvonalra
+- [x] Egy műveletben legfeljebb hat új fotó tölthető fel, az új Storage-útvonalra
       és 1280 px-es maximális hosszabbik oldallal.
-- [ ] Egy tőkéhez legfeljebb 100 fotó tartozhat; a felület a maradék helyre
+- [x] Egy tőkéhez legfeljebb 100 fotó tartozhat; a felület a maradék helyre
       vág, nulla kapacitásnál feltöltés előtt megáll, a tranzakció pedig
       párhuzamos írás esetén is betartja a korlátot.
-- [ ] Új tőke, tőkeszerkesztés és eseményűrlap nem fogad fotófájlt.
-- [ ] Az eseménykártyákon nincs fotósor vagy fotóművelet.
-- [ ] Fotó hozzáadása, törlése, feliratmódosítása és borítókép-váltása frissíti
+- [x] Új tőke, tőkeszerkesztés és eseményűrlap nem fogad fotófájlt.
+- [x] Az eseménykártyákon nincs fotósor vagy fotóművelet.
+- [x] Fotó hozzáadása, törlése, feliratmódosítása és borítókép-váltása frissíti
       a tőke `updatedAt` értékét és a lista rendezését.
-- [ ] Fotóművelet egyetlen eseményt sem módosít; eseményművelet egyetlen fotót
+- [x] Fotóművelet egyetlen eseményt sem módosít; eseményművelet egyetlen fotót
       sem módosít vagy töröl.
-- [ ] Fotóművelet Firestore update payloadja nem tartalmaz `events` mezőt;
+- [x] Fotóművelet Firestore update payloadja nem tartalmaz `events` mezőt;
       eseményműveleté pedig nem tartalmaz `photos` mezőt.
-- [ ] A kézi borító megmarad új fotó feltöltése után; visszavonáskor ismét a
+- [x] A kézi borító megmarad új fotó feltöltése után; visszavonáskor ismét a
       legújabb fotó az automatikus borító.
-- [ ] Kijelölt borító törlésekor a mutató tranzakciósan nullázódik.
-- [ ] Nem létező borítóazonosító olvasáskor hiba nélkül automatikus borítóra
+- [x] Kijelölt borító törlésekor a mutató tranzakciósan nullázódik.
+- [x] Nem létező borítóazonosító olvasáskor hiba nélkül automatikus borítóra
       esik vissza.
-- [ ] A galéria vizuálisan megkülönbözteti az automatikus és a kézzel kijelölt
+- [x] A galéria vizuálisan megkülönbözteti az automatikus és a kézzel kijelölt
       borítót; a közös interface ehhez `pinnedPhotoId` értéket használ.
-- [ ] Régi Storage-útvonalon maradt migrált fotó és bélyeg ugyanúgy megnyílik
+- [x] Régi Storage-útvonalon maradt migrált fotó és bélyeg ugyanúgy megnyílik
       és törölhető, mint az új útvonalon lévő.
-- [ ] A régi eseményfotó-feltöltés és `VineEventPhotos` kódút eltűnik; nincs
+- [x] A régi eseményfotó-feltöltés és `VineEventPhotos` kódút eltűnik; nincs
       tartós kettős modell.
-- [ ] Emulatoros integrációs teszt fedi a fotó CRUD-ot, a borító invariánsait,
+- [x] Emulatoros integrációs teszt fedi a fotó CRUD-ot, a borító invariánsait,
       az `updatedAt` frissítését és az esemény–fotó függetlenséget.
-- [ ] A `20` migrációs scriptjének eredményével futó alkalmazást külön
+- [x] A `20` migrációs scriptjének eredményével futó alkalmazást külön
       integrációs vagy E2E fixture ellenőrzi.
-- [ ] A cutover runbook mentés és nulla hibás `--verify` nélkül nem engedi a
+- [x] A cutover runbook mentés és nulla hibás `--verify` nélkül nem engedi a
       dashboard deployját.
-- [ ] Az új és a régi Storage-útvonal publikus olvasása, admin írása/törlése és
+- [x] Az új és a régi Storage-útvonal publikus olvasása, admin írása/törlése és
       nem admin írási tiltása külön, dokumentált ellenőrzést kap.
-- [ ] Egytőkés eseménymentés után a gyors fotógomb a tőke külön választóját
+- [x] Egytőkés eseménymentés után a gyors fotógomb a tőke külön választóját
       nyitja meg, és a létrejövő fotó nem tartalmaz eseményhivatkozást;
       többtőkés eseménynél a gomb nem jelenik meg.
-- [ ] Fotó nélküli tőkén az admin jól látható hozzáadási állapotot kap, publikus
+- [x] Fotó nélküli tőkén az admin jól látható hozzáadási állapotot kap, publikus
       nézetben pedig nem jelenik meg üres fotószakasz.
-- [ ] Admin és publikus tőkeadatlap pontos állapota mobilon és desktopon
+- [x] Admin és publikus tőkeadatlap pontos állapota mobilon és desktopon
       reprodukálva, DOM-mal és képernyőképpel ellenőrizve.
-- [ ] `npm test`, `npm run test:integration`, `npm run lint`, `npm run build`
+- [x] `npm test`, `npm run test:integration`, `npm run lint`, `npm run build`
       és a teljes releváns Playwright E2E zöld.
 
 ## Nem része
@@ -204,6 +204,21 @@ A fotó nem tartalmaz `eventId`-t. Az esemény és a fotó műveletei és
 
 ## Comments
 
+- 2026-08-05: Implementálva. A tőke a gyökérszintű `photos[]` és `coverPhotoId`
+  mezőt használja, a `VineEvent` nem tartalmaz fotót. Az új fotómodul a
+  `dashboard/src/features/vines/vinePhotos.ts`, a szakasz a
+  `ui/VinePhotoSection.tsx`, ami a `19`-es közös `PhotoGallery`-jét kapcsolja be
+  a tőke szándékalapú parancsaira. A `vineCoverPhoto.ts` már csak a közös
+  `sortPhotosNewestFirst` + `resolvePhotoCover` kompozíciója: a galéria, a
+  lightbox, a listakártya és az adatlap fejléce ugyanebből dolgozik. A
+  fotóműveletek tranzakciós payloadja nem tartalmaz `events` mezőt és fordítva —
+  ezt emulátoros teszt bizonyítja a mapper által nem ismert mezők
+  megmaradásával. Eltűnt a `VineEventPhotos`, a `vineEventPhotos.ts`, a négy
+  eseményfotó-parancs, a `MAX_VINE_EVENT_PHOTOS` és az űrlapok fotóválasztása.
+  Ellenőrizve: `npm test` (177 teszt), `npm run test:integration` (46 teszt),
+  `npm run lint`, `npm run build`, teljes Playwright E2E (20 teszt,
+  képernyőképek újragenerálva). Az éles migráció a `20` runbookja szerint a
+  deployjal együtt fut, még nem futott le.
 - A cutover szándékosan egy issue: a modellel együtt kell eltűnnie az eseményes
   UI-nak és megjelennie a tőkegalériának, különben valamelyik köztes commit nem
   fordulna vagy a felhasználó fotói átmenetileg elérhetetlenné válnának.

@@ -150,6 +150,24 @@ describe('PhotoGallery', () => {
     expect(screen.getByText('Kijelölt borító')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Automatikus borító' })).toBeTruthy();
   });
+
+  it('a legújabb fotó kijelölésekor csak a kijelölt borító jelvényét mutatja', async () => {
+    // Az automatikus és a kézi állapot egybeeshet ugyanazon a fotón. A kettős
+    // jelvény ilyenkor kétértelmű lenne: a kézi kijelölés a pontosabb állítás.
+    render(
+      <PhotoGallery
+        {...renderGalleryProps({
+          cover: { pinnedPhotoId: 'new', onPin: vi.fn().mockResolvedValue(undefined) },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Kijelölt borító')).toBeTruthy();
+    // Az egyetlen `Automatikus borító` szöveg a visszavonó gomb feliratja, nem
+    // egy második jelvény.
+    expect(screen.getAllByText('Automatikus borító')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Automatikus borító' })).toBeTruthy();
+  });
 });
 
 function renderGalleryProps(overrides: Partial<PhotoGalleryProps> = {}): PhotoGalleryProps {

@@ -12,6 +12,14 @@ service firebase.storage {
       allow write: if isAdmin();
     }
 
+    match /vines/{vineId}/photos/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // A migrált tőkefotók rekordjai a régi, eseményes útvonalra mutatnak, ezért a
+    // szabály megmarad: az objektum olvasható és admin által törölhető. Új
+    // feltöltés soha nem ide kerül.
     match /vines/{vineId}/events/{eventId}/photos/{fileName} {
       allow read: if true;
       allow write: if isAdmin();

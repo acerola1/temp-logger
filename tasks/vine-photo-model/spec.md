@@ -2,7 +2,13 @@
 
 ## Státusz
 
-Elfogadott koncepció, még nincs implementálva.
+Implementálva. A migrációs eszköz a
+[`functions/scripts/migrate-vine-photos.js`](../../functions/scripts/migrate-vine-photos.js)
+(20-as issue), a dashboard cutover a 21-es issue. A tőke a gyökérszintű
+`photos[]` és `coverPhotoId` mezőt használja, a `VineEvent` nem tartalmaz fotót,
+és a tőke a dugvánnyal közös galéria- és lightbox-modult használja. Az éles
+adatmigráció futtatási sorrendje a
+[cutover runbookban](../../docs/runbooks/migrate-vine-photos.md) van.
 
 Ez a dokumentum a tőkefotók tulajdonlásában, életciklusában és
 megjelenítésében felülírja a korábbi

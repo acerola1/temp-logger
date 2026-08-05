@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Photo } from './photoMetadata';
-import { photoDisplayTime, resolvePhotoCover, sortPhotosNewestFirst } from './photoOrder';
+import {
+  photoDisplayCaption,
+  photoDisplayDateText,
+  photoDisplayTime,
+  resolvePhotoCover,
+  sortPhotosNewestFirst,
+} from './photoOrder';
 
 function photo(id: string, capturedAt: string | null, uploadedAt: string): Photo {
   return {
@@ -61,5 +67,29 @@ describe('resolvePhotoCover', () => {
 
   it('elavult kijelölésnél automatikus borítóra esik vissza', () => {
     expect(resolvePhotoCover([newest, older], 'missing')).toEqual({ photo: newest, isPinned: false });
+  });
+});
+
+describe('photoDisplayDateText és photoDisplayCaption', () => {
+  it('a készítési időt `Készült` címkével, a feltöltést `Feltöltve` címkével írja ki', () => {
+    expect(photoDisplayDateText(photo('a', '2026-05-02T08:11:00.000Z', '2026-08-01T10:00:00.000Z')))
+      .toMatch(/^Készült: 2026\.05\.02\./);
+    expect(photoDisplayDateText(photo('b', null, '2026-08-01T10:00:00.000Z')))
+      .toMatch(/^Feltöltve: 2026\.08\.01\./);
+  });
+
+  it('az ismeretlen idejű legacy rekordnak nem talál ki dátumot', () => {
+    expect(photoDisplayDateText(photo('c', null, new Date(0).toISOString()))).toBe(
+      'Időpont ismeretlen',
+    );
+  });
+
+  it('a feliratot és a dátumsort egy sorba fűzi, üres részek nélkül', () => {
+    const captioned = { ...photo('d', null, '2026-08-01T10:00:00.000Z'), caption: 'Két fürt' };
+
+    expect(photoDisplayCaption(captioned)).toMatch(/^Két fürt • Feltöltve: /);
+    expect(photoDisplayCaption(photo('e', null, '2026-08-01T10:00:00.000Z'))).toMatch(
+      /^Feltöltve: /,
+    );
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  selectVineEventPhotos,
+  selectVinePhotos,
   toVineEventInput,
   toVineInput,
   getVineEventTargetError,
@@ -8,7 +8,7 @@ import {
   vineFormSchema,
   type VineFormValues,
 } from './forms';
-import { MAX_VINE_EVENT_PHOTOS } from './model';
+import { MAX_VINE_PHOTOS } from './model';
 
 function validVineForm(overrides: Partial<VineFormValues> = {}): VineFormValues {
   return {
@@ -160,30 +160,30 @@ describe('vine event forms', () => {
   });
 });
 
-describe('vine event photo selection', () => {
+describe('vine photo selection', () => {
   const files = (count: number): File[] =>
     Array.from({ length: count }, (_, index) => new File(['x'], `kep-${index + 1}.jpg`));
 
   it('a korlát alatti kijelölést érintetlenül átengedi', () => {
-    const selection = selectVineEventPhotos(MAX_VINE_EVENT_PHOTOS - 2, files(2));
+    const selection = selectVinePhotos(MAX_VINE_PHOTOS - 2, files(2));
 
     expect(selection.accepted).toHaveLength(2);
     expect(selection.error).toBeNull();
   });
 
   it('a maradék helyre vág, és a kimaradt képekről szól', () => {
-    const selection = selectVineEventPhotos(MAX_VINE_EVENT_PHOTOS - 1, files(3));
+    const selection = selectVinePhotos(MAX_VINE_PHOTOS - 1, files(3));
 
-    expect(selection.accepted.map((file) => file.name)).toEqual(['kep-1.jpg']);
+    expect(selection.accepted.map((file: File) => file.name)).toEqual(['kep-1.jpg']);
     expect(selection.error).toBe(
-      'Ehhez az eseményhez már csak 1 fotó vehető fel, 2 kép kimaradt.',
+      'Ehhez a tőkéhez már csak 1 fotó vehető fel, 2 kép kimaradt.',
     );
   });
 
-  it('teli eseménynél egyetlen képet sem engedélyez', () => {
-    const selection = selectVineEventPhotos(MAX_VINE_EVENT_PHOTOS, files(1));
+  it('teli tőkénél egyetlen képet sem engedélyez', () => {
+    const selection = selectVinePhotos(MAX_VINE_PHOTOS, files(1));
 
     expect(selection.accepted).toEqual([]);
-    expect(selection.error).toContain(`már ${MAX_VINE_EVENT_PHOTOS} fotó tartozik`);
+    expect(selection.error).toContain(`már ${MAX_VINE_PHOTOS} fotó tartozik`);
   });
 });

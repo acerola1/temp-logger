@@ -16,32 +16,31 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import type { FirebaseStorage } from 'firebase/storage';
-import { MAX_VINE_EVENT_PHOTOS, MAX_VINE_EVENT_TARGETS } from './model';
+import { MAX_VINE_PHOTOS, MAX_VINE_EVENT_TARGETS } from './model';
 import type {
-  AddVineEventPhotosInput,
   AddVineEventsInput,
+  AddVinePhotosInput,
   CreateVineInput,
   DeleteVineEventInput,
-  DeleteVineEventPhotoInput,
+  DeleteVinePhotoInput,
   EditVineInput,
   EditVineEventInput,
-  EditVineEventPhotoCaptionInput,
+  EditVinePhotoCaptionInput,
   SetVineCoverPhotoInput,
   Vine,
-  VineCoverPhotoRef,
   VineEvent,
-  VineEventPhoto,
-  VineEventPhotoThumbnail,
   VineEventType,
+  VinePhoto,
+  VinePhotoThumbnail,
   VinePlantingDate,
   VineRootType,
   VineStatus,
 } from './model';
 import {
-  deleteVineEventPhotos,
-  prepareVineEventPhotos,
-  uploadPreparedVineEventPhotos,
-} from './vineEventPhotos';
+  deleteVinePhotoObjects,
+  prepareVinePhotos,
+  uploadPreparedVinePhotos,
+} from './vinePhotos';
 
 export type VineMutationProgress = (progress: number) => void;
 
@@ -81,7 +80,7 @@ function optionalTimestampToIso(value: unknown): string | null {
 
 // A bélyeg csak a 17-es issue óta készül, és a régi fotókhoz nincs is: hiányzó
 // vagy hibás alak esetén `null`, azaz a felület a nagy képre esik vissza.
-function mapPhotoThumbnail(value: unknown): VineEventPhotoThumbnail | null {
+function mapPhotoThumbnail(value: unknown): VinePhotoThumbnail | null {
   if (!value || typeof value !== 'object') return null;
 
   const { storagePath, downloadUrl, width, height } = value as Record<string, unknown>;
@@ -96,7 +95,7 @@ function mapPhotoThumbnail(value: unknown): VineEventPhotoThumbnail | null {
   };
 }
 
-function mapPhoto(value: DocumentData): VineEventPhoto {
+function mapPhoto(value: DocumentData): VinePhoto {
   return {
     id: typeof value.id === 'string' ? value.id : '',
     storagePath: typeof value.storagePath === 'string' ? value.storagePath : '',
@@ -117,21 +116,18 @@ function mapEvent(value: DocumentData): VineEvent {
     occurredAt: timestampToIso(value.occurredAt),
     title: typeof value.title === 'string' ? value.title : '',
     notes: typeof value.notes === 'string' ? value.notes : '',
-    photos: Array.isArray(value.photos) ? value.photos.map(mapPhoto) : [],
     createdAt: timestampToIso(value.createdAt),
     updatedAt: timestampToIso(value.updatedAt),
   };
 }
 
-// A borítómutató csak a 15-es issue óta létezik, és el is avulhat: hiányzó vagy
-// hibás alak esetén `null`, azaz automatikus borító.
-function mapCoverPhoto(value: unknown): VineCoverPhotoRef | null {
-  if (!value || typeof value !== 'object') return null;
-
-  const { eventId, photoId } = value as Record<string, unknown>;
-  return typeof eventId === 'string' && eventId && typeof photoId === 'string' && photoId
-    ? { eventId, photoId }
-    : null;
+/**
+ * A kijelölt borító azonosítója. Hibás vagy már törölt fotóra mutató érték nem
+ * hiba: a feloldás csendben az automatikus borítóra esik vissza, javító írás
+ * nélkül.
+ */
+function mapCoverPhotoId(value: unknown): string | null {
+  return typeof value === 'string' && value ? value : null;
 }
 
 function mapVine(snapshot: QueryDocumentSnapshot<DocumentData>): Vine {
@@ -155,7 +151,8 @@ function mapVine(snapshot: QueryDocumentSnapshot<DocumentData>): Vine {
     notes: typeof value.notes === 'string' ? value.notes : '',
     sourceCuttingId:
       typeof value.sourceCuttingId === 'string' ? value.sourceCuttingId : null,
-    coverPhoto: mapCoverPhoto(value.coverPhoto),
+    photos: Array.isArray(value.photos) ? value.photos.map(mapPhoto) : [],
+    coverPhotoId: mapCoverPhotoId(value.coverPhotoId),
     events: Array.isArray(value.events) ? value.events.map(mapEvent) : [],
     createdAt: timestampToIso(value.createdAt),
     updatedAt: timestampToIso(value.updatedAt),
@@ -187,7 +184,8 @@ export async function createVine(
   const reference = await addDoc(collection(firestore, 'vines'), {
     ...editableFields(input),
     serialNumber,
-    coverPhoto: null,
+    photos: [],
+    coverPhotoId: null,
     events: [],
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -220,6 +218,12 @@ function normalizeEventDetails(input: AddVineEventsInput['event']): AddVineEvent
 function mapStoredEvents(data: DocumentData): VineEvent[] {
   return Array.isArray(data.events)
     ? data.events.map((value) => mapEvent(value as DocumentData))
+    : [];
+}
+
+function mapStoredPhotos(data: DocumentData): VinePhoto[] {
+  return Array.isArray(data.photos)
+    ? data.photos.map((value) => mapPhoto(value as DocumentData))
     : [];
 }
 
@@ -266,16 +270,14 @@ function validateEventTargets(targetVineIds: readonly string[]): string[] {
   return uniqueTargetIds;
 }
 
-interface EventWriteArtifact {
+interface PersistedEventWriteArtifact {
   vineId: string;
   eventId: string;
-  photos: VineEventPhoto[];
-}
-
-interface PersistedEventWriteArtifact extends EventWriteArtifact {
   previousStatus: VineStatus;
 }
 
+// Az eseményműveletek payloadja sosem tartalmaz `photos` mezőt: egy esemény
+// mentése, szerkesztése vagy törlése egyetlen tőkefotót sem módosít.
 async function appendEvent(
   firestore: Firestore,
   vineId: string,
@@ -309,7 +311,7 @@ async function appendEvent(
 async function rollbackEvent(
   firestore: Firestore,
   artifact: PersistedEventWriteArtifact,
-): Promise<boolean> {
+): Promise<void> {
   try {
     await runTransaction(firestore, async (transaction) => {
       const vineReference = doc(firestore, 'vines', artifact.vineId);
@@ -332,53 +334,24 @@ async function rollbackEvent(
         });
       }
     });
-    return true;
   } catch (error) {
     console.warn('Vine event rollback failed:', artifact.vineId, artifact.eventId, error);
-    return false;
   }
 }
 
 export async function addEvents(
   firestore: Firestore,
-  storage: FirebaseStorage,
   input: AddVineEventsInput,
-  onProgress?: VineMutationProgress,
 ): Promise<void> {
   const targetVineIds = validateEventTargets(input.targetVineIds);
   await assertActiveEventTargets(firestore, targetVineIds, input.openedVineId);
 
-  const preparedPhotos = await prepareVineEventPhotos(input.photos);
-  const targetBytes = preparedPhotos.reduce((sum, photo) => sum + photo.blob.size, 0);
-  const totalBytes = targetBytes * targetVineIds.length;
-  let completedBytes = 0;
-  const artifacts: EventWriteArtifact[] = [];
   const persistedArtifacts: PersistedEventWriteArtifact[] = [];
   const details = normalizeEventDetails(input.event);
-
-  if (preparedPhotos.length > 0) {
-    onProgress?.(0);
-  }
 
   try {
     for (const vineId of targetVineIds) {
       const eventId = crypto.randomUUID();
-      const photos = await uploadPreparedVineEventPhotos(
-        storage,
-        vineId,
-        eventId,
-        preparedPhotos,
-        (uploadedBytes, localTotalBytes) => {
-          const boundedUploadedBytes = Math.min(uploadedBytes, localTotalBytes);
-          const progress = totalBytes > 0
-            ? Math.round(((completedBytes + boundedUploadedBytes) / totalBytes) * 100)
-            : 100;
-          onProgress?.(Math.min(100, progress));
-        },
-      );
-      const artifact = { vineId, eventId, photos } satisfies EventWriteArtifact;
-      artifacts.push(artifact);
-
       const now = Timestamp.now().toDate().toISOString();
       const previousStatus = await appendEvent(
         firestore,
@@ -386,28 +359,17 @@ export async function addEvents(
         {
           ...details,
           id: eventId,
-          photos,
           createdAt: now,
           updatedAt: now,
         },
         input.openedVineId,
       );
-      persistedArtifacts.push({ ...artifact, previousStatus });
-      completedBytes += targetBytes;
-      onProgress?.(totalBytes > 0 ? Math.round((completedBytes / totalBytes) * 100) : 100);
+      persistedArtifacts.push({ vineId, eventId, previousStatus });
     }
   } catch (error) {
+    // Részleges tömeges mentés nem maradhat: ami már beírt, azt visszavesszük.
     for (const artifact of persistedArtifacts) {
-      if (await rollbackEvent(firestore, artifact)) {
-        await deleteVineEventPhotos(storage, artifact.photos);
-      }
-    }
-
-    const persistedIds = new Set(persistedArtifacts.map((artifact) => artifact.eventId));
-    for (const artifact of artifacts) {
-      if (!persistedIds.has(artifact.eventId)) {
-        await deleteVineEventPhotos(storage, artifact.photos);
-      }
+      await rollbackEvent(firestore, artifact);
     }
     throw error;
   }
@@ -444,15 +406,42 @@ export async function editEvent(
   });
 }
 
-// A fotók az esemény beágyazott tömbjében élnek, ezért minden fotóművelet
-// tranzakciós read–modify–write ugyanazon a tőkedokumentumon: két párhuzamos
-// írás nem írhatja felül egymás fotóit, és a művelet csak a megnevezett esemény
-// példányát érinti, más tőke azonos nevű eseményét nem.
-async function updateEventPhotos<T>(
+export async function deleteEvent(
+  firestore: Firestore,
+  input: DeleteVineEventInput,
+): Promise<void> {
+  await runTransaction(firestore, async (transaction) => {
+    const vineReference = doc(firestore, 'vines', input.vineId);
+    const snapshot = await transaction.get(vineReference);
+    if (!snapshot.exists()) {
+      throw new Error('A tőke nem található.');
+    }
+
+    const existingEvents = mapStoredEvents(snapshot.data());
+    if (!existingEvents.some((candidate) => candidate.id === input.eventId)) {
+      throw new Error('Az esemény nem található.');
+    }
+
+    // Az esemény törlése egyetlen fotót sem visz magával: a tőkefotók önálló
+    // életciklust kapnak, ezért a `photos` tömb és a borító érintetlen marad.
+    transaction.update(vineReference, {
+      events: existingEvents.filter((candidate) => candidate.id !== input.eventId),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+/**
+ * A fotók a tőke beágyazott tömbjében élnek, ezért minden fotóművelet
+ * tranzakciós read–modify–write ugyanazon a dokumentumon: két párhuzamos írás
+ * nem írhatja felül egymás fotóit. Az írás szándékosan nem tartalmazza az
+ * `events` mezőt, így egy fotóművelet párhuzamos eseménymódosítást sem
+ * söpörhet el.
+ */
+async function updateVinePhotos<T>(
   firestore: Firestore,
   vineId: string,
-  eventId: string,
-  apply: (photos: readonly VineEventPhoto[]) => { photos: VineEventPhoto[]; result: T },
+  apply: (photos: readonly VinePhoto[]) => { photos: VinePhoto[]; result: T },
 ): Promise<T> {
   return runTransaction(firestore, async (transaction) => {
     const vineReference = doc(firestore, 'vines', vineId);
@@ -462,25 +451,16 @@ async function updateEventPhotos<T>(
     }
 
     const data = snapshot.data();
-    const existingEvents = mapStoredEvents(data);
-    const event = existingEvents.find((candidate) => candidate.id === eventId);
-    if (!event) {
-      throw new Error('Az esemény nem található.');
-    }
-
-    const { photos, result } = apply(event.photos);
+    const { photos, result } = apply(mapStoredPhotos(data));
     // A kijelölt borító törlésekor a mutató ugyanebben az írásban tűnik el, hogy
     // a tőkén ne maradjon árva hivatkozás.
-    const coverPhoto = mapCoverPhoto(data.coverPhoto);
+    const coverPhotoId = mapCoverPhotoId(data.coverPhotoId);
     const isCoverRemoved =
-      coverPhoto?.eventId === eventId &&
-      !photos.some((candidate) => candidate.id === coverPhoto.photoId);
-    const now = Timestamp.now().toDate().toISOString();
+      coverPhotoId !== null && !photos.some((candidate) => candidate.id === coverPhotoId);
+
     transaction.update(vineReference, {
-      events: existingEvents.map((candidate) =>
-        candidate.id === eventId ? { ...candidate, photos, updatedAt: now } : candidate,
-      ),
-      ...(isCoverRemoved ? { coverPhoto: null } : {}),
+      photos,
+      ...(isCoverRemoved ? { coverPhotoId: null } : {}),
       updatedAt: serverTimestamp(),
     });
 
@@ -488,86 +468,43 @@ async function updateEventPhotos<T>(
   });
 }
 
-/**
- * A borítókép kijelölése, illetve `null`-lal a kijelölés visszavonása. A mutató
- * csak létező eseményre és fotóra állhat, ezért a tranzakció ellenőrzi.
- */
-export async function setCoverPhoto(
-  firestore: Firestore,
-  input: SetVineCoverPhotoInput,
-): Promise<void> {
-  await runTransaction(firestore, async (transaction) => {
-    const vineReference = doc(firestore, 'vines', input.vineId);
-    const snapshot = await transaction.get(vineReference);
-    if (!snapshot.exists()) {
-      throw new Error('A tőke nem található.');
-    }
-
-    if (input.coverPhoto) {
-      const event = mapStoredEvents(snapshot.data()).find(
-        (candidate) => candidate.id === input.coverPhoto?.eventId,
-      );
-      if (!event) {
-        throw new Error('Az esemény nem található.');
-      }
-
-      if (!event.photos.some((candidate) => candidate.id === input.coverPhoto?.photoId)) {
-        throw new Error('A fotó nem található.');
-      }
-    }
-
-    transaction.update(vineReference, {
-      coverPhoto: input.coverPhoto,
-      updatedAt: serverTimestamp(),
-    });
-  });
-}
-
 function photoLimitError(): Error {
-  return new Error(`Egy eseményhez legfeljebb ${MAX_VINE_EVENT_PHOTOS} fotó tartozhat.`);
+  return new Error(`Egy tőkéhez legfeljebb ${MAX_VINE_PHOTOS} fotó tartozhat.`);
 }
 
 // A korlátot már a fotók előkészítése előtt megnézzük: hiába töltenénk fel, ha a
 // tranzakció úgyis elutasítja.
-async function assertEventPhotoCapacity(
+async function assertVinePhotoCapacity(
   firestore: Firestore,
-  input: AddVineEventPhotosInput,
+  input: AddVinePhotosInput,
 ): Promise<void> {
   const snapshot = await getDoc(doc(firestore, 'vines', input.vineId));
   if (!snapshot.exists()) {
     throw new Error('A tőke nem található.');
   }
 
-  const event = mapStoredEvents(snapshot.data()).find(
-    (candidate) => candidate.id === input.eventId,
-  );
-  if (!event) {
-    throw new Error('Az esemény nem található.');
-  }
-
-  if (event.photos.length + input.photos.length > MAX_VINE_EVENT_PHOTOS) {
+  if (mapStoredPhotos(snapshot.data()).length + input.photos.length > MAX_VINE_PHOTOS) {
     throw photoLimitError();
   }
 }
 
-export async function addEventPhotos(
+export async function addVinePhotos(
   firestore: Firestore,
   storage: FirebaseStorage,
-  input: AddVineEventPhotosInput,
+  input: AddVinePhotosInput,
   onProgress?: VineMutationProgress,
 ): Promise<void> {
   if (input.photos.length === 0) {
     throw new Error('Válassz legalább egy fotót.');
   }
 
-  await assertEventPhotoCapacity(firestore, input);
+  await assertVinePhotoCapacity(firestore, input);
 
-  const preparedPhotos = await prepareVineEventPhotos(input.photos);
+  const preparedPhotos = await prepareVinePhotos(input.photos);
   onProgress?.(0);
-  const photos = await uploadPreparedVineEventPhotos(
+  const photos = await uploadPreparedVinePhotos(
     storage,
     input.vineId,
-    input.eventId,
     preparedPhotos,
     (uploadedBytes, totalBytes) => {
       const progress = totalBytes > 0
@@ -578,8 +515,9 @@ export async function addEventPhotos(
   );
 
   try {
-    await updateEventPhotos(firestore, input.vineId, input.eventId, (existingPhotos) => {
-      if (existingPhotos.length + photos.length > MAX_VINE_EVENT_PHOTOS) {
+    await updateVinePhotos(firestore, input.vineId, (existingPhotos) => {
+      // A korlát a tranzakcióban is szerepel: párhuzamos írás sem léphet túl.
+      if (existingPhotos.length + photos.length > MAX_VINE_PHOTOS) {
         throw photoLimitError();
       }
 
@@ -587,48 +525,43 @@ export async function addEventPhotos(
     });
   } catch (error) {
     // Storage-kompenzáció: sikertelen Firestore-írás után nem maradhat árva
-    // objektum, ahogy az `addEvents`-nél sem.
-    await deleteVineEventPhotos(storage, photos);
+    // objektum.
+    await deleteVinePhotoObjects(storage, photos);
     throw error;
   }
 }
 
-export async function deleteEventPhoto(
+export async function deleteVinePhoto(
   firestore: Firestore,
   storage: FirebaseStorage,
-  input: DeleteVineEventPhotoInput,
+  input: DeleteVinePhotoInput,
 ): Promise<void> {
   // Előbb a Firestore-rekordból vesszük ki a képet, és csak utána töröljük
   // best-effort a Storage-objektumot: a felület így nem mutat olyan bélyeget,
   // ami már nem letölthető.
-  const removedPhoto = await updateEventPhotos(
-    firestore,
-    input.vineId,
-    input.eventId,
-    (existingPhotos) => {
-      const photo = existingPhotos.find((candidate) => candidate.id === input.photoId);
-      if (!photo) {
-        throw new Error('A fotó nem található.');
-      }
+  const removedPhoto = await updateVinePhotos(firestore, input.vineId, (existingPhotos) => {
+    const photo = existingPhotos.find((candidate) => candidate.id === input.photoId);
+    if (!photo) {
+      throw new Error('A fotó nem található.');
+    }
 
-      return {
-        photos: existingPhotos.filter((candidate) => candidate.id !== input.photoId),
-        result: photo,
-      };
-    },
-  );
+    return {
+      photos: existingPhotos.filter((candidate) => candidate.id !== input.photoId),
+      result: photo,
+    };
+  });
 
-  await deleteVineEventPhotos(storage, [removedPhoto]);
+  await deleteVinePhotoObjects(storage, [removedPhoto]);
 }
 
-export async function editEventPhotoCaption(
+export async function editVinePhotoCaption(
   firestore: Firestore,
-  input: EditVineEventPhotoCaptionInput,
+  input: EditVinePhotoCaptionInput,
 ): Promise<void> {
   // Az üres felirat érvényes érték: a szerkesztő így tudja törölni is.
   const caption = input.caption.trim();
 
-  await updateEventPhotos(firestore, input.vineId, input.eventId, (existingPhotos) => {
+  await updateVinePhotos(firestore, input.vineId, (existingPhotos) => {
     if (!existingPhotos.some((candidate) => candidate.id === input.photoId)) {
       throw new Error('A fotó nem található.');
     }
@@ -642,34 +575,32 @@ export async function editEventPhotoCaption(
   });
 }
 
-export async function deleteEvent(
+/**
+ * A borítókép kijelölése, illetve `null`-lal a kijelölés visszavonása. A mutató
+ * csak a tőke létező fotójára állhat, ezért a tranzakció ellenőrzi. A fotólistát
+ * nem írja át: a kijelölés egyetlen mező.
+ */
+export async function setCoverPhoto(
   firestore: Firestore,
-  storage: FirebaseStorage,
-  input: DeleteVineEventInput,
+  input: SetVineCoverPhotoInput,
 ): Promise<void> {
-  const photos = await runTransaction(firestore, async (transaction) => {
+  await runTransaction(firestore, async (transaction) => {
     const vineReference = doc(firestore, 'vines', input.vineId);
     const snapshot = await transaction.get(vineReference);
     if (!snapshot.exists()) {
       throw new Error('A tőke nem található.');
     }
 
-    const data = snapshot.data();
-    const existingEvents = mapStoredEvents(data);
-    const event = existingEvents.find((candidate) => candidate.id === input.eventId);
-    if (!event) {
-      throw new Error('Az esemény nem található.');
+    if (
+      input.photoId &&
+      !mapStoredPhotos(snapshot.data()).some((candidate) => candidate.id === input.photoId)
+    ) {
+      throw new Error('A fotó nem található.');
     }
 
-    // Az esemény fotóival a borítómutató is elveszti az alapját.
-    const coverPhoto = mapCoverPhoto(data.coverPhoto);
     transaction.update(vineReference, {
-      events: existingEvents.filter((candidate) => candidate.id !== input.eventId),
-      ...(coverPhoto?.eventId === input.eventId ? { coverPhoto: null } : {}),
+      coverPhotoId: input.photoId,
       updatedAt: serverTimestamp(),
     });
-    return event.photos;
   });
-
-  await deleteVineEventPhotos(storage, photos);
 }

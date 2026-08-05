@@ -3,25 +3,25 @@ import { db, storage } from '../../lib/firebase';
 import { getErrorMessage } from '../../lib/errorMessage';
 import { useAuth } from '../../hooks/useAuth';
 import {
-  addEventPhotos as addFirestoreEventPhotos,
   addEvents as addFirestoreEvents,
+  addVinePhotos as addFirestoreVinePhotos,
   createVine as createFirestoreVine,
   deleteEvent as deleteFirestoreEvent,
-  deleteEventPhoto as deleteFirestoreEventPhoto,
+  deleteVinePhoto as deleteFirestoreVinePhoto,
   editEvent as editFirestoreEvent,
-  editEventPhotoCaption as editFirestoreEventPhotoCaption,
+  editVinePhotoCaption as editFirestoreVinePhotoCaption,
   editVine as editFirestoreVine,
   setCoverPhoto as setFirestoreCoverPhoto,
   subscribeToVines,
 } from './firestoreVines';
 import type {
-  AddVineEventPhotosInput,
   AddVineEventsInput,
+  AddVinePhotosInput,
   CreateVineInput,
   DeleteVineEventInput,
-  DeleteVineEventPhotoInput,
+  DeleteVinePhotoInput,
   EditVineEventInput,
-  EditVineEventPhotoCaptionInput,
+  EditVinePhotoCaptionInput,
   EditVineInput,
   SetVineCoverPhotoInput,
   Vine,
@@ -44,9 +44,9 @@ export interface VineCatalog {
   addEvents(input: AddVineEventsInput): Promise<void>;
   editEvent(input: EditVineEventInput): Promise<void>;
   deleteEvent(input: DeleteVineEventInput): Promise<void>;
-  addEventPhotos(input: AddVineEventPhotosInput): Promise<void>;
-  deleteEventPhoto(input: DeleteVineEventPhotoInput): Promise<void>;
-  editEventPhotoCaption(input: EditVineEventPhotoCaptionInput): Promise<void>;
+  addVinePhotos(input: AddVinePhotosInput): Promise<void>;
+  deleteVinePhoto(input: DeleteVinePhotoInput): Promise<void>;
+  editVinePhotoCaption(input: EditVinePhotoCaptionInput): Promise<void>;
   setCoverPhoto(input: SetVineCoverPhotoInput): Promise<void>;
   clearMutationError(): void;
 }
@@ -168,10 +168,7 @@ export function useVineCatalog(): VineCatalog {
 
   const addEvents = useCallback(
     (input: AddVineEventsInput) =>
-      runMutation(
-        (reportProgress) => addFirestoreEvents(db, storage, input, reportProgress),
-        'Nem sikerült menteni az eseményt.',
-      ),
+      runMutation(() => addFirestoreEvents(db, input), 'Nem sikerült menteni az eseményt.'),
     [runMutation],
   );
 
@@ -183,35 +180,32 @@ export function useVineCatalog(): VineCatalog {
 
   const deleteEvent = useCallback(
     (input: DeleteVineEventInput) =>
-      runMutation(
-        () => deleteFirestoreEvent(db, storage, input),
-        'Nem sikerült törölni az eseményt.',
-      ),
+      runMutation(() => deleteFirestoreEvent(db, input), 'Nem sikerült törölni az eseményt.'),
     [runMutation],
   );
 
-  const addEventPhotos = useCallback(
-    (input: AddVineEventPhotosInput) =>
+  const addVinePhotos = useCallback(
+    (input: AddVinePhotosInput) =>
       runMutation(
-        (reportProgress) => addFirestoreEventPhotos(db, storage, input, reportProgress),
+        (reportProgress) => addFirestoreVinePhotos(db, storage, input, reportProgress),
         'Nem sikerült feltölteni a fotókat.',
       ),
     [runMutation],
   );
 
-  const deleteEventPhoto = useCallback(
-    (input: DeleteVineEventPhotoInput) =>
+  const deleteVinePhoto = useCallback(
+    (input: DeleteVinePhotoInput) =>
       runMutation(
-        () => deleteFirestoreEventPhoto(db, storage, input),
+        () => deleteFirestoreVinePhoto(db, storage, input),
         'Nem sikerült törölni a fotót.',
       ),
     [runMutation],
   );
 
-  const editEventPhotoCaption = useCallback(
-    (input: EditVineEventPhotoCaptionInput) =>
+  const editVinePhotoCaption = useCallback(
+    (input: EditVinePhotoCaptionInput) =>
       runMutation(
-        () => editFirestoreEventPhotoCaption(db, input),
+        () => editFirestoreVinePhotoCaption(db, input),
         'Nem sikerült menteni a képaláírást.',
       ),
     [runMutation],
@@ -242,9 +236,9 @@ export function useVineCatalog(): VineCatalog {
     addEvents,
     editEvent,
     deleteEvent,
-    addEventPhotos,
-    deleteEventPhoto,
-    editEventPhotoCaption,
+    addVinePhotos,
+    deleteVinePhoto,
+    editVinePhotoCaption,
     setCoverPhoto,
     clearMutationError,
   };

@@ -356,6 +356,88 @@ Firebase Storage útvonal:
 
 - `cuttings/{cuttingId}/photos/{photoId}.jpg`
 
+## Tőkekövetés
+
+A dashboard külön nézetet kapott a kiültetett szőlőtőkék leltárára és
+élettörténetére.
+
+Fő útvonalak:
+
+- `/tokek`: tőkelista
+- `/tokek/{vineId}`: egy konkrét tőke adatlapja
+
+Fő képességek:
+
+- lista, szűrés és részletes nézet
+- automatikus sorszám, fajta, alany, telepítési idő és állapot nyilvántartása
+- eseménynapló: megfigyelés, metszés, permetezés, megszűnés — egy mentés több
+  tőkére is rögzíthető, tőkénként önálló eseménypéldánnyal
+- tőkefotók önálló galériában, borítókép-kijelöléssel
+- kliens oldali képátméretezés a hosszabbik oldalon `1280` px-re, mellé
+  `120` px-es bélyegkép
+- admin-only írás, publikus olvasás
+
+Firestore:
+
+- `vines/{vineId}`
+
+Egy tőkedokumentum fő mezői:
+
+- `serialNumber`
+- `variety`
+- `hasFruited`
+- `rootType`
+- `rootstockVariety`
+- `plantingDate`
+- `areaDescription`
+- `status`
+- `tags`
+- `notes`
+- `sourceCuttingId`
+- `photos`
+- `coverPhotoId`
+- `events`
+- `createdAt`
+- `updatedAt`
+- `createdByUid`
+
+A `photos` tömb elemei a dugványfotókkal közös fotóalakot használják:
+
+- `id`
+- `storagePath`
+- `downloadUrl`
+- `width`
+- `height`
+- `thumbnail` (`storagePath`, `downloadUrl`, `width`, `height`), vagy `null`
+- `capturedAt` (EXIF-készítési idő, vagy `null`)
+- `uploadedAt`
+- `caption`
+
+A fotó nem tartalmaz eseményhivatkozást: a tőke önálló képe. A `coverPhotoId`
+`null` értéke automatikus borítót jelent, azaz a `capturedAt ?? uploadedAt`
+szerinti legújabb fotót.
+
+Az `events` tömb elemei:
+
+- `id`
+- `type`
+- `occurredAt`
+- `title`
+- `notes`
+- `createdAt`
+- `updatedAt`
+
+Az esemény nem tartalmaz fotómezőt. Részletek:
+[a tőkefotók önálló modellje](tasks/vine-photo-model/spec.md).
+
+Firebase Storage útvonalak:
+
+- `vines/{vineId}/photos/{photoId}.jpg`: az új tőkefotók
+- `vines/{vineId}/events/{eventId}/photos/{photoId}.jpg`: a
+  [migráció](docs/runbooks/migrate-vine-photos.md) előtt feltöltött, régi
+  objektumok. A migrált fotórekordok ide mutatnak; új feltöltés nem kerül erre az
+  útvonalra, de a szabályok továbbra is engedik az olvasást és az admin törlést.
+
 ## React dashboard
 
 A dashboard a `dashboard/` mappában van.

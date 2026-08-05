@@ -158,16 +158,11 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
     await catalog.editVine(vineId, toVineInput(values));
   };
 
-  const handleAddEvents = async (
-    targetVineIds: string[],
-    values: VineEventFormValues,
-    photos: File[],
-  ) => {
+  const handleAddEvents = async (targetVineIds: string[], values: VineEventFormValues) => {
     await catalog.addEvents({
       targetVineIds,
       openedVineId: selectedVine?.id,
       event: toVineEventInput(values),
-      photos,
     });
   };
 
@@ -185,31 +180,24 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
     await catalog.deleteEvent({ vineId: selectedVine.id, eventId });
   };
 
-  const handleAddEventPhotos = async (eventId: string, photos: File[]) => {
+  const handleAddPhotos = async (photos: File[]) => {
     if (!selectedVine) return;
-    await catalog.addEventPhotos({ vineId: selectedVine.id, eventId, photos });
+    await catalog.addVinePhotos({ vineId: selectedVine.id, photos });
   };
 
-  const handleDeleteEventPhoto = async (eventId: string, photoId: string) => {
+  const handleDeletePhoto = async (photoId: string) => {
     if (!selectedVine) return;
-    await catalog.deleteEventPhoto({ vineId: selectedVine.id, eventId, photoId });
+    await catalog.deleteVinePhoto({ vineId: selectedVine.id, photoId });
   };
 
-  const handleEditEventPhotoCaption = async (
-    eventId: string,
-    photoId: string,
-    caption: string,
-  ) => {
+  const handleEditPhotoCaption = async (photoId: string, caption: string) => {
     if (!selectedVine) return;
-    await catalog.editEventPhotoCaption({ vineId: selectedVine.id, eventId, photoId, caption });
+    await catalog.editVinePhotoCaption({ vineId: selectedVine.id, photoId, caption });
   };
 
-  const handleSetCoverPhoto = async (eventId: string, photoId: string | null) => {
+  const handleSetCoverPhoto = async (photoId: string | null) => {
     if (!selectedVine) return;
-    await catalog.setCoverPhoto({
-      vineId: selectedVine.id,
-      coverPhoto: photoId ? { eventId, photoId } : null,
-    });
+    await catalog.setCoverPhoto({ vineId: selectedVine.id, photoId });
   };
 
   const handleOpenCutting = (cuttingId: string) => {
@@ -305,9 +293,9 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
           onAddEvents={handleAddEvents}
           onEditEvent={handleEditEvent}
           onDeleteEvent={handleDeleteEvent}
-          onAddEventPhotos={handleAddEventPhotos}
-          onDeleteEventPhoto={handleDeleteEventPhoto}
-          onEditEventPhotoCaption={handleEditEventPhotoCaption}
+          onAddPhotos={handleAddPhotos}
+          onDeletePhoto={handleDeletePhoto}
+          onEditPhotoCaption={handleEditPhotoCaption}
           onSetCoverPhoto={handleSetCoverPhoto}
           onClearMutationError={catalog.clearMutationError}
           onOpenCutting={handleOpenCutting}

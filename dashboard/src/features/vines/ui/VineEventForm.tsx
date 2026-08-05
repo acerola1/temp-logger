@@ -1,19 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ImagePlus, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useForm, useWatch } from 'react-hook-form';
-// A `photos` almoduljait közvetlenül importáljuk, nem az indexen át: az űrlap
-// így nem húzza be a feltöltő hook Firebase-szingletonját.
-import {
-  DEFAULT_MAX_SELECTED_PHOTOS,
-  appendSelectedPhotos,
-  releaseSelectedPhotos,
-  removeSelectedPhotoAt,
-  selectedPhotoFiles,
-  type SelectedPhoto,
-} from '../../photos/photoSelection';
-import { PhotoPickerButtons } from '../../photos/ui/PhotoPickerButtons';
-import { PhotoPreviewList } from '../../photos/ui/PhotoPreviewList';
 import {
   VINE_EVENT_TYPE_LABEL,
   getVineEventTargetError,
@@ -53,13 +41,9 @@ interface VineEventFormProps {
   tagSuggestions?: readonly string[];
   initialTargetVineId?: string;
   isPending: boolean;
-  uploadProgress: number | null;
   submitError: string | null;
-  onSubmit: (
-    values: VineEventFormValues,
-    targetVineIds: string[],
-    photos: File[],
-  ) => Promise<void>;
+  // Az űrlap nem fogad fotófájlt: a fotó külön tőkeművelet.
+  onSubmit: (values: VineEventFormValues, targetVineIds: string[]) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -70,7 +54,6 @@ export function VineEventForm({
   tagSuggestions = [],
   initialTargetVineId,
   isPending,
-  uploadProgress,
   submitError,
   onSubmit,
   onCancel,
@@ -79,10 +62,6 @@ export function VineEventForm({
     initialTargetVineId ? [initialTargetVineId] : [],
   );
   const [isTargetPickerOpen, setIsTargetPickerOpen] = useState(false);
-  const [photos, setPhotos] = useState<readonly SelectedPhoto[]>([]);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  // A lecsatoláskori felszabadításhoz kell az aktuális lista effekten kívül is.
-  const photosRef = useRef<readonly SelectedPhoto[]>([]);
   const [targetError, setTargetError] = useState<string | null>(null);
   const {
     register,
@@ -100,25 +79,6 @@ export function VineEventForm({
   // rövid; sok kijelölésnél a maradék már csak számként jelenik meg.
   const selectedTargetSummary = summarizeTargets(targetVines, selectedTargetIds);
 
-  // A kiválasztás elhagyása után nem maradhat felszabadítatlan objectURL.
-  useEffect(() => () => releaseSelectedPhotos(photosRef.current), []);
-
-  const applyPhotos = (next: readonly SelectedPhoto[]) => {
-    photosRef.current = next;
-    setPhotos(next);
-  };
-
-  const addPhotos = (files: File[]) => {
-    const selection = appendSelectedPhotos(photos, files);
-    applyPhotos(selection.photos);
-    setPhotoError(selection.error);
-  };
-
-  const removePhoto = (index: number) => {
-    applyPhotos(removeSelectedPhotoAt(photos, index));
-    setPhotoError(null);
-  };
-
   const submit = handleSubmit(async (values) => {
     const targets = mode === 'add' ? selectedTargetIds : [];
     const error = mode === 'add' ? getVineEventTargetError(targets.length) : null;
@@ -128,7 +88,7 @@ export function VineEventForm({
     }
 
     setTargetError(null);
-    await onSubmit(values, targets, selectedPhotoFiles(photos));
+    await onSubmit(values, targets);
   });
 
   return (
@@ -173,23 +133,6 @@ export function VineEventForm({
 
       {mode === 'add' && (
         <>
-          <div className="mt-3 space-y-2">
-            <span className={`block ${FIELD_LABEL_CLASS}`}>Fotók</span>
-            <PhotoPickerButtons onSelect={addPhotos} disabled={isPending} />
-            <PhotoPreviewList photos={photos} onRemove={removePhoto} disabled={isPending} />
-            <span className="inline-flex items-center gap-1 text-xs text-vine-500 dark:text-vine-400">
-              <ImagePlus className="h-3.5 w-3.5" />
-              {photos.length > 0
-                ? `${photos.length}/${DEFAULT_MAX_SELECTED_PHOTOS} fotó kiválasztva`
-                : `Legfeljebb ${DEFAULT_MAX_SELECTED_PHOTOS} fotó választható ki.`}
-            </span>
-            {photoError && (
-              <p role="alert" className="text-xs text-red-600 dark:text-red-300">
-                {photoError}
-              </p>
-            )}
-          </div>
-
           {selectedType === 'ceased' && (
             <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
               A megszűnés esemény a kiválasztott tőkéket megszűnt állapotba teszi. Az állapot később kézzel visszaállítható.
@@ -237,17 +180,6 @@ export function VineEventForm({
             />
           )}
         </>
-      )}
-
-      {uploadProgress !== null && (
-        <div className="mt-3 space-y-1" role="status">
-          <div className="flex justify-between text-xs text-vine-600 dark:text-vine-300">
-            <span>Fotók feltöltése</span><span>{uploadProgress}%</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-vine-200 dark:bg-vine-700">
-            <div role="progressbar" aria-label="Fotók feltöltése" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploadProgress} className="h-full bg-vine-600 transition-[width]" style={{ width: `${uploadProgress}%` }} />
-          </div>
-        </div>
       )}
 
       {(targetError || submitError) && (

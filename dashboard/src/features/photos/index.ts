@@ -47,6 +47,8 @@ export {
   type SelectedPhoto,
 } from './photoSelection';
 export {
+  photoDisplayCaption,
+  photoDisplayDateText,
   photoDisplayTime,
   resolvePhotoCover,
   sortPhotosNewestFirst,
