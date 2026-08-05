@@ -24,7 +24,15 @@ async function assertAdminGallery(page: Page) {
   await expect(gallery.getByRole('button', { name: 'Borítóképnek' })).toHaveCount(0)
 }
 
+// A dugványlap idővonala aktív dugványnál a *mostani* időpontig húzza a
+// skáláját (`CuttingTimeline`: `endMs = max(nowMs, ...)`), ezért a jelölők és a
+// nap-/hétosztások a valós idő múlásával elcsúsznak. A képernyőképek emiatt
+// néhány óra alatt kifutottak a pixeltűrésből, akkor is, ha a kód nem változott.
+// Az óra fixálása a felvételt a seed dátumaihoz köti.
+const FIXED_TIMESTAMP = '2026-08-05T12:00:00Z'
+
 test('dugványgaléria publikus és admin állapota desktopon és mobilon', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(FIXED_TIMESTAMP))
   await page.setViewportSize({ width: 1280, height: 900 })
   await openSeededCutting(page)
   await assertPublicGallery(page)
