@@ -1,5 +1,10 @@
 # PRD: Szőlőtőke-követés
 
+> **Későbbi döntés:** a fotók tulajdonlására, életciklusára és
+> megjelenítésére vonatkozó részeket felülírja a
+> [tőkefotók önálló modelljének koncepciója](../vine-photo-model/spec.md).
+> A tőkefotó a tőkéhez tartozik, nem a tőkeeseményhez.
+
 ## Összefoglaló
 
 A dashboard kapjon egy új **Tőkék** funkciót a nyaralóban kiültetett

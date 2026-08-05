@@ -1,5 +1,10 @@
 # PRD: Egységes fotókezelés
 
+> **Későbbi döntés:** a tőkefotók eseményhez kötött kezelését felülírja a
+> [tőkefotók önálló modelljének koncepciója](../vine-photo-model/spec.md).
+> A közös fotó-metaadat és képkezelő modul megmarad, de a tőkefotók a tőke
+> gyökérszintű fotólistájába kerülnek.
+
 ## Összefoglaló
 
 A dashboardban ma **három** helyen készül fotófeltöltés (dugvány-galéria,

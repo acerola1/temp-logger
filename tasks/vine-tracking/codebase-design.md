@@ -1,5 +1,11 @@
 # Codebase design: Szőlőtőke-követés
 
+> **Későbbi döntés:** a fotók seam-jére, adattárolására és eseménykapcsolatára
+> vonatkozó részeket felülírja a
+> [tőkefotók önálló modelljének koncepciója](../vine-photo-model/spec.md).
+> A jelen dokumentumban szereplő `VineEvent.photos[]` és
+> `{ eventId, photoId }` borítóhivatkozás nem a célmodell.
+
 ## Cél
 
 Ez a dokumentum a [termékspecifikáció](./spec.md) és az elkészült UI-prototípus
