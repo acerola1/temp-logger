@@ -89,6 +89,44 @@ describe('PhotoGallery', () => {
     expect(screen.getByRole('alert').textContent).toContain('2 kép kimaradt');
   });
 
+  it('a függő képeket külön sávban mutatja, a galériasorszám módosítása nélkül', async () => {
+    const onRetryPendingPhoto = vi.fn();
+    const onCancelPendingPhoto = vi.fn();
+    const user = userEvent.setup();
+    renderGallery({
+      pendingPhotos: [
+        {
+          jobId: 'job-uploading',
+          photoId: 'pending-photo',
+          fileName: 'uj.jpg',
+          status: 'uploading',
+          progress: 42,
+          previewUrl: 'blob:thumb',
+          error: null,
+        },
+        {
+          jobId: 'job-failed',
+          photoId: 'failed-photo',
+          fileName: 'hibas.jpg',
+          status: 'failed',
+          progress: 10,
+          previewUrl: null,
+          error: 'Hálózati hiba',
+        },
+      ],
+      onRetryPendingPhoto,
+      onCancelPendingPhoto,
+    });
+
+    expect(screen.getByText('Feltöltés alatt (2)')).toBeTruthy();
+    expect(screen.getByText('Kép 1/2')).toBeTruthy();
+    expect(screen.getByRole('progressbar', { name: 'uj.jpg feltöltése' }).getAttribute('aria-valuenow')).toBe('42');
+    await user.click(screen.getByRole('button', { name: 'Újrapróbálás' }));
+    expect(onRetryPendingPhoto).toHaveBeenCalledWith('job-failed');
+    await user.click(screen.getByRole('button', { name: 'Megszakítás' }));
+    expect(onCancelPendingPhoto).toHaveBeenCalledWith('job-uploading');
+  });
+
   it('az aktív fotó képaláírását módosítja, és üresre is törölheti', async () => {
     const onEditCaption = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();

@@ -23,6 +23,16 @@ export interface PrepareImageUploadOptions {
    * opt-in módon kérik: bélyeg nélkül a felület a nagy képre esik vissza.
    */
   thumbnailMaxSide?: number;
+  /** Megszakításkor a folyamatban levő böngészőképes dekódolás is leáll. */
+  signal?: AbortSignal;
+}
+
+function abortError(): DOMException {
+  return new DOMException('A kép előkészítése megszakadt.', 'AbortError');
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw abortError();
 }
 
 /** A kis változat: ugyanaz a kép, ugyanabban a formátumban, kisebb pixelben. */
@@ -63,7 +73,9 @@ async function scaleDecodedImage(
   size: ImageSize,
   maxSide: number,
   contentType: string,
+  signal?: AbortSignal,
 ): Promise<PreparedImageThumbnail> {
+  throwIfAborted(signal);
   const scale = maxSide / Math.max(size.width, size.height);
   const targetWidth = Math.max(1, Math.round(size.width * scale));
   const targetHeight = Math.max(1, Math.round(size.height * scale));
@@ -82,9 +94,14 @@ async function scaleDecodedImage(
   context.setTransform(...draw.transform);
   context.drawImage(decoded.image, 0, 0, draw.drawWidth, draw.drawHeight);
 
-  const blob = await new Promise<Blob | null>((resolve) => {
+  const blob = await new Promise<Blob | null>((resolve, reject) => {
+    const abort = () => reject(abortError());
+    signal?.addEventListener('abort', abort, { once: true });
     canvas.toBlob(
-      (nextBlob) => resolve(nextBlob),
+      (nextBlob) => {
+        signal?.removeEventListener('abort', abort);
+        if (!signal?.aborted) resolve(nextBlob);
+      },
       contentType,
       contentType === 'image/jpeg' ? JPEG_QUALITY : undefined,
     );
@@ -103,13 +120,16 @@ export async function prepareImageUpload(
 ): Promise<PreparedImageUpload> {
   const maxImageSide = options.maxImageSide ?? DEFAULT_MAX_IMAGE_SIDE;
   const thumbnailMaxSide = options.thumbnailMaxSide;
+  const signal = options.signal;
+  throwIfAborted(signal);
   // A három lépés független egymástól: az EXIF-olvasás, a kép dekódolása és a
   // dekóder-mérés párhuzamosan fut, hogy a lassú dekódolás ne szerializálódjon.
   const [exif, decoded, decoderRotates] = await Promise.all([
     readImageExif(file),
-    decodeImageElement(file),
+    decodeImageElement(file, signal),
     decoderAppliesExifOrientation(),
   ]);
+  throwIfAborted(signal);
   // Ha a dekóder már elforgatta a képet, a dekódolt méret és a pixelek is
   // helyesek: ilyenkor nincs mit alkalmaznunk. Ha nem, ránk marad a forgatás.
   const pendingOrientation = decoderRotates
@@ -130,13 +150,20 @@ export async function prepareImageUpload(
         // böngésző forgatja el. A méretet viszont már elforgatva adjuk vissza,
         // hogy a néző jó képarányt kapjon.
         { blob: file, width: size.width, height: size.height }
-      : await scaleDecodedImage(decoded, pendingOrientation, size, maxImageSide, contentType);
+      : await scaleDecodedImage(decoded, pendingOrientation, size, maxImageSide, contentType, signal);
 
   // A bélyegméretnél nem nagyobb eredetihez nem készül külön változat: a
   // felület ilyenkor a nagy képre esik vissza, ami maga is elég kicsi.
   const thumbnail =
     thumbnailMaxSide !== undefined && longestSide > thumbnailMaxSide
-      ? await scaleDecodedImage(decoded, pendingOrientation, size, thumbnailMaxSide, contentType)
+      ? await scaleDecodedImage(
+          decoded,
+          pendingOrientation,
+          size,
+          thumbnailMaxSide,
+          contentType,
+          signal,
+        )
       : null;
 
   return {

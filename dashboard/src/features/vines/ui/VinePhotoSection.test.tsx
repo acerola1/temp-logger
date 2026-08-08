@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MAX_VINE_PHOTOS, type Vine, type VinePhoto } from '../model';
+import type { VinePhotoUploadJob } from '../vinePhotoUploadQueue';
 import { VinePhotoSection } from './VinePhotoSection';
 
 function photo(id: string, overrides: Partial<VinePhoto> = {}): VinePhoto {
@@ -45,19 +46,29 @@ function vine(photos: VinePhoto[], coverPhotoId: string | null = null): Vine {
 
 function renderSection(
   target: Vine,
-  { isAdmin = true, onAddPhotos = vi.fn().mockResolvedValue(undefined) } = {},
+  {
+    isAdmin = true,
+    onAddPhotos = vi.fn().mockResolvedValue(undefined),
+    pendingPhotos = [],
+  }: {
+    isAdmin?: boolean;
+    onAddPhotos?: Mock<(photos: File[]) => void>;
+    pendingPhotos?: VinePhotoUploadJob[];
+  } = {},
 ) {
   render(
     <VinePhotoSection
       vine={target}
       isAdmin={isAdmin}
       isPending={false}
-      uploadProgress={null}
       mutationError={null}
+      pendingPhotos={pendingPhotos}
       onAddPhotos={onAddPhotos}
       onDeletePhoto={vi.fn().mockResolvedValue(undefined)}
       onEditCaption={vi.fn().mockResolvedValue(undefined)}
       onSetCoverPhoto={vi.fn().mockResolvedValue(undefined)}
+      onRetryPendingPhoto={vi.fn()}
+      onCancelPendingPhoto={vi.fn()}
     />,
   );
   return { onAddPhotos };
@@ -134,6 +145,30 @@ describe('VinePhotoSection', () => {
     expect(
       screen.getByText(`Ehhez a tőkéhez már ${MAX_VINE_PHOTOS} fotó tartozik. Előbb törölj egyet.`),
     ).toBeDefined();
+  });
+
+  it('a függő photoId-ket is beleszámolja a kapacitásba', async () => {
+    const user = userEvent.setup();
+    const photos = Array.from({ length: MAX_VINE_PHOTOS - 1 }, (_, index) =>
+      photo(`meglevo-${index}`),
+    );
+    const onAddPhotos = vi.fn();
+    renderSection(vine(photos), {
+      onAddPhotos,
+      pendingPhotos: [{
+        jobId: 'job-1',
+        photoId: 'pending-1',
+        vineId: 'vine-1',
+        fileName: 'pending.jpg',
+        status: 'uploading' as const,
+        progress: 20,
+        previewUrl: null,
+        error: null,
+      }],
+    });
+
+    await user.upload(fileInput(), makeFiles(1));
+    expect(onAddPhotos).not.toHaveBeenCalled();
   });
 
   it('a kézzel kijelölt és az automatikus borítót külön jelzi', async () => {

@@ -16,19 +16,27 @@ import {
   uploadBytes,
 } from 'firebase/storage';
 import type { Firestore } from 'firebase/firestore';
-import { MAX_VINE_PHOTOS, type CreateVineInput, type Vine } from './model';
+import { MAX_VINE_PHOTOS, type CreateVineInput, type Vine, type VinePhoto } from './model';
 import {
   addEvents,
   addVinePhotos,
+  commitVinePhoto,
   createVine,
   deleteEvent,
   deleteVinePhoto,
   editEvent,
   editVinePhotoCaption,
   editVine,
+  hasVinePhoto,
   setCoverPhoto,
   subscribeToVines,
 } from './firestoreVines';
+import { InMemoryVinePhotoUploadQueue } from './vinePhotoUploadQueue';
+import {
+  deleteVinePhotoObjects,
+  prepareVinePhoto,
+  uploadPreparedVinePhoto,
+} from './vinePhotos';
 
 const projectId = 'demo-esp32-vines-integration';
 
@@ -47,6 +55,14 @@ function waitForVines(
       reject,
     );
   });
+}
+
+async function waitUntil(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('A várt integrációs állapot nem érkezett meg.');
 }
 
 // A bélyeg bájtjai: a nagy képtől megkülönböztethető tartalom, hogy a
@@ -678,6 +694,52 @@ describe('Firestore vine catalog', () => {
     );
   });
 
+  it('a stabil photoId-val commitolt egyetlen fotó idempotens', async () => {
+    const vineId = 'vine-photo-idempotent';
+    await seedVine(vineId, 39);
+    const photo: VinePhoto = {
+      id: 'stable-photo-id',
+      storagePath: `vines/${vineId}/photos/stable-photo-id.jpg`,
+      downloadUrl: 'https://example.test/stable-photo-id.jpg',
+      width: 640,
+      height: 480,
+      thumbnail: null,
+      capturedAt: null,
+      uploadedAt: '2026-08-08T10:00:00.000Z',
+      caption: '',
+    };
+
+    await Promise.all([
+      commitVinePhoto(adminClientDb, vineId, photo),
+      editVine(adminClientDb, vineId, {
+        variety: 'Párhuzamosan szerkesztett tőke',
+        hasFruited: true,
+        rootType: 'own_rooted',
+        rootstockVariety: '',
+        plantingDate: { precision: 'unknown' },
+        areaDescription: 'E2E sor',
+        status: 'active',
+        tags: [],
+        notes: '',
+        sourceCuttingId: null,
+      }),
+    ]);
+    const committed = await waitForVines(
+      adminClientDb,
+      (vines) => vines.find((vine) => vine.id === vineId)?.photos.length === 1,
+    );
+    const updatedAt = committed.find((vine) => vine.id === vineId)?.updatedAt;
+    expect(committed.find((vine) => vine.id === vineId)?.variety).toBe(
+      'Párhuzamosan szerkesztett tőke',
+    );
+    expect(await hasVinePhoto(adminClientDb, vineId, photo.id)).toBe(true);
+
+    await commitVinePhoto(adminClientDb, vineId, photo);
+    const snapshot = await adminDb.collection('vines').doc(vineId).get();
+    expect(snapshot.data()?.photos).toHaveLength(1);
+    expect(snapshot.data()?.updatedAt.toDate().toISOString()).toBe(updatedAt);
+  });
+
   it('egyetlen fotó törlése a többi fotót és a másik tőke fotóit sem érinti', async () => {
     const first = await seedVineWithPhotos('vine-photos-delete-one', 31, [
       testPhoto('marad.png', [4, 4, 4]),
@@ -781,6 +843,44 @@ describe('Firestore vine catalog', () => {
       (nextVines) => nextVines.some((candidate) => candidate.id === vine.id),
     );
     expect(vines.find((candidate) => candidate.id === vine.id)?.photos).toHaveLength(1);
+  });
+
+  it('a háttérsor sikertelen commit után eltávolítja a feltöltött objektumokat', async () => {
+    const vine = await seedVineWithPhotos('vine-queue-compensation', 36, []);
+    const ids = ['queue-job', 'queue-compensated-photo'];
+    const queue = new InMemoryVinePhotoUploadQueue({
+      prepare: prepareVinePhoto,
+      upload: (vineId, photoId, prepared, onProgress, signal) =>
+        uploadPreparedVinePhoto(
+          adminClientStorage,
+          vineId,
+          photoId,
+          prepared,
+          onProgress,
+          signal,
+        ),
+      // A publikus kliens nem írhat: ezzel a queue kompenzációs ága fut le.
+      commit: (vineId, photo) => commitVinePhoto(clientDb, vineId, photo),
+      hasCommitted: (vineId, photoId) => hasVinePhoto(adminClientDb, vineId, photoId),
+      cleanup: (photo) => deleteVinePhotoObjects(adminClientStorage, [photo]),
+      createId: () => ids.shift() ?? crypto.randomUUID(),
+    });
+
+    await withTestImage(async () => {
+      queue.enqueue(vine.id, [testPhoto('queue-nem-menthet.png', [7, 8, 9])]);
+      await waitUntil(() => queue.getSnapshot()[0]?.status === 'failed');
+    });
+
+    expect(queue.getSnapshot()[0]).toMatchObject({
+      photoId: 'queue-compensated-photo',
+      status: 'failed',
+    });
+    await expect(
+      getBytes(ref(adminClientStorage, `vines/${vine.id}/photos/queue-compensated-photo.png`)),
+    ).rejects.toMatchObject({ code: 'storage/object-not-found' });
+    await expect(
+      getBytes(ref(adminClientStorage, `vines/${vine.id}/photos/queue-compensated-photo_thumb.png`)),
+    ).rejects.toMatchObject({ code: 'storage/object-not-found' });
   });
 
   it('a tőkénkénti fotókorlát fölötti felvételt a fájlok beolvasása előtt elutasítja', async () => {

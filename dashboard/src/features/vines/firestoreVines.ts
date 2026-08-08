@@ -472,6 +472,44 @@ function photoLimitError(): Error {
   return new Error(`Egy tőkéhez legfeljebb ${MAX_VINE_PHOTOS} fotó tartozhat.`);
 }
 
+/**
+ * Egyetlen, előre lefoglalt azonosítójú fotó idempotens commitja. Ugyanazzal az
+ * azonosítóval ismételve sikeres no-op, így egy elveszett tranzakcióválasz után
+ * az újrapróbálás nem készít duplikált rekordot.
+ */
+export async function commitVinePhoto(
+  firestore: Firestore,
+  vineId: string,
+  photo: VinePhoto,
+): Promise<void> {
+  await runTransaction(firestore, async (transaction) => {
+    const vineReference = doc(firestore, 'vines', vineId);
+    const snapshot = await transaction.get(vineReference);
+    if (!snapshot.exists()) throw new Error('A tőke nem található.');
+    const existingPhotos = mapStoredPhotos(snapshot.data());
+
+    if (existingPhotos.some((candidate) => candidate.id === photo.id)) {
+      return;
+    }
+
+    if (existingPhotos.length >= MAX_VINE_PHOTOS) throw photoLimitError();
+    transaction.update(vineReference, {
+      photos: [...existingPhotos, photo],
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+export async function hasVinePhoto(
+  firestore: Firestore,
+  vineId: string,
+  photoId: string,
+): Promise<boolean> {
+  const snapshot = await getDoc(doc(firestore, 'vines', vineId));
+  if (!snapshot.exists()) throw new Error('A tőke nem található.');
+  return mapStoredPhotos(snapshot.data()).some((photo) => photo.id === photoId);
+}
+
 // A korlátot már a fotók előkészítése előtt megnézzük: hiába töltenénk fel, ha a
 // tranzakció úgyis elutasítja.
 async function assertVinePhotoCapacity(

@@ -11,6 +11,7 @@ import {
 } from '../../photos';
 import type { VineEventFormValues, VineFormValues } from '../forms';
 import type { Vine, VineEvent, VinePlantingDate } from '../model';
+import type { VinePhotoUploadJob } from '../vinePhotoUploadQueue';
 import { resolveVineCoverPhoto, sortVinePhotos } from '../vineCoverPhoto';
 import { VineEventForm } from './VineEventForm';
 import { VineForm, type VineCuttingOption } from './VineForm';
@@ -35,17 +36,19 @@ interface VineDetailProps {
   isAdmin: boolean;
   isMobileLayout: boolean;
   isPending: boolean;
-  uploadProgress: number | null;
   mutationError: string | null;
+  pendingPhotos: readonly VinePhotoUploadJob[];
   onClose: () => void;
   onEdit: (vineId: string, values: VineFormValues) => Promise<void>;
   onAddEvents: (targetVineIds: string[], values: VineEventFormValues) => Promise<void>;
   onEditEvent: (eventId: string, values: VineEventFormValues) => Promise<void>;
   onDeleteEvent: (eventId: string) => Promise<void>;
-  onAddPhotos: (photos: File[]) => Promise<void>;
+  onAddPhotos: (photos: File[]) => void;
   onDeletePhoto: (photoId: string) => Promise<void>;
   onEditPhotoCaption: (photoId: string, caption: string) => Promise<void>;
   onSetCoverPhoto: (photoId: string | null) => Promise<void>;
+  onRetryPendingPhoto: (jobId: string) => void;
+  onCancelPendingPhoto: (jobId: string) => void;
   onClearMutationError: () => void;
   onOpenCutting: (cuttingId: string) => void;
 }
@@ -105,8 +108,8 @@ export function VineDetail({
   isAdmin,
   isMobileLayout,
   isPending,
-  uploadProgress,
   mutationError,
+  pendingPhotos,
   onClose,
   onEdit,
   onAddEvents,
@@ -116,6 +119,8 @@ export function VineDetail({
   onDeletePhoto,
   onEditPhotoCaption,
   onSetCoverPhoto,
+  onRetryPendingPhoto,
+  onCancelPendingPhoto,
   onClearMutationError,
   onOpenCutting,
 }: VineDetailProps) {
@@ -415,14 +420,16 @@ export function VineDetail({
                 vine={selectedVine}
                 isAdmin={isAdmin}
                 isPending={isPending}
-                uploadProgress={isPhotoMutation ? uploadProgress : null}
                 mutationError={isPhotoMutation ? mutationError : null}
-                onAddPhotos={(photos) => runPhotoMutation(() => onAddPhotos(photos))}
+                pendingPhotos={pendingPhotos}
+                onAddPhotos={onAddPhotos}
                 onDeletePhoto={(photoId) => runPhotoMutation(() => onDeletePhoto(photoId))}
                 onEditCaption={(photoId, caption) =>
                   runPhotoMutation(() => onEditPhotoCaption(photoId, caption))
                 }
                 onSetCoverPhoto={(photoId) => runPhotoMutation(() => onSetCoverPhoto(photoId))}
+                onRetryPendingPhoto={onRetryPendingPhoto}
+                onCancelPendingPhoto={onCancelPendingPhoto}
               />
 
               <section className="space-y-3">
@@ -486,14 +493,9 @@ export function VineDetail({
                     <span>Az esemény mentve.</span>
                     <div className="flex flex-wrap items-center gap-2">
                       <PhotoPickerButtons
-                        // A hibát a fotószakasz írja ki (`isPhotoMutation`),
-                        // ezért itt csak naplózzuk: kezeletlen rejectet nem
-                        // hagyhat maga után a gyorsművelet.
                         onSelect={(photos) => {
                           setShowPhotoQuickAction(false);
-                          runPhotoMutation(() => onAddPhotos(photos)).catch((error: unknown) => {
-                            console.error('Vine photo quick action error:', error);
-                          });
+                          onAddPhotos(photos);
                         }}
                         disabled={isPending}
                         singleLabel="Fotó hozzáadása ehhez a tőkéhez"

@@ -3,17 +3,22 @@ import { DEFAULT_MAX_SELECTED_PHOTOS } from '../../photos/photoSelection';
 import { PhotoGallery } from '../../photos/ui/PhotoGallery';
 import { selectVinePhotos } from '../forms';
 import type { Vine } from '../model';
+import type { VinePhotoUploadJob } from '../vinePhotoUploadQueue';
+
+export type PendingVinePhoto = VinePhotoUploadJob;
 
 interface VinePhotoSectionProps {
   vine: Vine;
   isAdmin: boolean;
   isPending: boolean;
-  uploadProgress: number | null;
   mutationError: string | null;
-  onAddPhotos: (photos: File[]) => Promise<void>;
+  pendingPhotos: readonly PendingVinePhoto[];
+  onAddPhotos: (photos: File[]) => void;
   onDeletePhoto: (photoId: string) => Promise<void>;
   onEditCaption: (photoId: string, caption: string) => Promise<void>;
   onSetCoverPhoto: (photoId: string | null) => Promise<void>;
+  onRetryPendingPhoto: (jobId: string) => void;
+  onCancelPendingPhoto: (jobId: string) => void;
 }
 
 /**
@@ -25,12 +30,14 @@ export function VinePhotoSection({
   vine,
   isAdmin,
   isPending,
-  uploadProgress,
   mutationError,
+  pendingPhotos,
   onAddPhotos,
   onDeletePhoto,
   onEditCaption,
   onSetCoverPhoto,
+  onRetryPendingPhoto,
+  onCancelPendingPhoto,
 }: VinePhotoSectionProps) {
   const [capacityError, setCapacityError] = useState<string | null>(null);
 
@@ -38,14 +45,16 @@ export function VinePhotoSection({
   // admin viszont itt kapja a hozzáadási állapotot, ezért nála nem tűnik el.
   if (!isAdmin && vine.photos.length === 0) return null;
 
-  const addPhotos = async (files: File[]) => {
+  const addPhotos = (files: File[]) => {
     // A 100-as biztonsági korlát a szabad helyre vág. Nulla kapacitásnál
     // kép-előkészítés és feltöltés sem indul.
-    const selection = selectVinePhotos(vine.photos.length, files);
+    const occupiedPhotoIds = new Set(vine.photos.map((photo) => photo.id));
+    for (const pending of pendingPhotos) occupiedPhotoIds.add(pending.photoId);
+    const selection = selectVinePhotos(occupiedPhotoIds.size, files);
     setCapacityError(selection.error);
     if (selection.accepted.length === 0) return;
 
-    await onAddPhotos(selection.accepted);
+    onAddPhotos(selection.accepted);
   };
 
   const deletePhoto = async (photoId: string) => {
@@ -66,30 +75,13 @@ export function VinePhotoSection({
         emptyMessage="Még nincs fotó ehhez a tőkéhez."
         lightboxLabel="Tőkefotók"
         cover={{ pinnedPhotoId: vine.coverPhotoId, onPin: onSetCoverPhoto }}
+        pendingPhotos={pendingPhotos}
         onAddPhotos={addPhotos}
         onDeletePhoto={deletePhoto}
         onEditCaption={onEditCaption}
+        onRetryPendingPhoto={onRetryPendingPhoto}
+        onCancelPendingPhoto={onCancelPendingPhoto}
       />
-
-      {uploadProgress !== null && (
-        <div className="space-y-1" role="status">
-          <div className="flex justify-between text-xs text-vine-600 dark:text-vine-300">
-            <span>Fotók feltöltése</span>
-            <span>{uploadProgress}%</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-vine-200 dark:bg-vine-700">
-            <div
-              role="progressbar"
-              aria-label="Fotók feltöltése"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={uploadProgress}
-              className="h-full bg-vine-600 transition-[width]"
-              style={{ width: `${uploadProgress}%` }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

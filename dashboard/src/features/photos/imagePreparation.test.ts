@@ -97,6 +97,20 @@ afterEach(() => {
 });
 
 describe('prepareImageUpload', () => {
+  it('megszakításkor leállítja a folyamatban levő böngészőképes dekódolást', async () => {
+    naturalSize = { width: 4000, height: 3000 };
+    const controller = new AbortController();
+
+    const result = prepareImageUpload(makeFile('image/jpeg'), {
+      maxImageSide: 1280,
+      signal: controller.signal,
+    });
+    controller.abort();
+
+    await expect(result).rejects.toMatchObject({ name: 'AbortError' });
+    expect(canvasCalls).toHaveLength(0);
+  });
+
   it('a méretkorlát alatti képet változatlanul engedi tovább', async () => {
     naturalSize = { width: 800, height: 600 };
     const file = makeFile('image/jpeg');

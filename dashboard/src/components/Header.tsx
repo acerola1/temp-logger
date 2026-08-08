@@ -6,6 +6,7 @@ interface HeaderProps {
   theme: 'light' | 'dark';
   isAdmin: boolean;
   canManageSessions?: boolean;
+  activePhotoUploadCount?: number;
   onToggleTheme: () => void;
   onOpenSessionManager: () => void;
 }
@@ -14,6 +15,7 @@ export function Header({
   theme,
   isAdmin,
   canManageSessions = true,
+  activePhotoUploadCount = 0,
   onToggleTheme,
   onOpenSessionManager,
 }: HeaderProps) {
@@ -35,6 +37,11 @@ export function Header({
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {activePhotoUploadCount > 0 && (
+          <span role="status" className="rounded-full border border-vine-200 bg-white/70 px-2.5 py-1 text-xs font-medium text-vine-700 dark:border-vine-700 dark:bg-vine-800/70 dark:text-vine-100">
+            {activePhotoUploadCount} fotó feltöltése
+          </span>
+        )}
         <button
           onClick={onToggleTheme}
           className="p-2 rounded-xl bg-white/70 dark:bg-vine-800/70 backdrop-blur-sm border border-vine-200 dark:border-vine-700 hover:bg-vine-100 dark:hover:bg-vine-700 transition-colors"

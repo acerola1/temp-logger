@@ -4,6 +4,8 @@ import { Header } from './components/Header';
 import { CuttingsPage } from './components/CuttingsPage';
 import { MonitorPage } from './components/MonitorPage';
 import { VinesPage } from './features/vines';
+import { VinePhotoUploadQueueProvider } from './features/vines/VinePhotoUploadQueueProvider';
+import { useVinePhotoUploadQueue } from './features/vines/vinePhotoUploadQueueContext';
 import { useTheme } from './hooks/useTheme';
 import { useIsAdmin } from './hooks/useIsAdmin';
 import { getViewFromPath, type DashboardView } from './lib/dashboardRouting';
@@ -22,6 +24,7 @@ const VIEW_TABS: Array<{ view: DashboardView; label: string }> = [
 function Dashboard() {
   const { theme, toggle } = useTheme();
   const { isAdmin } = useIsAdmin();
+  const { jobs: photoUploadJobs } = useVinePhotoUploadQueue();
   const [currentView, setCurrentView] = useState<DashboardView>(() =>
     getViewFromPath(window.location.pathname),
   );
@@ -79,6 +82,7 @@ function Dashboard() {
           isAdmin={isAdmin}
           onToggleTheme={toggle}
           canManageSessions={currentView === 'monitor'}
+          activePhotoUploadCount={photoUploadJobs.filter((job) => job.status !== 'failed').length}
           onOpenSessionManager={() => window.dispatchEvent(new Event('dashboard:open-session-manager'))}
         />
 
@@ -109,7 +113,9 @@ function Dashboard() {
 export default function App() {
   return (
     <AuthProvider>
-      <Dashboard />
+      <VinePhotoUploadQueueProvider>
+        <Dashboard />
+      </VinePhotoUploadQueueProvider>
     </AuthProvider>
   );
 }

@@ -10,6 +10,8 @@ const deletedPaths: string[] = [];
 const failingPaths = new Set<string>();
 // A bélyeg útjában véletlen `photoId` van, ezért a hibát végződésre is lehet kérni.
 const failingSuffixes = new Set<string>();
+const stalledPaths = new Set<string>();
+const cancelledPaths: string[] = [];
 
 vi.mock('firebase/storage', () => ({
   ref: (_storage: unknown, path: string): StorageRef => ({ path }),
@@ -17,14 +19,23 @@ vi.mock('firebase/storage', () => ({
   deleteObject: async (storageRef: StorageRef) => {
     deletedPaths.push(storageRef.path);
   },
-  uploadBytesResumable: (storageRef: StorageRef, blob: Blob) => ({
-    on: (
+  uploadBytesResumable: (storageRef: StorageRef, blob: Blob) => {
+    let reportError: ((error: Error) => void) | null = null;
+    return {
+      cancel: () => {
+        cancelledPaths.push(storageRef.path);
+        reportError?.(new Error(`cancelled: ${storageRef.path}`));
+        return true;
+      },
+      on: (
       _event: string,
       onSnapshot: (snapshot: { bytesTransferred: number }) => void,
       onError: (error: Error) => void,
       onComplete: () => void,
     ) => {
+      reportError = onError;
       onSnapshot({ bytesTransferred: blob.size / 2 });
+      if (stalledPaths.has(storageRef.path)) return;
 
       const shouldFail =
         failingPaths.has(storageRef.path) ||
@@ -37,7 +48,8 @@ vi.mock('firebase/storage', () => ({
       onSnapshot({ bytesTransferred: blob.size });
       onComplete();
     },
-  }),
+    };
+  },
 }));
 
 const storage = {} as FirebaseStorage;
@@ -72,6 +84,8 @@ beforeEach(() => {
   deletedPaths.length = 0;
   failingPaths.clear();
   failingSuffixes.clear();
+  stalledPaths.clear();
+  cancelledPaths.length = 0;
 });
 
 describe('uploadPreparedPhotos', () => {
@@ -114,6 +128,24 @@ describe('uploadPreparedPhotos', () => {
     ).rejects.toThrow('upload failed: photos/1.jpg');
 
     expect(deletedPaths).toEqual(['photos/0.jpg', 'photos/1.jpg']);
+  });
+
+  it('stabil photoId-t használ, és abortkor a Firebase UploadTaskot is megszakítja', async () => {
+    stalledPaths.add('photos/0.jpg');
+    const controller = new AbortController();
+    const upload = uploadPreparedPhotos({
+      storage,
+      photos: [makePreparedPhoto(100)],
+      photoIds: ['stable-photo'],
+      buildStoragePath,
+      signal: controller.signal,
+    });
+    await Promise.resolve();
+
+    controller.abort();
+    await expect(upload).rejects.toMatchObject({ name: 'AbortError' });
+    expect(cancelledPaths).toEqual(['photos/0.jpg']);
+    expect(deletedPaths).toEqual(['photos/0.jpg']);
   });
 
   it('a takarítás hibáját elnyeli, és az eredeti hibát dobja tovább', async () => {

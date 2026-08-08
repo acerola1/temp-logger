@@ -8,18 +8,39 @@ export interface DecodedImage {
   height: number;
 }
 
-export function decodeImageElement(source: Blob): Promise<DecodedImage> {
+function abortError(): DOMException {
+  return new DOMException('A kép előkészítése megszakadt.', 'AbortError');
+}
+
+export function decodeImageElement(source: Blob, signal?: AbortSignal): Promise<DecodedImage> {
+  if (signal?.aborted) return Promise.reject(abortError());
+
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(source);
     const image = new Image();
 
-    image.onload = () => {
-      resolve({ image, width: image.naturalWidth, height: image.naturalHeight });
+    const cleanup = () => {
+      signal?.removeEventListener('abort', abort);
       URL.revokeObjectURL(objectUrl);
     };
 
+    const abort = () => {
+      image.onload = null;
+      image.onerror = null;
+      image.src = '';
+      cleanup();
+      reject(abortError());
+    };
+
+    signal?.addEventListener('abort', abort, { once: true });
+
+    image.onload = () => {
+      cleanup();
+      resolve({ image, width: image.naturalWidth, height: image.naturalHeight });
+    };
+
     image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
+      cleanup();
       reject(new Error('Nem sikerült beolvasni a képet.'));
     };
 

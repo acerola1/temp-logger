@@ -42,14 +42,40 @@ export function buildVinePhotoStoragePath(
 export async function prepareVinePhotos(
   files: readonly File[],
 ): Promise<PreparedVinePhoto[]> {
-  return Promise.all(
-    files.map((file) =>
-      prepareImageUpload(file, {
-        maxImageSide: VINE_PHOTO_MAX_SIDE,
-        thumbnailMaxSide: VINE_PHOTO_THUMBNAIL_MAX_SIDE,
-      }),
-    ),
-  );
+  return Promise.all(files.map((file) => prepareVinePhoto(file)));
+}
+
+export async function prepareVinePhoto(
+  file: File,
+  signal?: AbortSignal,
+): Promise<PreparedVinePhoto> {
+  return prepareImageUpload(file, {
+    maxImageSide: VINE_PHOTO_MAX_SIDE,
+    thumbnailMaxSide: VINE_PHOTO_THUMBNAIL_MAX_SIDE,
+    signal,
+  });
+}
+
+export async function uploadPreparedVinePhoto(
+  storage: FirebaseStorage,
+  vineId: string,
+  photoId: string,
+  preparedPhoto: PreparedVinePhoto,
+  onProgress?: VinePhotoUploadProgress,
+  signal?: AbortSignal,
+): Promise<VinePhoto> {
+  const [upload] = await uploadPreparedPhotos({
+    storage,
+    photos: [preparedPhoto],
+    photoIds: [photoId],
+    buildStoragePath: ({ photoId: objectId, extension }) =>
+      buildVinePhotoStoragePath(vineId, objectId, extension),
+    onProgress,
+    signal,
+  });
+
+  if (!upload) throw new Error('A fotó feltöltése nem adott eredményt.');
+  return toPhotoRecord({ ...upload, id: upload.photoId }, new Date().toISOString());
 }
 
 export async function uploadPreparedVinePhotos(

@@ -4,7 +4,6 @@ import { getErrorMessage } from '../../lib/errorMessage';
 import { useAuth } from '../../hooks/useAuth';
 import {
   addEvents as addFirestoreEvents,
-  addVinePhotos as addFirestoreVinePhotos,
   createVine as createFirestoreVine,
   deleteEvent as deleteFirestoreEvent,
   deleteVinePhoto as deleteFirestoreVinePhoto,
@@ -16,7 +15,6 @@ import {
 } from './firestoreVines';
 import type {
   AddVineEventsInput,
-  AddVinePhotosInput,
   CreateVineInput,
   DeleteVineEventInput,
   DeleteVinePhotoInput,
@@ -44,7 +42,6 @@ export interface VineCatalog {
   addEvents(input: AddVineEventsInput): Promise<void>;
   editEvent(input: EditVineEventInput): Promise<void>;
   deleteEvent(input: DeleteVineEventInput): Promise<void>;
-  addVinePhotos(input: AddVinePhotosInput): Promise<void>;
   deleteVinePhoto(input: DeleteVinePhotoInput): Promise<void>;
   editVinePhotoCaption(input: EditVinePhotoCaptionInput): Promise<void>;
   setCoverPhoto(input: SetVineCoverPhotoInput): Promise<void>;
@@ -184,15 +181,6 @@ export function useVineCatalog(): VineCatalog {
     [runMutation],
   );
 
-  const addVinePhotos = useCallback(
-    (input: AddVinePhotosInput) =>
-      runMutation(
-        (reportProgress) => addFirestoreVinePhotos(db, storage, input, reportProgress),
-        'Nem sikerült feltölteni a fotókat.',
-      ),
-    [runMutation],
-  );
-
   const deleteVinePhoto = useCallback(
     (input: DeleteVinePhotoInput) =>
       runMutation(
@@ -236,7 +224,6 @@ export function useVineCatalog(): VineCatalog {
     addEvents,
     editEvent,
     deleteEvent,
-    addVinePhotos,
     deleteVinePhoto,
     editVinePhotoCaption,
     setCoverPhoto,

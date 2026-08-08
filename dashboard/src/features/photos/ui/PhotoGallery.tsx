@@ -36,6 +36,16 @@ export interface PhotoGalleryCoverControls {
   onPin: (photoId: string | null) => Promise<void>;
 }
 
+export interface PendingPhoto {
+  jobId: string;
+  photoId: string;
+  fileName: string;
+  status: 'queued' | 'preparing' | 'uploading' | 'committing' | 'awaiting-sync' | 'failed';
+  progress: number;
+  previewUrl: string | null;
+  error: string | null;
+}
+
 export interface PhotoGalleryProps {
   galleryId: string;
   photos: readonly Photo[];
@@ -48,9 +58,12 @@ export interface PhotoGalleryProps {
   emptyMessage?: string;
   lightboxLabel?: string;
   cover?: PhotoGalleryCoverControls;
-  onAddPhotos: (files: File[]) => Promise<void>;
+  pendingPhotos?: readonly PendingPhoto[];
+  onAddPhotos: (files: File[]) => void | Promise<void>;
   onDeletePhoto: (photoId: string) => Promise<void>;
   onEditCaption: (photoId: string, caption: string) => Promise<void>;
+  onRetryPendingPhoto?: (jobId: string) => void;
+  onCancelPendingPhoto?: (jobId: string) => void;
 }
 
 function errorText(error: unknown, fallback: string): string {
@@ -69,9 +82,12 @@ export function PhotoGallery({
   emptyMessage = 'Még nincs feltöltött kép.',
   lightboxLabel = 'Fotó',
   cover,
+  pendingPhotos = [],
   onAddPhotos,
   onDeletePhoto,
   onEditCaption,
+  onRetryPendingPhoto,
+  onCancelPendingPhoto,
 }: PhotoGalleryProps) {
   const sortedPhotos = useMemo(() => sortPhotosNewestFirst(photos), [photos]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
@@ -238,6 +254,55 @@ export function PhotoGallery({
       {(localError || errorMessage) && (
         <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
           {localError ?? errorMessage}
+        </div>
+      )}
+
+      {pendingPhotos.length > 0 && (
+        <div className="space-y-2 rounded-2xl border border-vine-200 bg-vine-50/80 p-3 dark:border-vine-700 dark:bg-vine-800/40" aria-label="Feltöltés alatt">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-vine-600 dark:text-vine-300">
+            Feltöltés alatt ({pendingPhotos.length})
+          </div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
+            {pendingPhotos.map((pending) => {
+              const statusLabel = {
+                queued: 'Várakozik',
+                preparing: 'Előkészítés',
+                uploading: `Feltöltés ${pending.progress}%`,
+                committing: 'Mentés',
+                'awaiting-sync': 'Szinkronizálás',
+                failed: 'Sikertelen',
+              }[pending.status];
+              const canCancel = ['queued', 'preparing', 'uploading'].includes(pending.status);
+              return (
+                <div key={pending.jobId} data-upload-job-id={pending.jobId} className="min-w-0 space-y-1.5 rounded-xl border border-vine-200 bg-white p-2 dark:border-vine-700 dark:bg-vine-900">
+                  {pending.previewUrl ? (
+                    <img src={pending.previewUrl} alt="" className="h-24 w-full rounded-lg object-cover" />
+                  ) : (
+                    <div className="flex h-24 items-center justify-center rounded-lg bg-vine-100 text-vine-400 dark:bg-vine-800 dark:text-vine-500">
+                      <Loader2 className={pending.status === 'failed' ? 'h-5 w-5' : 'h-5 w-5 animate-spin'} />
+                    </div>
+                  )}
+                  <div className="truncate text-[11px] text-vine-500 dark:text-vine-300" title={pending.fileName}>{pending.fileName}</div>
+                  <div role="status" className={pending.status === 'failed' ? 'text-xs font-medium text-red-600 dark:text-red-300' : 'text-xs font-medium text-vine-700 dark:text-vine-100'}>{statusLabel}</div>
+                  {pending.status === 'uploading' && (
+                    <div className="h-1.5 overflow-hidden rounded-full bg-vine-200 dark:bg-vine-700">
+                      <div role="progressbar" aria-label={`${pending.fileName} feltöltése`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pending.progress} className="h-full bg-vine-600 transition-[width]" style={{ width: `${pending.progress}%` }} />
+                    </div>
+                  )}
+                  {pending.error && <p role="alert" className="break-all text-[11px] text-red-600 dark:text-red-300">{pending.error}</p>}
+                  {pending.status === 'failed' && (
+                    <div className="flex flex-wrap gap-1">
+                      <button type="button" className={SMALL_BUTTON_CLASS} onClick={() => onRetryPendingPhoto?.(pending.jobId)}>Újrapróbálás</button>
+                      <button type="button" className={DELETE_BUTTON_CLASS} onClick={() => onCancelPendingPhoto?.(pending.jobId)}>Eltávolítás</button>
+                    </div>
+                  )}
+                  {canCancel && (
+                    <button type="button" className={DELETE_BUTTON_CLASS} onClick={() => onCancelPendingPhoto?.(pending.jobId)}>Megszakítás</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

@@ -15,6 +15,7 @@ import {
   type VineFormValues,
 } from '../forms';
 import { getNextVineSerialNumber, useVineCatalog } from '../useVineCatalog';
+import { useVinePhotoUploadQueue } from '../vinePhotoUploadQueueContext';
 import { VineDetail } from './VineDetail';
 import { VineForm, type VineCuttingOption } from './VineForm';
 import { VineListFilters } from './VineListFilters';
@@ -71,6 +72,7 @@ interface VinesPageProps {
 
 export function VinesPage({ isAdmin }: VinesPageProps) {
   const catalog = useVineCatalog();
+  const { queue: photoUploadQueue, jobs: photoUploadJobs } = useVinePhotoUploadQueue();
   const { data: cuttings, loading: loadingCuttings, error: cuttingsError } = useCuttingsQuery();
   const [listState, setListState] = useState<VineListState>(() =>
     parseVineListState(window.location.search),
@@ -94,6 +96,10 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
       : selectedVineId;
   const selectedVine =
     catalog.vines.find((vine) => vine.id === routedSelectedVineId) ?? null;
+  const selectedVinePendingPhotos = useMemo(
+    () => photoUploadJobs.filter((job) => job.vineId === selectedVine?.id),
+    [photoUploadJobs, selectedVine?.id],
+  );
   const nextSerialNumber = getNextVineSerialNumber(catalog.vines);
   const knownVarieties = useMemo(
     () => uniqueSorted(catalog.vines.map((vine) => vine.variety)),
@@ -180,9 +186,9 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
     await catalog.deleteEvent({ vineId: selectedVine.id, eventId });
   };
 
-  const handleAddPhotos = async (photos: File[]) => {
+  const handleAddPhotos = (photos: File[]) => {
     if (!selectedVine) return;
-    await catalog.addVinePhotos({ vineId: selectedVine.id, photos });
+    photoUploadQueue.enqueue(selectedVine.id, photos);
   };
 
   const handleDeletePhoto = async (photoId: string) => {
@@ -286,8 +292,8 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
           isAdmin={isAdmin}
           isMobileLayout={isMobileLayout}
           isPending={catalog.mutation.pending}
-          uploadProgress={catalog.mutation.uploadProgress}
           mutationError={catalog.mutation.error}
+          pendingPhotos={selectedVinePendingPhotos}
           onClose={() => navigateToVine(null)}
           onEdit={handleEdit}
           onAddEvents={handleAddEvents}
@@ -297,6 +303,8 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
           onDeletePhoto={handleDeletePhoto}
           onEditPhotoCaption={handleEditPhotoCaption}
           onSetCoverPhoto={handleSetCoverPhoto}
+          onRetryPendingPhoto={(jobId) => photoUploadQueue.retry(jobId)}
+          onCancelPendingPhoto={(jobId) => photoUploadQueue.cancel(jobId)}
           onClearMutationError={catalog.clearMutationError}
           onOpenCutting={handleOpenCutting}
         />

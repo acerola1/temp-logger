@@ -53,6 +53,14 @@ export interface UploadPreparedPhotosRequest {
   photos: readonly PreparedPhoto[];
   buildStoragePath: (params: BuildPhotoStoragePathParams) => string;
   onProgress?: PhotoUploadProgress;
+  /** A hívó által előre lefoglalt stabil azonosítók. */
+  photoIds?: readonly string[];
+  /** Megszakításkor az éppen aktív Firebase UploadTask is leáll. */
+  signal?: AbortSignal;
+}
+
+function abortError(): DOMException {
+  return new DOMException('A fotófeltöltés megszakadt.', 'AbortError');
 }
 
 // Best-effort takarítás: a hívó hibaága fut tovább, a Storage-hibát csak naplózzuk.
@@ -78,7 +86,12 @@ export async function uploadPreparedPhotos({
   photos,
   buildStoragePath,
   onProgress,
+  photoIds,
+  signal,
 }: UploadPreparedPhotosRequest): Promise<UploadedPhotoObject[]> {
+  if (photoIds && photoIds.length !== photos.length) {
+    throw new Error('Minden előkészített fotóhoz pontosan egy azonosító szükséges.');
+  }
   // A bélyegek bájtjai is benne vannak az összegben, hogy a folyamatjelző ne
   // ugorjon vissza, amikor a kis kép feltöltése következik.
   const totalBytes = photos.reduce(
@@ -94,17 +107,27 @@ export async function uploadPreparedPhotos({
     blob: Blob,
     contentType: string,
   ): Promise<string> => {
+    if (signal?.aborted) throw abortError();
     const storageRef = ref(storage, storagePath);
     uploadedPaths.push(storagePath);
 
     await new Promise<void>((resolve, reject) => {
       const uploadTask = uploadBytesResumable(storageRef, blob, { contentType });
+      const abort = () => {
+        uploadTask.cancel();
+        reject(abortError());
+      };
+      signal?.addEventListener('abort', abort, { once: true });
 
       uploadTask.on(
         'state_changed',
         (snapshot) => onProgress?.(uploadedBytes + snapshot.bytesTransferred, totalBytes),
-        reject,
+        (error) => {
+          signal?.removeEventListener('abort', abort);
+          reject(signal?.aborted ? abortError() : error);
+        },
         () => {
+          signal?.removeEventListener('abort', abort);
           uploadedBytes += blob.size;
           onProgress?.(uploadedBytes, totalBytes);
           resolve();
@@ -117,7 +140,8 @@ export async function uploadPreparedPhotos({
 
   try {
     for (const [index, prepared] of photos.entries()) {
-      const photoId = crypto.randomUUID();
+      if (signal?.aborted) throw abortError();
+      const photoId = photoIds?.[index] ?? crypto.randomUUID();
       const extension = getFileExtension(prepared.contentType);
       const storagePath = buildStoragePath({ index, photoId, extension });
       const downloadUrl = await uploadBlob(storagePath, prepared.blob, prepared.contentType);
