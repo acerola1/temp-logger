@@ -215,8 +215,13 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   // Az új kép lett az aktív, felirat nélkül.
   await expect(gallery.getByText('Nincs képaláírás.')).toBeVisible();
 
-  // A frissebb feltöltés a rács elejére kerül, tehát az aktív kép egyben az
-  // automatikus borító is.
+  // A két egyszerre feltöltött kép időbélyege azonos, ezért az aktív kép a
+  // realtime commitok sorrendjétől függhet. A rendezett rács első elemét
+  // választjuk ki, mielőtt az automatikus borítót ellenőrizzük.
+  await gallery
+    .getByRole('button', { name: 'Cabernet Franc fotó megnyitása' })
+    .first()
+    .click();
   await expect(gallery.getByText('Kép 1/3')).toBeVisible();
   await expect(gallery.getByText('Automatikus borító')).toBeVisible();
 

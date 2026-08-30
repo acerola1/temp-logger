@@ -1,7 +1,8 @@
-import type { FirebaseStorage } from 'firebase/storage';
+import { deleteObject, ref, type FirebaseStorage } from 'firebase/storage';
 // A keretrendszer-független magot közvetlenül importáljuk, nem az index-en át:
 // így a tőke-adatréteg nem húzza be a React-hook Storage-szingletonját.
-import { prepareImageUpload } from '../photos/imagePreparation';
+import { getFileExtension, prepareImageUpload } from '../photos/imagePreparation';
+import { PHOTO_THUMBNAIL_SUFFIX } from '../photos/photoUpload';
 import { toPhotoRecord } from '../photos/photoMetadata';
 import {
   deletePhotoObjects,
@@ -115,4 +116,63 @@ export async function deleteVinePhotoObjects(
       .flatMap((photo) => [photo.storagePath, photo.thumbnail?.storagePath ?? ''])
       .filter((storagePath) => storagePath.length > 0),
   );
+}
+
+/**
+ * Végleges tőketörléshez használt, visszajelző takarítás. A hiányzó objektum
+ * sikernek számít, minden más hibás útvonal visszakerül a hívóhoz, így ugyanaz
+ * a lista veszély nélkül újrapróbálható.
+ */
+export async function cleanupVinePhotoStoragePaths(
+  storage: FirebaseStorage,
+  storagePaths: readonly string[],
+): Promise<string[]> {
+  const uniquePaths = [...new Set(storagePaths.filter(Boolean))];
+  const results = await Promise.all(
+    uniquePaths.map(async (storagePath) => {
+      try {
+        await deleteObject(ref(storage, storagePath));
+        return null;
+      } catch (error) {
+        if (
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          error.code === 'storage/object-not-found'
+        ) {
+          return null;
+        }
+        console.warn('Vine photo cleanup failed:', storagePath, error);
+        return storagePath;
+      }
+    }),
+  );
+
+  return results.filter((storagePath): storagePath is string => storagePath !== null);
+}
+
+export function vinePhotoStoragePaths(photos: readonly VinePhoto[]): string[] {
+  return [...new Set(
+    photos
+      .flatMap((photo) => [photo.storagePath, photo.thumbnail?.storagePath ?? ''])
+      .filter(Boolean),
+  )];
+}
+
+export function preparedVinePhotoStoragePaths(
+  vineId: string,
+  photoId: string,
+  prepared: PreparedVinePhoto,
+): string[] {
+  const extension = getFileExtension(prepared.contentType);
+  return [
+    buildVinePhotoStoragePath(vineId, photoId, extension),
+    ...(prepared.thumbnail
+      ? [buildVinePhotoStoragePath(
+          vineId,
+          `${photoId}${PHOTO_THUMBNAIL_SUFFIX}`,
+          extension,
+        )]
+      : []),
+  ];
 }

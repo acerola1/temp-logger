@@ -14,14 +14,15 @@ describe('vine catalog tag suggestions', () => {
 });
 
 describe('vine catalog serial allocation', () => {
-  it('a betöltött legnagyobb sorszám után következő számot adja', () => {
+  it('a legkisebb nem használt pozitív egész sorszámot adja', () => {
     const vines = [
+      { serialNumber: 1 },
       { serialNumber: 4 },
-      { serialNumber: 11 },
-      { serialNumber: 7 },
+      { serialNumber: 2 },
     ] as Vine[];
 
-    expect(getNextVineSerialNumber(vines)).toBe(12);
+    expect(getNextVineSerialNumber(vines)).toBe(3);
+    expect(getNextVineSerialNumber([{ serialNumber: 2 }] as Vine[])).toBe(1);
     expect(getNextVineSerialNumber([])).toBe(1);
   });
 });

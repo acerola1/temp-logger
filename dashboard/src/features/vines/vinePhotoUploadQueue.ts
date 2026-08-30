@@ -1,5 +1,9 @@
 import { MAX_VINE_PHOTOS, type Vine, type VinePhoto } from './model';
-import type { PreparedVinePhoto } from './vinePhotos';
+import {
+  preparedVinePhotoStoragePaths,
+  vinePhotoStoragePaths,
+  type PreparedVinePhoto,
+} from './vinePhotos';
 
 export type VinePhotoUploadJobStatus =
   | 'queued'
@@ -111,6 +115,10 @@ export interface VinePhotoUploadQueue {
   enqueue(vineId: string, files: readonly File[]): readonly string[];
   retry(jobId: string): void;
   cancel(jobId: string): void;
+  /** Leállítja a tőke összes jobját, és visszaadja a már feltöltött objektumokat. */
+  prepareVineDeletion(vineId: string): readonly string[];
+  /** Sikertelen Firestore-törlés után ismét engedi a tőke feltöltéseit. */
+  restoreVine(vineId: string): void;
   reconcile(vines: readonly Vine[]): void;
   getSnapshot(): readonly VinePhotoUploadJob[];
   subscribe(listener: () => void): () => void;
@@ -123,6 +131,7 @@ export class InMemoryVinePhotoUploadQueue implements VinePhotoUploadQueue {
   private readonly listeners = new Set<() => void>();
   private readonly jobsById = new Map<string, InternalJob>();
   private readonly confirmedPhotoIds = new Map<string, Set<string>>();
+  private readonly deletingVineIds = new Set<string>();
   private readonly dependencies: VinePhotoUploadQueueDependencies;
   private snapshot: readonly VinePhotoUploadJob[] = [];
 
@@ -131,6 +140,7 @@ export class InMemoryVinePhotoUploadQueue implements VinePhotoUploadQueue {
   }
 
   enqueue(vineId: string, files: readonly File[]): readonly string[] {
+    if (this.deletingVineIds.has(vineId)) return [];
     const occupiedPhotoIds = new Set(this.confirmedPhotoIds.get(vineId) ?? []);
     for (const job of this.jobsById.values()) {
       if (job.vineId === vineId) occupiedPhotoIds.add(job.photoId);
@@ -181,6 +191,31 @@ export class InMemoryVinePhotoUploadQueue implements VinePhotoUploadQueue {
     job.controller.abort();
     this.remove(job);
     if (job.uploadedPhoto) void this.cleanupIfUncommitted(job);
+  }
+
+  prepareVineDeletion(vineId: string): readonly string[] {
+    this.deletingVineIds.add(vineId);
+    const storagePaths: string[] = [];
+    for (const job of [...this.jobsById.values()]) {
+      if (job.vineId !== vineId) continue;
+      job.controller.abort();
+      if (job.uploadedPhoto) {
+        storagePaths.push(...vinePhotoStoragePaths([job.uploadedPhoto]));
+      } else if (job.prepared) {
+        // Aktív feltöltés megszakításakor az upload helper is próbál takarítani,
+        // de az előre ismert útvonalakat a végleges törlés még egyszer,
+        // visszajelzéssel eltávolítja. A hiányzó objektum idempotens siker.
+        storagePaths.push(
+          ...preparedVinePhotoStoragePaths(job.vineId, job.photoId, job.prepared),
+        );
+      }
+      this.remove(job);
+    }
+    return [...new Set(storagePaths)];
+  }
+
+  restoreVine(vineId: string): void {
+    this.deletingVineIds.delete(vineId);
   }
 
   reconcile(vines: readonly Vine[]): void {

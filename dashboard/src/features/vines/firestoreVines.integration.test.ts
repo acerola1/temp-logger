@@ -23,11 +23,13 @@ import {
   commitVinePhoto,
   createVine,
   deleteEvent,
+  deleteVine,
   deleteVinePhoto,
   editEvent,
   editVinePhotoCaption,
   editVine,
   hasVinePhoto,
+  retryDeletedVinePhotoCleanup,
   setCoverPhoto,
   subscribeToVines,
 } from './firestoreVines';
@@ -303,6 +305,11 @@ describe('Firestore vine catalog', () => {
         { contentType: 'image/png' },
       ),
     ).rejects.toMatchObject({ code: 'storage/unauthorized' });
+
+    await expect(
+      deleteVine(nonAdminClientDb, nonAdminClientStorage, 'vine-public'),
+    ).rejects.toBeDefined();
+    expect((await adminDb.collection('vines').doc('vine-public').get()).exists).toBe(true);
   });
 
   it('admin automatikus következő sorszámmal és szerveridőkkel hoz létre tőkét', async () => {
@@ -319,15 +326,15 @@ describe('Firestore vine catalog', () => {
       sourceCuttingId: 'already-deleted-cutting',
     };
 
-    const result = await createVine(adminClientDb, adminUid, 8, input);
+    const result = await createVine(adminClientDb, adminUid, input);
     const vines = await waitForVines(adminClientDb, (nextVines) =>
       nextVines.some((vine) => vine.id === result.vineId),
     );
     const created = vines.find((vine) => vine.id === result.vineId);
 
-    expect(result.serialNumber).toBe(8);
+    expect(result.serialNumber).toBe(1);
     expect(created).toMatchObject({
-      serialNumber: 8,
+      serialNumber: 1,
       variety: 'Néró',
       hasFruited: false,
       rootType: 'unknown',
@@ -347,7 +354,7 @@ describe('Firestore vine catalog', () => {
     expect(created?.updatedAt).toBe(created?.createdAt);
   });
 
-  it('a catalog által lefoglalt sorszámot snapshot-frissítés előtt sem osztja ki újra', async () => {
+  it('párhuzamos létrehozások nem kapnak azonos sorszámot', async () => {
     const input: CreateVineInput = {
       variety: 'Cserszegi fűszeres',
       hasFruited: false,
@@ -361,14 +368,34 @@ describe('Firestore vine catalog', () => {
       sourceCuttingId: null,
     };
 
-    const result = await createVine(
-      adminClientDb,
-      adminUid,
-      9,
-      input,
-    );
+    const results = await Promise.all([
+      createVine(adminClientDb, adminUid, input),
+      createVine(adminClientDb, adminUid, { ...input, variety: 'Párhuzamos Néró' }),
+    ]);
 
-    expect(result.serialNumber).toBe(9);
+    expect(results.map((result) => result.serialNumber).sort((a, b) => a - b)).toEqual([2, 3]);
+  });
+
+  it('a végleges törléssel felszabadult legkisebb sorszámot újra kiosztja', async () => {
+    await adminDb.collection('vines').doc('vine-serial-reuse').set(
+      vineDocument(adminUid, { serialNumber: 4 }),
+    );
+    await deleteVine(adminClientDb, adminClientStorage, 'vine-serial-reuse');
+
+    const result = await createVine(adminClientDb, adminUid, {
+      variety: 'Újrahasznált sorszám',
+      hasFruited: false,
+      rootType: 'unknown',
+      rootstockVariety: '',
+      plantingDate: { precision: 'unknown' },
+      areaDescription: 'Tesztterület',
+      status: 'active',
+      tags: [],
+      notes: '',
+      sourceCuttingId: null,
+    });
+
+    expect(result.serialNumber).toBe(4);
   });
 
   it('a teljes szerkesztőinput nem módosítja a sorszámot, létrehozást és eseményeket', async () => {
@@ -646,9 +673,11 @@ describe('Firestore vine catalog', () => {
     photos: File[],
   ): Promise<Vine> {
     const vine = await seedVine(vineId, serialNumber);
-    await withTestImage(() =>
-      addVinePhotos(adminClientDb, adminClientStorage, { vineId, photos }),
-    );
+    if (photos.length > 0) {
+      await withTestImage(() =>
+        addVinePhotos(adminClientDb, adminClientStorage, { vineId, photos }),
+      );
+    }
 
     const vines = await waitForVines(
       adminClientDb,
@@ -657,10 +686,114 @@ describe('Firestore vine catalog', () => {
     );
     const withPhotos = vines.find((candidate) => candidate.id === vineId);
     if (!withPhotos) throw new Error('A teszttőke eltűnt.');
-    // A `updatedAt` a fotófeltöltéssel frissült, ezért a hívó a friss tőkét kapja.
-    expect(withPhotos.updatedAt).not.toBe(vine.updatedAt);
+    // A `updatedAt` valódi fotófeltöltéssel frissült, ezért a hívó a friss
+    // tőkét kapja. Az üres lista csak kényelmi seed, ott nincs írás.
+    if (photos.length > 0) expect(withPhotos.updatedAt).not.toBe(vine.updatedAt);
     return withPhotos;
   }
+
+  it('a tőkét minden új és migrált fotóobjektummal törli, másik tőkét nem érint', async () => {
+    const vineId = 'vine-delete-complete';
+    const currentPath = `vines/${vineId}/photos/current.png`;
+    const currentThumbPath = `vines/${vineId}/photos/current_thumb.png`;
+    const legacyPath = `vines/${vineId}/events/old-event/photos/legacy.png`;
+    const legacyThumbPath = `vines/${vineId}/events/old-event/photos/legacy_thumb.png`;
+    const otherPath = 'vines/vine-delete-other/photos/keep.png';
+    const paths = [currentPath, currentThumbPath, legacyPath, legacyThumbPath, otherPath];
+    await Promise.all(
+      paths.map((storagePath, index) =>
+        uploadBytes(ref(adminClientStorage, storagePath), new Uint8Array([index + 1])),
+      ),
+    );
+    const photo = (id: string, storagePath: string, thumbnailPath: string): VinePhoto => ({
+      id,
+      storagePath,
+      downloadUrl: `https://example.test/${id}`,
+      width: 10,
+      height: 10,
+      thumbnail: {
+        storagePath: thumbnailPath,
+        downloadUrl: `https://example.test/${id}-thumb`,
+        width: 5,
+        height: 5,
+      },
+      capturedAt: null,
+      uploadedAt: '2026-08-30T10:00:00.000Z',
+      caption: '',
+    });
+    await adminDb.collection('vines').doc(vineId).set(vineDocument(adminUid, {
+      serialNumber: 41,
+      notes: 'Törlendő jegyzet',
+      events: [{ id: 'event-delete', title: 'Törlendő esemény' }],
+      photos: [
+        photo('current', currentPath, currentThumbPath),
+        photo('legacy', legacyPath, legacyThumbPath),
+      ],
+    }));
+    await adminDb.collection('vines').doc('vine-delete-other').set(
+      vineDocument(adminUid, { serialNumber: 42 }),
+    );
+
+    const realtimeRemoval = waitForVines(
+      adminClientDb,
+      (vines) => !vines.some((vine) => vine.id === vineId),
+    );
+    await expect(deleteVine(adminClientDb, adminClientStorage, vineId)).resolves.toEqual({
+      remainingStoragePaths: [],
+    });
+    await realtimeRemoval;
+
+    expect((await adminDb.collection('vines').doc(vineId).get()).exists).toBe(false);
+    expect((await adminDb.collection('vines').doc('vine-delete-other').get()).exists).toBe(true);
+    for (const storagePath of paths.slice(0, 4)) {
+      await expect(getBytes(ref(adminClientStorage, storagePath))).rejects.toMatchObject({
+        code: 'storage/object-not-found',
+      });
+    }
+    expect(new Uint8Array(await getBytes(ref(adminClientStorage, otherPath)))).toEqual(
+      new Uint8Array([5]),
+    );
+  });
+
+  it('Storage-részhiba után a dokumentum törölt marad, a takarítás idempotensen újrapróbálható', async () => {
+    const vineId = 'vine-delete-retry';
+    const existingPath = `vines/${vineId}/photos/retry.png`;
+    const alreadyMissingPath = `vines/${vineId}/photos/missing.png`;
+    await uploadBytes(ref(adminClientStorage, existingPath), new Uint8Array([7]));
+    await adminDb.collection('vines').doc(vineId).set(vineDocument(adminUid, {
+      serialNumber: 43,
+      photos: [
+        {
+          id: 'retry-photo',
+          storagePath: existingPath,
+          downloadUrl: 'https://example.test/retry',
+          width: 1,
+          height: 1,
+          thumbnail: {
+            storagePath: alreadyMissingPath,
+            downloadUrl: 'https://example.test/missing',
+            width: 1,
+            height: 1,
+          },
+          capturedAt: null,
+          uploadedAt: '2026-08-30T10:00:00.000Z',
+          caption: '',
+        },
+      ],
+    }));
+
+    const partial = await deleteVine(adminClientDb, nonAdminClientStorage, vineId);
+    expect(partial.remainingStoragePaths).toEqual([existingPath, alreadyMissingPath]);
+    expect((await adminDb.collection('vines').doc(vineId).get()).exists).toBe(false);
+    expect(await getBytes(ref(adminClientStorage, existingPath))).toBeDefined();
+
+    await expect(
+      retryDeletedVinePhotoCleanup(adminClientStorage, partial.remainingStoragePaths),
+    ).resolves.toEqual({ remainingStoragePaths: [] });
+    await expect(
+      retryDeletedVinePhotoCleanup(adminClientStorage, partial.remainingStoragePaths),
+    ).resolves.toEqual({ remainingStoragePaths: [] });
+  });
 
   it('egy műveletben több tőkefotót vesz fel az új, eseménymentes útvonalra', async () => {
     const vine = await seedVineWithPhotos('vine-photos-add', 30, [

@@ -82,6 +82,7 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
   );
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(isMobileLayoutWidth);
+  const [unfinishedCleanupPaths, setUnfinishedCleanupPaths] = useState<string[]>([]);
 
   const visibleVines = useMemo(
     () => selectVisibleVines(catalog.vines, listState),
@@ -186,6 +187,25 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
     await catalog.deleteEvent({ vineId: selectedVine.id, eventId });
   };
 
+  const handleDeleteVine = async () => {
+    if (!selectedVine) return;
+    const vineId = selectedVine.id;
+    const queuedPhotoStoragePaths = photoUploadQueue.prepareVineDeletion(vineId);
+    try {
+      const result = await catalog.deleteVine(vineId, queuedPhotoStoragePaths);
+      setUnfinishedCleanupPaths(result.remainingStoragePaths);
+      navigateToVine(null, 'replace');
+    } catch (error) {
+      photoUploadQueue.restoreVine(vineId);
+      throw error;
+    }
+  };
+
+  const retryUnfinishedCleanup = async () => {
+    const result = await catalog.retryDeletedVinePhotoCleanup(unfinishedCleanupPaths);
+    setUnfinishedCleanupPaths(result.remainingStoragePaths);
+  };
+
   const handleAddPhotos = (photos: File[]) => {
     if (!selectedVine) return;
     photoUploadQueue.enqueue(selectedVine.id, photos);
@@ -213,6 +233,21 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
 
   return (
     <section className="space-y-6" data-access-mode={isAdmin ? 'admin' : 'public'}>
+      {unfinishedCleanupPaths.length > 0 && (
+        <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+          <span>
+            A tőke adatai törlődtek, de {unfinishedCleanupPaths.length} képobjektum eltávolítása nem sikerült.
+          </span>
+          <button
+            type="button"
+            onClick={() => void retryUnfinishedCleanup()}
+            disabled={catalog.mutation.pending}
+            className="shrink-0 rounded-xl border border-amber-400 bg-white px-3 py-2 font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-70 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+          >
+            Képtakarítás újrapróbálása
+          </button>
+        </div>
+      )}
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-vine-900 dark:text-vine-50">Tőkék</h2>
@@ -299,6 +334,7 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
           onAddEvents={handleAddEvents}
           onEditEvent={handleEditEvent}
           onDeleteEvent={handleDeleteEvent}
+          onDeleteVine={handleDeleteVine}
           onAddPhotos={handleAddPhotos}
           onDeletePhoto={handleDeletePhoto}
           onEditPhotoCaption={handleEditPhotoCaption}

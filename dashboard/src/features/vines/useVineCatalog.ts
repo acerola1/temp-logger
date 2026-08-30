@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import {
   addEvents as addFirestoreEvents,
   createVine as createFirestoreVine,
+  deleteVine as deleteFirestoreVine,
   deleteEvent as deleteFirestoreEvent,
   deleteVinePhoto as deleteFirestoreVinePhoto,
   editEvent as editFirestoreEvent,
@@ -12,18 +13,21 @@ import {
   editVine as editFirestoreVine,
   setCoverPhoto as setFirestoreCoverPhoto,
   subscribeToVines,
+  retryDeletedVinePhotoCleanup as retryFirestoreDeletedVinePhotoCleanup,
 } from './firestoreVines';
 import type {
   AddVineEventsInput,
   CreateVineInput,
   DeleteVineEventInput,
   DeleteVinePhotoInput,
+  DeleteVineResult,
   EditVineEventInput,
   EditVinePhotoCaptionInput,
   EditVineInput,
   SetVineCoverPhotoInput,
   Vine,
 } from './model';
+export { getNextVineSerialNumber } from './vineSerialNumber';
 
 export interface VineCatalogMutationState {
   pending: boolean;
@@ -38,6 +42,11 @@ export interface VineCatalog {
   error: string | null;
   mutation: VineCatalogMutationState;
   createVine(input: CreateVineInput): Promise<{ vineId: string }>;
+  deleteVine(
+    vineId: string,
+    additionalStoragePaths?: readonly string[],
+  ): Promise<DeleteVineResult>;
+  retryDeletedVinePhotoCleanup(storagePaths: readonly string[]): Promise<DeleteVineResult>;
   editVine(vineId: string, input: EditVineInput): Promise<void>;
   addEvents(input: AddVineEventsInput): Promise<void>;
   editEvent(input: EditVineEventInput): Promise<void>;
@@ -46,13 +55,6 @@ export interface VineCatalog {
   editVinePhotoCaption(input: EditVinePhotoCaptionInput): Promise<void>;
   setCoverPhoto(input: SetVineCoverPhotoInput): Promise<void>;
   clearMutationError(): void;
-}
-
-export function getNextVineSerialNumber(vines: readonly Vine[]): number {
-  return vines.reduce(
-    (highest, vine) => Math.max(highest, vine.serialNumber),
-    0,
-  ) + 1;
 }
 
 export function getVineTagSuggestions(vines: readonly Vine[]): string[] {
@@ -84,18 +86,12 @@ export function useVineCatalog(): VineCatalog {
   const [error, setError] = useState<string | null>(null);
   const [mutation, setMutation] = useState(INITIAL_MUTATION);
   const hasLoadedVines = useRef(false);
-  const highestAllocatedSerialNumber = useRef(0);
 
   useEffect(
     () =>
       subscribeToVines(
         db,
         (nextVines) => {
-          const highestLoadedSerialNumber = getNextVineSerialNumber(nextVines) - 1;
-          highestAllocatedSerialNumber.current = Math.max(
-            highestAllocatedSerialNumber.current,
-            highestLoadedSerialNumber,
-          );
           hasLoadedVines.current = true;
           setVines(nextVines);
           setLoadingVines(false);
@@ -144,17 +140,32 @@ export function useVineCatalog(): VineCatalog {
           throw new Error('A tőkék betöltéséig nem lehet új tőkét létrehozni.');
         }
 
-        const reservedSerialNumber = highestAllocatedSerialNumber.current + 1;
-        highestAllocatedSerialNumber.current = reservedSerialNumber;
         const result = await createFirestoreVine(
           db,
           user?.uid ?? null,
-          reservedSerialNumber,
           input,
         );
         return { vineId: result.vineId };
       }),
     [runMutation, user?.uid],
+  );
+
+  const deleteVine = useCallback(
+    (vineId: string, additionalStoragePaths: readonly string[] = []) =>
+      runMutation(
+        () => deleteFirestoreVine(db, storage, vineId, additionalStoragePaths),
+        'Nem sikerült végleg törölni a tőkét.',
+      ),
+    [runMutation],
+  );
+
+  const retryDeletedVinePhotoCleanup = useCallback(
+    (storagePaths: readonly string[]) =>
+      runMutation(
+        () => retryFirestoreDeletedVinePhotoCleanup(storage, storagePaths),
+        'Nem sikerült befejezni a képek törlését.',
+      ),
+    [runMutation],
   );
 
   const editVine = useCallback(
@@ -220,6 +231,8 @@ export function useVineCatalog(): VineCatalog {
     error,
     mutation,
     createVine,
+    deleteVine,
+    retryDeletedVinePhotoCleanup,
     editVine,
     addEvents,
     editEvent,

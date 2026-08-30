@@ -287,6 +287,46 @@ describe('InMemoryVinePhotoUploadQueue', () => {
     expect(deps.revokePreviewUrl).toHaveBeenCalledOnce();
   });
 
+  it('tőketörléshez csak a cél jobjait állítja le és letiltja az új feltöltést', async () => {
+    const uploadGates = new Map<string, ReturnType<typeof deferred<VinePhoto>>>();
+    const deps = dependencies({
+      upload: vi.fn(async (_vineId, photoId) => {
+        const gate = deferred<VinePhoto>();
+        uploadGates.set(photoId, gate);
+        return gate.promise;
+      }),
+    });
+    const queue = new InMemoryVinePhotoUploadQueue(deps);
+    queue.enqueue('vine-delete', [file('torlendo.jpg')]);
+    queue.enqueue('vine-keep', [file('marad.jpg')]);
+    await waitUntil(() => uploadGates.size === 2);
+
+    expect(queue.prepareVineDeletion('vine-delete')).toEqual([
+      'vines/vine-delete/photos/id-2.jpg',
+      'vines/vine-delete/photos/id-2_thumb.jpg',
+    ]);
+    expect(queue.getSnapshot().map((job) => job.vineId)).toEqual(['vine-keep']);
+    expect(queue.enqueue('vine-delete', [file('tiltott.jpg')])).toEqual([]);
+
+    queue.restoreVine('vine-delete');
+    expect(queue.enqueue('vine-delete', [file('ujra.jpg')])).toHaveLength(1);
+  });
+
+  it('tőketörléshez visszaadja a már feltöltött job objektumait', async () => {
+    const commitGate = deferred<void>();
+    const deps = dependencies({ commit: vi.fn(() => commitGate.promise) });
+    const queue = new InMemoryVinePhotoUploadQueue(deps);
+    queue.enqueue('vine-delete', [file('feltoltott.jpg')]);
+    await waitUntil(() => queue.getSnapshot()[0]?.status === 'committing');
+    const photoId = queue.getSnapshot()[0]?.photoId;
+
+    expect(queue.prepareVineDeletion('vine-delete')).toEqual([
+      `photos/${photoId}.jpg`,
+    ]);
+    expect(queue.getSnapshot()).toEqual([]);
+    commitGate.resolve();
+  });
+
   it('megszakított előkészítés után azonnal elindítja a következő fotót', async () => {
     const started: string[] = [];
     const aborted: string[] = [];

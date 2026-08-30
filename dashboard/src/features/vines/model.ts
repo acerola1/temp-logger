@@ -104,6 +104,11 @@ export interface DeleteVinePhotoInput {
   photoId: string;
 }
 
+export interface DeleteVineResult {
+  /** A dokumentum már nem látható; csak a felsorolt Storage-objektumok maradtak. */
+  remainingStoragePaths: string[];
+}
+
 export interface EditVinePhotoCaptionInput {
   vineId: string;
   photoId: string;

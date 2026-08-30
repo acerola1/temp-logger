@@ -65,6 +65,12 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Az aktív sorszámok rövid claimje teszi atomi biztonságúvá a párhuzamos
+    // tőkelétrehozást. A tőkével együtt keletkezik és végleges törléskor eltűnik.
+    match /vineSerialClaims/{serialNumber} {
+      allow read, create, update, delete: if isAdmin();
+    }
+
     // Admin registry — auth read, server-only write
     match /admins/{uid} {
       allow read: if isSignedIn() && request.auth.uid == uid;

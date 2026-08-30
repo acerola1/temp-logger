@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { CalendarDays, Loader2, ExternalLink, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Loader2, ExternalLink, Trash2, X } from 'lucide-react';
+import { Dialog } from '../../../components/Dialog';
 import { formatDate, formatDateTime, toDateTimeLocalValue } from '../../../lib/dateFormat';
 import {
   PhotoLightbox,
@@ -43,6 +44,7 @@ interface VineDetailProps {
   onAddEvents: (targetVineIds: string[], values: VineEventFormValues) => Promise<void>;
   onEditEvent: (eventId: string, values: VineEventFormValues) => Promise<void>;
   onDeleteEvent: (eventId: string) => Promise<void>;
+  onDeleteVine: () => Promise<void>;
   onAddPhotos: (photos: File[]) => void;
   onDeletePhoto: (photoId: string) => Promise<void>;
   onEditPhotoCaption: (photoId: string, caption: string) => Promise<void>;
@@ -115,6 +117,7 @@ export function VineDetail({
   onAddEvents,
   onEditEvent,
   onDeleteEvent,
+  onDeleteVine,
   onAddPhotos,
   onDeletePhoto,
   onEditPhotoCaption,
@@ -138,6 +141,7 @@ export function VineDetail({
   // A fejléc borítójáról nyíló néző a teljes, rendezett tőkefotólistát lapozza —
   // ugyanabban a sorrendben, mint a galéria.
   const [coverLightboxIndex, setCoverLightboxIndex] = useState<number | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const sourceCutting = useMemo(
     () => cuttingOptions.find((option) => option.id === selectedVine?.sourceCuttingId) ?? null,
@@ -571,6 +575,36 @@ export function VineDetail({
                   </div>
                 )}
               </section>
+
+              {isAdmin && (
+                <section
+                  aria-label="Veszélyzóna"
+                  className="space-y-3 rounded-2xl border border-red-200 bg-red-50/70 p-4 dark:border-red-900 dark:bg-red-950/20"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-300" />
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-semibold text-red-800 dark:text-red-200">Veszélyzóna</h4>
+                      <p className="mt-1 text-sm text-red-700 dark:text-red-300">
+                        A végleges törlés nem a tőke megszűnt állapota: minden adatot és képet eltávolít.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDeleteDialogOpen(true);
+                      setIsPhotoMutation(false);
+                      onClearMutationError();
+                    }}
+                    disabled={isPending}
+                    className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Tőke végleges törlése
+                  </button>
+                </section>
+              )}
             </div>
           )}
         </div>
@@ -586,6 +620,72 @@ export function VineDetail({
           onClose={() => setCoverLightboxIndex(null)}
           label="Tőkefotók"
         />
+      )}
+
+      {isDeleteDialogOpen && selectedVine && (
+        <Dialog
+          label="Tőke végleges törlésének megerősítése"
+          onClose={() => {
+            if (!isPending) setIsDeleteDialogOpen(false);
+          }}
+          className="w-full max-w-lg rounded-3xl border border-red-200 bg-white p-5 shadow-xl dark:border-red-900 dark:bg-vine-900"
+        >
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
+                <AlertTriangle className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-lg font-semibold text-vine-900 dark:text-vine-50">
+                  Végleg törlöd ezt a tőkét?
+                </h3>
+                <p className="mt-1 text-sm font-medium text-vine-700 dark:text-vine-200">
+                  Szőlőtőke #{selectedVine.serialNumber} – {selectedVine.variety}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/30 dark:text-red-200">
+              <p>A törlés eltávolítja:</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li>az alapadatokat és az általános jegyzeteket;</li>
+                <li>az összes eseményt és eseményjegyzetet;</li>
+                <li>az összes eredeti fotót és bélyegképet.</li>
+              </ul>
+              <p className="mt-3 font-semibold">A művelet nem vonható vissza.</p>
+            </div>
+
+            {mutationError && (
+              <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                {mutationError}
+              </p>
+            )}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setIsDeleteDialogOpen(false)}
+                disabled={isPending}
+                className="rounded-xl border border-vine-200 bg-white px-4 py-2 text-sm font-medium text-vine-700 hover:bg-vine-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-100 dark:hover:bg-vine-800"
+              >
+                Mégse
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void onDeleteVine().catch((error) => {
+                    console.error('Vine permanent delete error:', error);
+                  });
+                }}
+                disabled={isPending}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isPending ? 'Végleges törlés…' : 'Igen, végleg törlöm'}
+              </button>
+            </div>
+          </div>
+        </Dialog>
       )}
     </>
   );

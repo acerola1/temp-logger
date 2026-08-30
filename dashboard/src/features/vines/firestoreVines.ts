@@ -1,8 +1,8 @@
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -22,6 +22,7 @@ import type {
   AddVinePhotosInput,
   CreateVineInput,
   DeleteVineEventInput,
+  DeleteVineResult,
   DeleteVinePhotoInput,
   EditVineInput,
   EditVineEventInput,
@@ -37,10 +38,13 @@ import type {
   VineStatus,
 } from './model';
 import {
+  cleanupVinePhotoStoragePaths,
   deleteVinePhotoObjects,
   prepareVinePhotos,
   uploadPreparedVinePhotos,
+  vinePhotoStoragePaths,
 } from './vinePhotos';
+import { getNextVineSerialNumber } from './vineSerialNumber';
 
 export type VineMutationProgress = (progress: number) => void;
 
@@ -177,22 +181,89 @@ export function subscribeToVines(
 export async function createVine(
   firestore: Firestore,
   createdByUid: string | null,
-  serialNumber: number,
   input: CreateVineInput,
 ): Promise<{ vineId: string; serialNumber: number }> {
-  const timestamp = serverTimestamp();
-  const reference = await addDoc(collection(firestore, 'vines'), {
-    ...editableFields(input),
-    serialNumber,
-    photos: [],
-    coverPhotoId: null,
-    events: [],
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    createdByUid,
+  // A katalógus-lekérdezés adja a legkisebb rést, a sorszám-claim pedig a két
+  // azonos pillanatban induló kliens között dönt. Ütközés után friss listából
+  // számolunk újra; a tőke és a claim ugyanabban a tranzakcióban jön létre.
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const vinesSnapshot = await getDocs(collection(firestore, 'vines'));
+    const serialNumber = getNextVineSerialNumber(
+      vinesSnapshot.docs.map((snapshot) => ({
+        serialNumber: snapshot.data().serialNumber as number,
+      })),
+    );
+    const vineReference = doc(collection(firestore, 'vines'));
+    const claimReference = doc(firestore, 'vineSerialClaims', String(serialNumber));
+
+    const created = await runTransaction(firestore, async (transaction) => {
+      const claim = await transaction.get(claimReference);
+      if (claim.exists()) return false;
+
+      const timestamp = serverTimestamp();
+      transaction.set(claimReference, { vineId: vineReference.id });
+      transaction.set(vineReference, {
+        ...editableFields(input),
+        serialNumber,
+        photos: [],
+        coverPhotoId: null,
+        events: [],
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        createdByUid,
+      });
+      return true;
+    });
+
+    if (created) return { vineId: vineReference.id, serialNumber };
+  }
+
+  throw new Error('Nem sikerült szabad tőkesorszámot lefoglalni. Próbáld újra.');
+}
+
+/**
+ * A Firestore-dokumentum a láthatóság határa: a teljes dokumentum és a hozzá
+ * tartozó sorszám-claim atomikusan tűnik el, csak ezután indul Storage I/O.
+ */
+export async function deleteVine(
+  firestore: Firestore,
+  storage: FirebaseStorage,
+  vineId: string,
+  additionalStoragePaths: readonly string[] = [],
+): Promise<DeleteVineResult> {
+  const photos = await runTransaction(firestore, async (transaction) => {
+    const vineReference = doc(firestore, 'vines', vineId);
+    const snapshot = await transaction.get(vineReference);
+    if (!snapshot.exists()) return [];
+
+    const storedPhotos = mapStoredPhotos(snapshot.data());
+    const serialNumber = snapshot.data().serialNumber;
+    if (Number.isInteger(serialNumber) && serialNumber > 0) {
+      const claimReference = doc(firestore, 'vineSerialClaims', String(serialNumber));
+      const claim = await transaction.get(claimReference);
+      if (!claim.exists() || claim.data().vineId === vineId) {
+        transaction.delete(claimReference);
+      }
+    }
+    transaction.delete(vineReference);
+    return storedPhotos;
   });
 
-  return { vineId: reference.id, serialNumber };
+  return {
+    remainingStoragePaths: await cleanupVinePhotoStoragePaths(
+      storage,
+      [...vinePhotoStoragePaths(photos), ...additionalStoragePaths],
+    ),
+  };
+}
+
+export async function retryDeletedVinePhotoCleanup(
+  storage: FirebaseStorage,
+  storagePaths: readonly string[],
+): Promise<DeleteVineResult> {
+  return {
+    remainingStoragePaths: await cleanupVinePhotoStoragePaths(storage, storagePaths),
+  };
 }
 
 export async function editVine(
