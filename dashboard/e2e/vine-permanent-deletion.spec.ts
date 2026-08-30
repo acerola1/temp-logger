@@ -52,6 +52,7 @@ for (const layout of layouts) {
       await page.goto(`/tokek/${vineId}`);
       const detail = page.getByTestId('vine-detail');
       await expect(detail.getByRole('heading', { name: document.variety })).toBeVisible();
+      await expect(detail.getByRole('button', { name: 'Veszélyzóna' })).toHaveCount(0);
       await expect(detail.getByRole('button', { name: 'Tőke végleges törlése' })).toHaveCount(0);
 
       if (layout.name === 'mobile') {
@@ -61,7 +62,15 @@ for (const layout of layouts) {
       if (layout.name === 'mobile') {
         await page.getByTestId('vine-card').filter({ hasText: document.variety }).click();
       }
+      // A veszélyzóna alapból csukva van: a törlés csak szándékos kinyitás után érhető el.
+      const dangerZoneToggle = detail.getByRole('button', { name: 'Veszélyzóna' });
+      await dangerZoneToggle.scrollIntoViewIfNeeded();
+      await expect(dangerZoneToggle).toHaveAttribute('aria-expanded', 'false');
       const deleteButton = detail.getByRole('button', { name: 'Tőke végleges törlése' });
+      await expect(deleteButton).toHaveCount(0);
+
+      await dangerZoneToggle.click();
+      await expect(dangerZoneToggle).toHaveAttribute('aria-expanded', 'true');
       await deleteButton.scrollIntoViewIfNeeded();
       await expect(deleteButton).toBeVisible();
       await deleteButton.click();

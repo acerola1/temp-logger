@@ -1,5 +1,14 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CalendarDays, Loader2, ExternalLink, Trash2, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  ExternalLink,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { Dialog } from '../../../components/Dialog';
 import { formatDate, formatDateTime, toDateTimeLocalValue } from '../../../lib/dateFormat';
 import {
@@ -145,6 +154,10 @@ export function VineDetail({
   // ugyanabban a sorrendben, mint a galéria.
   const [coverLightboxIndex, setCoverLightboxIndex] = useState<number | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  // A veszélyzóna azonosítóhoz kötve nyílik, nem sima logikai kapcsolóval:
+  // másik tőke adatlapjára váltva magától összecsukódik, így a törlés nem
+  // marad nyitva egy olyan tőkén, amelyiken a felhasználó ki sem nyitotta.
+  const [openDangerZoneVineId, setOpenDangerZoneVineId] = useState<string | null>(null);
 
   const sourceCutting = useMemo(
     () => cuttingOptions.find((option) => option.id === selectedVine?.sourceCuttingId) ?? null,
@@ -196,6 +209,8 @@ export function VineDetail({
       })),
     [selectedVine?.variety, sortedPhotos],
   );
+
+  const isDangerZoneOpen = selectedVine !== null && openDangerZoneVineId === selectedVine.id;
 
   // Minden fotóművelet előtt átállítjuk a jelölést, hogy a progressz és az
   // esetleges hiba a fotószakaszban jelenjen meg, ne az űrlapokon.
@@ -583,33 +598,49 @@ export function VineDetail({
                 )}
               </section>
 
-              {isAdmin && (
-                <section
-                  aria-label="Veszélyzóna"
-                  className="space-y-3 rounded-2xl border border-red-200 bg-red-50/70 p-4 dark:border-red-900 dark:bg-red-950/20"
-                >
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-300" />
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-semibold text-red-800 dark:text-red-200">Veszélyzóna</h4>
-                      <p className="mt-1 text-sm text-red-700 dark:text-red-300">
-                        A végleges törlés nem a tőke megszűnt állapota: minden adatot és képet eltávolít.
-                      </p>
-                    </div>
-                  </div>
+              {isAdmin && selectedVine && (
+                <section aria-label="Veszélyzóna">
+                  {/* A törlés visszafordíthatatlan és ritka művelet, ezért
+                      összecsukva, alacsony hangsúllyal ül az adatlap alján. A
+                      piros figyelmeztetés csak a szándékos kinyitás után jelenik meg. */}
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsDeleteDialogOpen(true);
-                      setIsPhotoMutation(false);
-                      onClearMutationError();
-                    }}
-                    disabled={isPending}
-                    className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-70"
+                    aria-expanded={isDangerZoneOpen}
+                    onClick={() =>
+                      setOpenDangerZoneVineId(isDangerZoneOpen ? null : selectedVine.id)
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-vine-500 transition-colors hover:bg-vine-50 hover:text-vine-700 dark:text-vine-400 dark:hover:bg-vine-800/60 dark:hover:text-vine-100"
                   >
-                    <Trash2 className="h-4 w-4" />
-                    Tőke végleges törlése
+                    {isDangerZoneOpen ? (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    )}
+                    Veszélyzóna
                   </button>
+                  {isDangerZoneOpen && (
+                    <div className="mt-2 space-y-3 rounded-2xl border border-red-200 bg-red-50/70 p-4 dark:border-red-900 dark:bg-red-950/20">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-300" />
+                        <p className="min-w-0 flex-1 text-sm text-red-700 dark:text-red-300">
+                          A végleges törlés nem a tőke megszűnt állapota: minden adatot és képet eltávolít.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsDeleteDialogOpen(true);
+                          setIsPhotoMutation(false);
+                          onClearMutationError();
+                        }}
+                        disabled={isPending}
+                        className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Tőke végleges törlése
+                      </button>
+                    </div>
+                  )}
                 </section>
               )}
             </div>

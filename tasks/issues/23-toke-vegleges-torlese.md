@@ -138,3 +138,9 @@ tartozó eredeti fotót és bélyegképet is.
   háttérfeltöltések leállítása, az idempotens Storage-takarítás és a
   konkurenciabiztos legkisebb szabad sorszám kiosztása. Ellenőrzés: 198 unit,
   51 emulatoros integrációs és 23 Playwright E2E teszt, továbbá lint és build.
+- 2026-08-30: Felhasználói visszajelzés alapján a veszélyzóna lenyithatóvá vált.
+  Az adatlap alján alapból csak egy visszafogott `Veszélyzóna` kapcsoló látszik;
+  a piros figyelmeztetés és a törlés gomb csak szándékos kinyitás után jelenik
+  meg. A nyitott állapot tőkeazonosítóhoz kötött, ezért másik adatlapra váltva
+  magától összecsukódik. Az E2E teszt a csukott alapállapotot és a kinyitást is
+  ellenőrzi.
