@@ -21,7 +21,7 @@ for (const layout of layouts) {
       hasFruited: false,
       rootType: 'own_rooted',
       rootstockVariety: '',
-      plantingDate: { precision: 'year', year: 2025 },
+      plantingYear: 2025,
       location: 'Telek',
       areaDescription: 'E2E veszélyzóna',
       status: 'active',

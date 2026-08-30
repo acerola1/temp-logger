@@ -2,7 +2,7 @@
 
 Feature: vine-planting-year
 Type: enhancement
-Status: ready-for-agent
+Status: done
 Blocked by: -
 
 ## Probléma
@@ -79,35 +79,35 @@ előtte pontosságválasztó, dátummező vagy külön `Ismeretlen` választás.
 
 ## Elfogadási kritériumok
 
-- [ ] Az új és szerkesztő tőkeűrlapon pontosan egy `Telepítés éve` mező van;
+- [x] Az új és szerkesztő tőkeűrlapon pontosan egy `Telepítés éve` mező van;
       pontosságválasztó, dátummező és `Ismeretlen` választó nincs.
-- [ ] Az üres év érvényes, `null` értékként mentődik és az adatlapon
+- [x] Az üres év érvényes, `null` értékként mentődik és az adatlapon
       `Ismeretlen` formában jelenik meg.
-- [ ] Érvényes négyjegyű év elmenthető, visszanyitáskor ugyanaz az év látszik.
-- [ ] Nem négyjegyű, nem egész vagy a `1000–9999` tartományon kívüli érték nem
+- [x] Érvényes négyjegyű év elmenthető, visszanyitáskor ugyanaz az év látszik.
+- [x] Nem négyjegyű, nem egész vagy a `1000–9999` tartományon kívüli érték nem
       menthető, és érthető mezőszintű hibát kap.
-- [ ] Új Firestore-dokumentum `plantingYear` mezőt tartalmaz, és nem tartalmaz
+- [x] Új Firestore-dokumentum `plantingYear` mezőt tartalmaz, és nem tartalmaz
       `plantingDate` objektumot.
-- [ ] Régi `date` pontosságú dokumentum az ISO dátum évével töltődik be, és a
+- [x] Régi `date` pontosságú dokumentum az ISO dátum évével töltődik be, és a
       hónap vagy nap nem jelenik meg a felületen.
-- [ ] Régi `year` pontosságú dokumentum az eredeti évével, régi `unknown` vagy
+- [x] Régi `year` pontosságú dokumentum az eredeti évével, régi `unknown` vagy
       hiányzó érték pedig ismeretlen évként töltődik be.
-- [ ] Régi tőke mentése az új `plantingYear` mezőre áll át és eltávolítja a
+- [x] Régi tőke mentése az új `plantingYear` mezőre áll át és eltávolítja a
       `plantingDate` mezőt; egyszerű megnyitás nem okoz Firestore-írást.
-- [ ] Telepítési év szerinti rendezés újabb évvel kezd, azonos évnél sorszám
+- [x] Telepítési év szerinti rendezés újabb évvel kezd, azonos évnél sorszám
       szerint rendez, az ismeretlen értékeket pedig a végére teszi.
-- [ ] Két azonos évű, korábban eltérő pontos dátumú tőke sorrendjét már nem a
+- [x] Két azonos évű, korábban eltérő pontos dátumú tőke sorrendjét már nem a
       hónap vagy nap, hanem a sorszám dönti el.
-- [ ] A meglévő `sort=planting_desc` URL-paraméter változtatás nélkül működik.
-- [ ] A mező mobilon numerikus billentyűzetet kér, és mobil/desktop nézetben
+- [x] A meglévő `sort=planting_desc` URL-paraméter változtatás nélkül működik.
+- [x] A mező mobilon numerikus billentyűzetet kér, és mobil/desktop nézetben
       nincs a megszüntetett pontosságválasztó helyén üres vagy hibás elrendezés.
-- [ ] Unit teszt fedi a validációt, normalizálást, mindhárom régi adatalakot és
+- [x] Unit teszt fedi a validációt, normalizálást, mindhárom régi adatalakot és
       az évszám alapú rendezést.
-- [ ] Emulatoros integrációs teszt fedi az új tárolási alakot és a régi rekord
+- [x] Emulatoros integrációs teszt fedi az új tárolási alakot és a régi rekord
       szerkesztéskori átállását.
-- [ ] Mobil és desktop E2E teszt fedi az üres és kitöltött év létrehozását,
+- [x] Mobil és desktop E2E teszt fedi az üres és kitöltött év létrehozását,
       szerkesztését és adatlap-megjelenítését.
-- [ ] `npm test`, `npm run test:integration`, `npm run lint`, `npm run build`
+- [x] `npm test`, `npm run test:integration`, `npm run lint`, `npm run build`
       és a releváns Playwright E2E tesztek zöldek.
 
 ## Nem része
@@ -138,3 +138,7 @@ előtte pontosságválasztó, dátummező vagy külön `Ismeretlen` választás.
   telepítési idő pedig `null` lesz. A kanonikus domainfogalom `Telepítési év`
   néven bekerült a `CONTEXT.md` szótárába. Nem készült ADR, mert ez közvetlen
   termékegyszerűsítés, nem nehezen visszafordítható architekturális döntés.
+- 2026-08-30: Megvalósítva az opcionális `plantingYear` domain- és Firestore-
+  alakkal, a régi `plantingDate` kompatibilis beolvasásával és szerkesztéskori
+  eltávolításával. Unit-, emulatoros integrációs és mobil/desktop E2E tesztekkel
+  ellenőrizve.

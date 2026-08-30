@@ -10,7 +10,7 @@ function makeVine(overrides: Partial<Vine> & Pick<Vine, 'id' | 'serialNumber' | 
     hasFruited: false,
     rootType: 'own_rooted',
     rootstockVariety: '',
-    plantingDate: { precision: 'unknown' },
+    plantingYear: null,
     areaDescription: '',
     status: 'active',
     tags: [],

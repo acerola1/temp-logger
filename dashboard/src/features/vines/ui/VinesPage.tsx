@@ -27,8 +27,6 @@ const DEFAULT_FORM_VALUES: VineFormValues = {
   hasFruited: false,
   rootType: 'unknown',
   rootstockVariety: '',
-  plantingDatePrecision: 'unknown',
-  plantingDate: '',
   plantingYear: '',
   location: '',
   areaDescription: '',

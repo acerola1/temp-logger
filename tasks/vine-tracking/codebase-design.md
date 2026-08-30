@@ -101,11 +101,6 @@ lenne.
 type VineStatus = 'active' | 'ceased';
 type VineRootType = 'grafted' | 'own_rooted' | 'unknown';
 
-type VinePlantingDate =
-  | { precision: 'date'; date: IsoDateString }
-  | { precision: 'year'; year: number }
-  | { precision: 'unknown' };
-
 interface Vine {
   id: string;
   serialNumber: number;
@@ -113,7 +108,7 @@ interface Vine {
   hasFruited: boolean;
   rootType: VineRootType;
   rootstockVariety: string;
-  plantingDate: VinePlantingDate;
+  plantingYear: number | null;
   areaDescription: string;
   status: VineStatus;
   tags: string[];
@@ -283,7 +278,7 @@ interface CreateVineInput {
   hasFruited: boolean;
   rootType: VineRootType;
   rootstockVariety: string;
-  plantingDate: VinePlantingDate;
+  plantingYear: number | null;
   areaDescription: string;
   status: VineStatus;
   tags: string[];

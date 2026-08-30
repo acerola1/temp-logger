@@ -1,6 +1,6 @@
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 test.describe.configure({ retries: 0 });
 
@@ -15,6 +15,10 @@ const PHOTO_UPLOAD_TIMES = {
   gallery: '2026-08-03T17:20:00Z',
   afterPinning: '2026-08-03T17:30:00Z',
 } as const;
+
+function plantingYearValue(detail: Locator) {
+  return detail.locator('dt', { hasText: 'Telepítési év' }).locator('xpath=following-sibling::dd');
+}
 
 async function stabilizeVineTimestamps(
   vineId: string,
@@ -58,6 +62,9 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
     animations: 'disabled',
   });
   await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(createForm.locator('[name="plantingYear"]')).toHaveAttribute('inputmode', 'numeric');
+  await expect(createForm.locator('[name="plantingDatePrecision"]')).toHaveCount(0);
+  await expect(createForm.locator('input[type="date"]')).toHaveCount(0);
   await createForm.locator('[name="variety"]').fill('  Cabernet franc  ');
   await createForm.locator('[name="areaDescription"]').fill('  Nyugati támrendszer  ');
   await createForm.locator('[name="location"]').fill('  ');
@@ -71,7 +78,9 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await expect(createForm.locator('[name="location"]')).toHaveValue('  Présház  ');
   await createForm.locator('[name="rootType"]').selectOption('grafted');
   await createForm.locator('[name="rootstockVariety"]').fill('  Teleki 5C  ');
-  await createForm.locator('[name="plantingDatePrecision"]').selectOption('year');
+  await createForm.locator('[name="plantingYear"]').fill('2025.5');
+  await createForm.getByRole('button', { name: 'Mentés' }).click();
+  await expect(createForm.getByText(/négyjegyű egész szám/)).toBeVisible();
   await createForm.locator('[name="plantingYear"]').fill('2025');
   await createForm.locator('[name="sourceCuttingId"]').selectOption('cutting-e2e-1');
   await createForm.locator('[name="tags"]').fill('új, teszt');
@@ -88,19 +97,24 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await expect(vineDetail.locator('dt', { hasText: 'Helyszín' }).locator('xpath=following-sibling::dd')).toHaveText('Présház');
   await expect(page.getByText('#1 - Kékfrankos')).toBeVisible();
 
+  await page.setViewportSize({ width: 375, height: 812 });
   await page.getByRole('button', { name: 'Alapadatok szerkesztése' }).click();
   let editForm = page.getByRole('form', { name: 'Szőlőtőke #4 űrlap' });
   await expect(editForm.getByText('#4', { exact: true })).toBeVisible();
+  await expect(editForm.locator('[name="plantingYear"]')).toHaveValue('2025');
   await editForm.locator('[name="variety"]').fill('Cabernet Franc');
+  await editForm.locator('[name="plantingYear"]').fill('   ');
   await editForm.locator('[name="status"]').selectOption('ceased');
   await editForm.getByRole('button', { name: 'Mentés' }).click();
   await expect(editForm).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 900 });
   await expect(page.getByTestId('vine-detail').getByText('Megszűnt', { exact: true })).toBeVisible();
   // Sikeres mentés után az olvasó nézet hiánytalanul visszatér, a mentett értékkel
   // és egy frissült `Módosítva` időponttal.
   await expect(vineDetail.getByTestId('vine-meta')).toBeVisible();
   await expect(vineDetail.getByTestId('vine-notes')).toBeVisible();
   await expect(vineDetail.getByRole('heading', { name: 'Cabernet Franc' })).toBeVisible();
+  await expect(plantingYearValue(vineDetail)).toHaveText('Ismeretlen');
   // A szerver írja az `updatedAt`-ot, ezért a formátumra horgonyzunk: a perces
   // felbontáson a mentés előtti érték is ugyanaz lehetne.
   await expect(
@@ -109,11 +123,13 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
 
   await page.getByRole('button', { name: 'Alapadatok szerkesztése' }).click();
   editForm = page.getByRole('form', { name: 'Szőlőtőke #4 űrlap' });
+  await editForm.locator('[name="plantingYear"]').fill('2026');
   await editForm.locator('[name="status"]').selectOption('active');
   await editForm.getByRole('button', { name: 'Mentés' }).click();
   await expect(editForm).toHaveCount(0);
   await expect(page.getByTestId('vine-detail').getByText('Aktív', { exact: true })).toBeVisible();
   await expect(page.getByText('Szőlőtőke #4')).toBeVisible();
+  await expect(plantingYearValue(vineDetail)).toHaveText('2026');
 
   await page.getByRole('button', { name: 'Új esemény' }).click();
   const cessationForm = page.getByRole('form', { name: 'Új tőkeesemény' });
@@ -411,4 +427,58 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await ceasedEventForm.getByRole('button', { name: 'Esemény mentése (1)' }).click();
   await expect(page.getByText('Utólagos állapotfelmérés')).toBeVisible();
   await expect(page.getByTestId('vine-detail').getByText('Megszűnt', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Új tőke' }).click();
+  const emptyYearForm = page.getByRole('form', { name: 'Szőlőtőke #5 űrlap' });
+  await emptyYearForm.locator('[name="variety"]').fill('Év nélkül');
+  await emptyYearForm.locator('[name="areaDescription"]').fill('Teszt sor');
+  await expect(emptyYearForm.locator('[name="plantingYear"]')).toHaveValue('');
+  await emptyYearForm.getByRole('button', { name: 'Mentés' }).click();
+  const emptyYearDetail = page.getByTestId('vine-detail');
+  await expect(emptyYearDetail.getByRole('heading', { name: 'Év nélkül' })).toBeVisible();
+  await expect(plantingYearValue(emptyYearDetail)).toHaveText('Ismeretlen');
 });
+
+async function createPlantingYearVine(page: Page, variety: string, plantingYear: string) {
+  await page.goto('/tokek');
+  await page.getByRole('button', { name: 'Új tőke' }).click();
+  const form = page.getByRole('form', { name: /Szőlőtőke #\d+ űrlap/ });
+  await form.locator('[name="variety"]').fill(variety);
+  await form.locator('[name="areaDescription"]').fill('E2E telepítésiév-sor');
+  await form.locator('[name="plantingYear"]').fill(plantingYear);
+  await form.getByRole('button', { name: 'Mentés' }).click();
+  const detail = page.getByTestId('vine-detail');
+  await expect(detail.getByRole('heading', { name: variety })).toBeVisible();
+  return detail;
+}
+
+for (const layout of [
+  { name: 'desktop', width: 1280, height: 900 },
+  { name: 'mobile', width: 375, height: 812 },
+] as const) {
+  test(`${layout.name}: az üres és kitöltött telepítési év létrehozható, szerkeszthető és megjelenik`, async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width: layout.width, height: layout.height });
+    await page.goto('/tokek');
+    await page.getByRole('button', { name: /^Teszt admin(?: belépés)?$/ }).click();
+    await expect(page.locator('[data-access-mode="admin"]')).toBeVisible();
+
+    let detail = await createPlantingYearVine(page, `${layout.name} üres év`, '');
+    await expect(plantingYearValue(detail)).toHaveText('Ismeretlen');
+    await detail.getByRole('button', { name: 'Alapadatok szerkesztése' }).click();
+    let editForm = detail.getByRole('form', { name: /Szőlőtőke #\d+ űrlap/ });
+    await expect(editForm.locator('[name="plantingYear"]')).toHaveValue('');
+    await editForm.locator('[name="plantingYear"]').fill('2024');
+    await editForm.getByRole('button', { name: 'Mentés' }).click();
+    await expect(plantingYearValue(detail)).toHaveText('2024');
+
+    detail = await createPlantingYearVine(page, `${layout.name} kitöltött év`, '2025');
+    await expect(plantingYearValue(detail)).toHaveText('2025');
+    await detail.getByRole('button', { name: 'Alapadatok szerkesztése' }).click();
+    editForm = detail.getByRole('form', { name: /Szőlőtőke #\d+ űrlap/ });
+    await expect(editForm.locator('[name="plantingYear"]')).toHaveValue('2025');
+    await editForm.locator('[name="plantingYear"]').fill('');
+    await editForm.getByRole('button', { name: 'Mentés' }).click();
+    await expect(plantingYearValue(detail)).toHaveText('Ismeretlen');
+  });
+}

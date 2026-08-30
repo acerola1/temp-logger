@@ -66,14 +66,11 @@ export function VineForm({
     reset(defaultValues);
   }, [defaultValues, reset]);
 
-  const plantingDatePrecision = useWatch({ control, name: 'plantingDatePrecision' });
   const rootType = useWatch({ control, name: 'rootType' });
   const firstError =
     errors.variety?.message ??
     errors.location?.message ??
     errors.areaDescription?.message ??
-    errors.plantingDate?.message ??
-    errors.plantingYear?.message ??
     submitError ??
     null;
 
@@ -142,36 +139,21 @@ export function VineForm({
         </label>
 
         <label className="space-y-1">
-          <span className={LABEL_CLASS}>Telepítési idő</span>
-          <select {...register('plantingDatePrecision')} className={INPUT_CLASS}>
-            <option value="date">Pontos dátum</option>
-            <option value="year">Csak év</option>
-            <option value="unknown">Ismeretlen</option>
-          </select>
-        </label>
-
-        <div className="space-y-1">
-          <span className={LABEL_CLASS}>
-            {plantingDatePrecision === 'year' ? 'Telepítés éve' : 'Telepítés dátuma'}
-          </span>
-          {plantingDatePrecision === 'unknown' ? (
-            <div className="rounded-xl border border-dashed border-vine-300 px-3 py-2 text-sm text-vine-500 dark:border-vine-700 dark:text-vine-300">
-              Nem ismert
-            </div>
-          ) : plantingDatePrecision === 'year' ? (
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1000}
-              max={9999}
-              {...register('plantingYear')}
-              className={INPUT_CLASS}
-              placeholder="pl. 1998"
-            />
-          ) : (
-            <input type="date" {...register('plantingDate')} className={INPUT_CLASS} />
+          <span className={LABEL_CLASS}>Telepítés éve</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            {...register('plantingYear')}
+            className={INPUT_CLASS}
+            placeholder="pl. 1998"
+          />
+          {errors.plantingYear?.message && (
+            <span className="block text-xs text-red-700 dark:text-red-300" role="alert">
+              {errors.plantingYear.message}
+            </span>
           )}
-        </div>
+        </label>
 
         <label className="space-y-1">
           <span className={LABEL_CLASS}>Állapot</span>

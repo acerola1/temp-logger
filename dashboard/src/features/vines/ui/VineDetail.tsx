@@ -10,7 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { Dialog } from '../../../components/Dialog';
-import { formatDate, formatDateTime, toDateTimeLocalValue } from '../../../lib/dateFormat';
+import { formatDateTime, toDateTimeLocalValue } from '../../../lib/dateFormat';
 import {
   PhotoLightbox,
   PhotoPickerButtons,
@@ -20,7 +20,7 @@ import {
   type PhotoLightboxImage,
 } from '../../photos';
 import type { VineEventFormValues, VineFormValues } from '../forms';
-import type { Vine, VineEvent, VinePlantingDate } from '../model';
+import type { Vine, VineEvent } from '../model';
 import type { VinePhotoUploadJob } from '../vinePhotoUploadQueue';
 import { resolveVineCoverPhoto, sortVinePhotos } from '../vineCoverPhoto';
 import { VineEventForm } from './VineEventForm';
@@ -74,21 +74,13 @@ function defaultEventValues(event?: VineEvent): VineEventFormValues {
   };
 }
 
-function formatPlantingDate(value: VinePlantingDate): string {
-  if (value.precision === 'date') return formatDate(value.date);
-  if (value.precision === 'year') return `${value.year}`;
-  return 'Ismeretlen';
-}
-
 function toFormValues(vine: Vine): VineFormValues {
   return {
     variety: vine.variety,
     hasFruited: vine.hasFruited,
     rootType: vine.rootType,
     rootstockVariety: vine.rootstockVariety,
-    plantingDatePrecision: vine.plantingDate.precision,
-    plantingDate: vine.plantingDate.precision === 'date' ? vine.plantingDate.date : '',
-    plantingYear: vine.plantingDate.precision === 'year' ? String(vine.plantingDate.year) : '',
+    plantingYear: vine.plantingYear === null ? '' : String(vine.plantingYear),
     location: vine.location ?? '',
     areaDescription: vine.areaDescription,
     status: vine.status,
@@ -346,7 +338,9 @@ export function VineDetail({
                     data-testid="vine-meta"
                     className="grid gap-4 rounded-2xl bg-vine-50 px-4 py-4 sm:grid-cols-2 dark:bg-vine-800/50"
                   >
-                    <MetaRow label="Telepítési idő">{formatPlantingDate(selectedVine.plantingDate)}</MetaRow>
+                    <MetaRow label="Telepítési év">
+                      {selectedVine.plantingYear ?? 'Ismeretlen'}
+                    </MetaRow>
                     <MetaRow label="Termett már">{selectedVine.hasFruited ? 'Igen' : 'Nem'}</MetaRow>
                     <MetaRow label="Alanyfajta">
                       {selectedVine.rootstockVariety || <span className="text-vine-500 dark:text-vine-300">Nincs megadva</span>}

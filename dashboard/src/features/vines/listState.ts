@@ -2,7 +2,6 @@ import {
   VINE_ROOT_TYPES,
   VINE_STATUSES,
   type Vine,
-  type VinePlantingDate,
   type VineRootType,
   type VineStatus,
 } from './model';
@@ -87,28 +86,17 @@ export function serializeVineListState(state: VineListState): string {
   return serialized ? `?${serialized}` : '';
 }
 
-function plantingTime(value: VinePlantingDate): number | null {
-  switch (value.precision) {
-    case 'date':
-      return Date.parse(`${value.date}T00:00:00.000Z`);
-    case 'year':
-      return Date.UTC(value.year, 0, 1);
-    default:
-      return null;
-  }
-}
-
 function compareSerialNumber(left: Vine, right: Vine): number {
   return left.serialNumber - right.serialNumber;
 }
 
-function compareByPlantingDate(left: Vine, right: Vine): number {
-  const leftTime = plantingTime(left.plantingDate);
-  const rightTime = plantingTime(right.plantingDate);
+function compareByPlantingYear(left: Vine, right: Vine): number {
+  const leftYear = left.plantingYear;
+  const rightYear = right.plantingYear;
 
-  if (leftTime === null) return rightTime === null ? compareSerialNumber(left, right) : 1;
-  if (rightTime === null) return -1;
-  return rightTime - leftTime || compareSerialNumber(left, right);
+  if (leftYear === null) return rightYear === null ? compareSerialNumber(left, right) : 1;
+  if (rightYear === null) return -1;
+  return rightYear - leftYear || compareSerialNumber(left, right);
 }
 
 export function selectVisibleVines(
@@ -143,7 +131,7 @@ export function selectVisibleVines(
   return visible.sort((left, right) => {
     switch (state.sort) {
       case 'planting_desc':
-        return compareByPlantingDate(left, right);
+        return compareByPlantingYear(left, right);
       case 'variety_asc':
         return (
           left.variety.localeCompare(right.variety, 'hu', { sensitivity: 'base' }) ||

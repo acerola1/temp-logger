@@ -12,7 +12,7 @@ const VINE: Vine = {
   hasFruited: false,
   rootType: 'own_rooted',
   rootstockVariety: '',
-  plantingDate: { precision: 'unknown' },
+  plantingYear: null,
   location: 'Telek',
   areaDescription: 'Déli sor',
   status: 'active',

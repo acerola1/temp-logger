@@ -1,5 +1,5 @@
 import type { Photo, PhotoThumbnail } from '../photos/photoMetadata';
-import type { IsoDateString, IsoDateTimeString } from '../../types/datetime';
+import type { IsoDateTimeString } from '../../types/datetime';
 
 export const VINE_STATUSES = ['active', 'ceased'] as const;
 export type VineStatus = (typeof VINE_STATUSES)[number];
@@ -9,11 +9,6 @@ export type VineRootType = (typeof VINE_ROOT_TYPES)[number];
 
 export const VINE_EVENT_TYPES = ['observation', 'pruning', 'spraying', 'ceased'] as const;
 export type VineEventType = (typeof VINE_EVENT_TYPES)[number];
-
-export type VinePlantingDate =
-  | { precision: 'date'; date: IsoDateString }
-  | { precision: 'year'; year: number }
-  | { precision: 'unknown' };
 
 // A tőkefotó ugyanaz a közös fotó-metaadat, mint a dugványfotó. A fotó nem
 // hordoz eseményhivatkozást: a tőke önálló képe, nem egy esemény melléklete.
@@ -39,7 +34,7 @@ export interface Vine {
   hasFruited: boolean;
   rootType: VineRootType;
   rootstockVariety: string;
-  plantingDate: VinePlantingDate;
+  plantingYear: number | null;
   /** A mező nélküli, régi Firestore-rekordok kompatibilis értéke `null`. */
   location: string | null;
   areaDescription: string;
@@ -61,7 +56,7 @@ export interface CreateVineInput {
   hasFruited: boolean;
   rootType: VineRootType;
   rootstockVariety: string;
-  plantingDate: VinePlantingDate;
+  plantingYear: number | null;
   location: string;
   areaDescription: string;
   status: VineStatus;

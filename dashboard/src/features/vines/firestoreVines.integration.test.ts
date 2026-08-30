@@ -140,7 +140,7 @@ function vineDocument(
     hasFruited: false,
     rootType: 'unknown',
     rootstockVariety: '',
-    plantingDate: { precision: 'unknown' },
+    plantingYear: null,
     location: 'Telek',
     areaDescription: 'Tesztterület',
     status: 'active',
@@ -247,7 +247,7 @@ describe('Firestore vine catalog', () => {
         hasFruited: true,
         rootType: 'grafted',
         rootstockVariety: '5BB',
-        plantingDate: { precision: 'year', year: 2021 },
+        plantingYear: 2021,
         location: null,
         areaDescription: 'Déli kerítés',
         status: 'active',
@@ -274,6 +274,44 @@ describe('Firestore vine catalog', () => {
         createdByUid: 'admin-1',
       },
     ]);
+
+    const stored = (await adminDb.collection('vines').doc('vine-public').get()).data();
+    expect(stored?.plantingDate).toEqual({ precision: 'year', year: 2021 });
+    expect(stored).not.toHaveProperty('plantingYear');
+  });
+
+  it('a régi telepítési alakokat évre olvassa, a hibás vagy hiányzó értéket ismeretlennek', async () => {
+    const legacyBase = vineDocument(adminUid);
+    delete legacyBase.plantingYear;
+    await Promise.all([
+      adminDb.collection('vines').doc('legacy-date').set(
+        { ...legacyBase,
+          serialNumber: 91,
+          plantingDate: { precision: 'date', date: '2022-04-03' },
+        },
+      ),
+      adminDb.collection('vines').doc('legacy-unknown').set(
+        { ...legacyBase,
+          serialNumber: 92,
+          plantingDate: { precision: 'unknown' },
+        },
+      ),
+      adminDb.collection('vines').doc('legacy-missing').set(
+        { ...legacyBase, serialNumber: 93 },
+      ),
+      adminDb.collection('vines').doc('legacy-invalid').set(
+        { ...legacyBase,
+          serialNumber: 94,
+          plantingDate: { precision: 'date', date: '2022-02-30' },
+        },
+      ),
+    ]);
+
+    const vines = await waitForVines(clientDb, (items) => items.length >= 5);
+    expect(vines.find((vine) => vine.id === 'legacy-date')?.plantingYear).toBe(2022);
+    expect(vines.find((vine) => vine.id === 'legacy-unknown')?.plantingYear).toBeNull();
+    expect(vines.find((vine) => vine.id === 'legacy-missing')?.plantingYear).toBeNull();
+    expect(vines.find((vine) => vine.id === 'legacy-invalid')?.plantingYear).toBeNull();
   });
 
   it('autentikált nem-admin közvetlen Firestore- és Storage-írását elutasítja', async () => {
@@ -320,7 +358,7 @@ describe('Firestore vine catalog', () => {
       hasFruited: false,
       rootType: 'unknown',
       rootstockVariety: '',
-      plantingDate: { precision: 'unknown' },
+      plantingYear: null,
       location: '  Telek  ',
       areaDescription: '  Felső sor  ',
       status: 'active',
@@ -342,7 +380,7 @@ describe('Firestore vine catalog', () => {
       hasFruited: false,
       rootType: 'unknown',
       rootstockVariety: '',
-      plantingDate: { precision: 'unknown' },
+      plantingYear: null,
       location: 'Telek',
       areaDescription: 'Felső sor',
       status: 'active',
@@ -356,6 +394,9 @@ describe('Firestore vine catalog', () => {
     });
     expect(created?.createdAt).not.toBe(new Date(0).toISOString());
     expect(created?.updatedAt).toBe(created?.createdAt);
+    const stored = (await adminDb.collection('vines').doc(result.vineId).get()).data();
+    expect(stored?.plantingYear).toBeNull();
+    expect(stored).not.toHaveProperty('plantingDate');
   });
 
   it('párhuzamos létrehozások nem kapnak azonos sorszámot', async () => {
@@ -364,7 +405,7 @@ describe('Firestore vine catalog', () => {
       hasFruited: false,
       rootType: 'unknown',
       rootstockVariety: '',
-      plantingDate: { precision: 'unknown' },
+      plantingYear: null,
       location: 'telek',
       areaDescription: 'Középső sor',
       status: 'active',
@@ -399,7 +440,7 @@ describe('Firestore vine catalog', () => {
       hasFruited: false,
       rootType: 'unknown',
       rootstockVariety: '',
-      plantingDate: { precision: 'unknown' },
+      plantingYear: null,
       location: 'Telek',
       areaDescription: 'Tesztterület',
       status: 'active',
@@ -417,7 +458,7 @@ describe('Firestore vine catalog', () => {
       hasFruited: false,
       rootType: 'own_rooted',
       rootstockVariety: 'ezt el kell dobni',
-      plantingDate: { precision: 'date', date: '2022-04-03' },
+      plantingYear: 2022,
       location: ' Erkély ',
       areaDescription: '  Alsó lugas ',
       status: 'ceased',
@@ -438,7 +479,7 @@ describe('Firestore vine catalog', () => {
       hasFruited: false,
       rootType: 'own_rooted',
       rootstockVariety: '',
-      plantingDate: { precision: 'date', date: '2022-04-03' },
+      plantingYear: 2022,
       location: 'Erkély',
       areaDescription: 'Alsó lugas',
       status: 'ceased',
@@ -450,6 +491,9 @@ describe('Firestore vine catalog', () => {
       events: [{ id: 'event-1', title: 'Első fürt' }],
     });
     expect(edited?.updatedAt).not.toBe('2026-07-16T10:00:00.000Z');
+    const stored = (await adminDb.collection('vines').doc('vine-public').get()).data();
+    expect(stored?.plantingYear).toBe(2022);
+    expect(stored).not.toHaveProperty('plantingDate');
   });
 
   it('több tőkéhez külön eseménypéldányt ír és a megszűnési állapotot együtt frissíti', async () => {
@@ -864,7 +908,7 @@ describe('Firestore vine catalog', () => {
         hasFruited: true,
         rootType: 'own_rooted',
         rootstockVariety: '',
-        plantingDate: { precision: 'unknown' },
+        plantingYear: null,
         location: 'Telek',
         areaDescription: 'E2E sor',
         status: 'active',

@@ -369,7 +369,7 @@ Fő útvonalak:
 Fő képességek:
 
 - lista, szűrés és részletes nézet
-- automatikus sorszám, fajta, alany, telepítési idő és állapot nyilvántartása
+- automatikus sorszám, fajta, alany, opcionális telepítési év és állapot nyilvántartása
 - eseménynapló: megfigyelés, metszés, permetezés, megszűnés — egy mentés több
   tőkére is rögzíthető, tőkénként önálló eseménypéldánnyal
 - tőkefotók önálló galériában, borítókép-kijelöléssel
@@ -388,7 +388,7 @@ Egy tőkedokumentum fő mezői:
 - `hasFruited`
 - `rootType`
 - `rootstockVariety`
-- `plantingDate`
+- `plantingYear`
 - `areaDescription`
 - `status`
 - `tags`

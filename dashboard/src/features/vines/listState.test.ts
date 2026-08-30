@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Vine, VinePlantingDate } from './model';
+import type { Vine } from './model';
 import {
   DEFAULT_VINE_LIST_STATE,
   parseVineListState,
@@ -10,7 +10,7 @@ import {
 
 function vine(
   serialNumber: number,
-  overrides: Partial<Vine> & { plantingDate?: VinePlantingDate } = {},
+  overrides: Partial<Vine> = {},
 ): Vine {
   return {
     id: `vine-${serialNumber}`,
@@ -19,7 +19,7 @@ function vine(
     hasFruited: false,
     rootType: 'unknown',
     rootstockVariety: '',
-    plantingDate: { precision: 'unknown' },
+    plantingYear: null,
     areaDescription: `Terület ${serialNumber}`,
     status: 'active',
     tags: [],
@@ -157,19 +157,18 @@ describe('selectVisibleVines', () => {
     ).toEqual([1, 2, 3]);
   });
 
-  it('treats a year as January 1 and always puts unknown planting dates last', () => {
+  it('sorts newer planting years first, uses serial-number ties and puts unknown years last', () => {
     const input = [
-      vine(1, { plantingDate: { precision: 'unknown' } }),
-      vine(2, { plantingDate: { precision: 'year', year: 2025 } }),
-      vine(3, { plantingDate: { precision: 'date', date: '2025-06-01' } }),
-      vine(4, { plantingDate: { precision: 'date', date: '2025-01-01' } }),
-      vine(5, { plantingDate: { precision: 'year', year: 2026 } }),
+      vine(1, { plantingYear: null }),
+      vine(2, { plantingYear: 2025 }),
+      vine(3, { plantingYear: 2025 }),
+      vine(4, { plantingYear: 2026 }),
     ];
 
     expect(
       selectVisibleVines(input, state({ sort: 'planting_desc' })).map(
         (item) => item.serialNumber,
       ),
-    ).toEqual([5, 3, 2, 4, 1]);
+    ).toEqual([4, 2, 3, 1]);
   });
 });

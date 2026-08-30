@@ -16,8 +16,6 @@ function validVineForm(overrides: Partial<VineFormValues> = {}): VineFormValues 
     hasFruited: false,
     rootType: 'grafted',
     rootstockVariety: ' Teleki 5C ',
-    plantingDatePrecision: 'unknown',
-    plantingDate: '',
     plantingYear: '',
     location: ' Telek ',
     areaDescription: ' Ház mögötti sor ',
@@ -41,33 +39,21 @@ describe('vineFormSchema', () => {
     );
   });
 
-  it('validates the selected planting-date precision', () => {
-    expect(
-      vineFormSchema.safeParse(
-        validVineForm({ plantingDatePrecision: 'date', plantingDate: '2025-02-29' }),
-      ).success,
-    ).toBe(false);
-    expect(
-      vineFormSchema.safeParse(
-        validVineForm({ plantingDatePrecision: 'date', plantingDate: '2024-02-29' }),
-      ).success,
-    ).toBe(true);
-    expect(
-      vineFormSchema.safeParse(
-        validVineForm({ plantingDatePrecision: 'year', plantingYear: '1998' }),
-      ).success,
-    ).toBe(true);
-    expect(
-      vineFormSchema.safeParse(
-        validVineForm({ plantingDatePrecision: 'year', plantingYear: '98' }),
-      ).success,
-    ).toBe(false);
-    expect(
-      vineFormSchema.safeParse(
-        validVineForm({ plantingDatePrecision: 'year', plantingYear: '0000' }),
-      ).success,
-    ).toBe(false);
-  });
+  it.each(['', '   ', '1000', '1998', '9999'])(
+    'accepts an empty or four-digit planting year: %j',
+    (plantingYear) => {
+      expect(vineFormSchema.safeParse(validVineForm({ plantingYear })).success).toBe(true);
+    },
+  );
+
+  it.each(['999', '10000', '1998.5', 'abcd', '0x7ce'])(
+    'rejects an invalid planting year: %s',
+    (plantingYear) => {
+      const result = vineFormSchema.safeParse(validVineForm({ plantingYear }));
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.issues[0]?.path).toEqual(['plantingYear']);
+    },
+  );
 });
 
 describe('toVineInput', () => {
@@ -77,7 +63,7 @@ describe('toVineInput', () => {
       hasFruited: false,
       rootType: 'grafted',
       rootstockVariety: 'Teleki 5C',
-      plantingDate: { precision: 'unknown' },
+      plantingYear: null,
       location: 'Telek',
       areaDescription: 'Ház mögötti sor',
       status: 'active',
@@ -87,18 +73,9 @@ describe('toVineInput', () => {
     });
   });
 
-  it('normalizes the three planting-date variants', () => {
-    expect(
-      toVineInput(
-        validVineForm({ plantingDatePrecision: 'date', plantingDate: '2024-04-06' }),
-      ).plantingDate,
-    ).toEqual({ precision: 'date', date: '2024-04-06' });
-    expect(
-      toVineInput(
-        validVineForm({ plantingDatePrecision: 'year', plantingYear: ' 1998 ' }),
-      ).plantingDate,
-    ).toEqual({ precision: 'year', year: 1998 });
-    expect(toVineInput(validVineForm()).plantingDate).toEqual({ precision: 'unknown' });
+  it('normalizes an empty planting year to null and a filled year to a number', () => {
+    expect(toVineInput(validVineForm({ plantingYear: ' 1998 ' })).plantingYear).toBe(1998);
+    expect(toVineInput(validVineForm({ plantingYear: '  ' })).plantingYear).toBeNull();
   });
 
   it('clears the rootstock variety for non-grafted vines', () => {

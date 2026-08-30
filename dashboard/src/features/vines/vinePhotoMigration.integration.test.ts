@@ -125,7 +125,7 @@ function legacyVine(overrides: Record<string, unknown> = {}): Record<string, unk
     hasFruited: false,
     rootType: 'unknown',
     rootstockVariety: '',
-    plantingDate: { precision: 'unknown' },
+    plantingYear: null,
     areaDescription: 'Migrációs terület',
     status: 'active',
     tags: [],

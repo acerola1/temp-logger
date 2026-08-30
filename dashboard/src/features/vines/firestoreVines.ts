@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -33,7 +34,6 @@ import type {
   VineEventType,
   VinePhoto,
   VinePhotoThumbnail,
-  VinePlantingDate,
   VineRootType,
   VineStatus,
 } from './model';
@@ -46,6 +46,7 @@ import {
 } from './vinePhotos';
 import { getNextVineSerialNumber } from './vineSerialNumber';
 import { resolveVineLocation } from './vineLocations';
+import { normalizeStoredPlantingYear } from './plantingYear';
 
 export type VineMutationProgress = (progress: number) => void;
 
@@ -66,7 +67,7 @@ function editableFields(input: CreateVineInput, location: string) {
     rootType: input.rootType,
     rootstockVariety:
       input.rootType === 'grafted' ? input.rootstockVariety.trim() : '',
-    plantingDate: input.plantingDate,
+    plantingYear: input.plantingYear,
     location,
     areaDescription: input.areaDescription.trim(),
     status: input.status,
@@ -157,7 +158,7 @@ function mapVine(snapshot: QueryDocumentSnapshot<DocumentData>): Vine {
     rootType: value.rootType as VineRootType,
     rootstockVariety:
       typeof value.rootstockVariety === 'string' ? value.rootstockVariety.trim() : '',
-    plantingDate: value.plantingDate as VinePlantingDate,
+    plantingYear: normalizeStoredPlantingYear(value),
     location: typeof value.location === 'string' && value.location.trim()
       ? value.location.trim()
       : null,
@@ -299,6 +300,7 @@ export async function editVine(
 ): Promise<void> {
   await updateDoc(doc(firestore, 'vines', vineId), {
     ...editableFields(input, requireVineLocation(input.location)),
+    plantingDate: deleteField(),
     updatedAt: serverTimestamp(),
   });
 }

@@ -18,7 +18,7 @@ function vine(
     hasFruited: false,
     rootType: 'unknown',
     rootstockVariety: '',
-    plantingDate: { precision: 'unknown' },
+    plantingYear: null,
     location,
     areaDescription: 'Tesztterület',
     status: 'active',

@@ -8,7 +8,6 @@ import {
   type CreateVineInput,
   type VineEventDetailsInput,
   type VineEventType,
-  type VinePlantingDate,
 } from './model';
 import { resolveVineLocation } from './vineLocations';
 
@@ -52,8 +51,6 @@ export const vineFormSchema = z
     hasFruited: z.boolean(),
     rootType: z.enum(VINE_ROOT_TYPES),
     rootstockVariety: z.string(),
-    plantingDatePrecision: z.enum(['date', 'year', 'unknown']),
-    plantingDate: z.string(),
     plantingYear: z.string(),
     location: z.string().trim().min(1, 'A helyszín megadása kötelező.'),
     areaDescription: z.string().trim().min(1, 'A területleírás megadása kötelező.'),
@@ -63,27 +60,13 @@ export const vineFormSchema = z
     sourceCuttingId: z.string(),
   })
   .superRefine((values, context) => {
-    if (values.plantingDatePrecision === 'date' && !isIsoDate(values.plantingDate.trim())) {
+    const plantingYear = values.plantingYear.trim();
+    if (plantingYear && !/^[1-9]\d{3}$/.test(plantingYear)) {
       context.addIssue({
         code: 'custom',
-        path: ['plantingDate'],
-        message: 'Adj meg érvényes telepítési dátumot.',
+        path: ['plantingYear'],
+        message: 'A telepítési év 1000 és 9999 közötti, négyjegyű egész szám legyen.',
       });
-    }
-
-    if (values.plantingDatePrecision === 'year') {
-      const year = Number(values.plantingYear.trim());
-      if (
-        !/^\d{4}$/.test(values.plantingYear.trim()) ||
-        !Number.isInteger(year) ||
-        year < 1000
-      ) {
-        context.addIssue({
-          code: 'custom',
-          path: ['plantingYear'],
-          message: 'A telepítési év négy számjegyű szám legyen.',
-        });
-      }
     }
   });
 
@@ -159,17 +142,6 @@ function normalizeTags(value: string): string[] {
   return tags;
 }
 
-function toPlantingDate(values: VineFormValues): VinePlantingDate {
-  switch (values.plantingDatePrecision) {
-    case 'date':
-      return { precision: 'date', date: values.plantingDate.trim() };
-    case 'year':
-      return { precision: 'year', year: Number(values.plantingYear.trim()) };
-    default:
-      return { precision: 'unknown' };
-  }
-}
-
 export function toVineInput(
   values: VineFormValues,
   knownLocations: readonly string[] = [],
@@ -180,7 +152,7 @@ export function toVineInput(
     rootType: values.rootType,
     rootstockVariety:
       values.rootType === 'grafted' ? values.rootstockVariety.trim() : '',
-    plantingDate: toPlantingDate(values),
+    plantingYear: values.plantingYear.trim() ? Number(values.plantingYear.trim()) : null,
     location: resolveVineLocation(values.location, knownLocations),
     areaDescription: values.areaDescription.trim(),
     status: values.status,

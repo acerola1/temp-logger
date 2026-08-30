@@ -84,7 +84,7 @@ Egy tőkéhez, dátumhoz és időponthoz kötött naplóbejegyzés. Kezdeti típ
 | Termett már | Kézzel szerkeszthető igen/nem jelölő. |
 | Gyökérzet típusa | Kötelező választás: oltott, saját gyökerű vagy ismeretlen. |
 | Alanyfajta | Opcionális szöveg, oltott tőkénél használható. |
-| Telepítési idő | Megadható pontos dátummal, csak évvel, vagy ismeretlenül hagyható. |
+| Telepítési év | Opcionális, 1000 és 9999 közötti négyjegyű évszám. Ismeretlenül hagyható. |
 | Területleírás | Kötelező, szabad szöveges helyleírás. Nincs külön helyszín-, sor-, koordináta- vagy térképmodell. |
 | Állapot | Aktív vagy megszűnt. Új tőke alapértelmezésben aktív. |
 | Címkék | Opcionális, szabad szöveges címkék a dugványokéval azonos működéssel, de külön tőke-címkeajánlási készlettel. |
