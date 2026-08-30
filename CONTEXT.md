@@ -34,6 +34,11 @@ Több szőlőtőkét összefogó, szabadon bővíthető helynév, például `Erk
 `Telek`. Nem azonos a helyszínen belüli pontosabb területleírással.
 _Avoid_: Területleírás, címke
 
+**Telepítési év**:
+A szőlőtőke kiültetésének ismert naptári éve, nap- és hónappontosság nélkül.
+Ha az év nem ismert, az érték üres marad.
+_Avoid_: Telepítési idő, telepítési dátum, dátumpontosság
+
 **Tömeges eseményrögzítés**:
 Adatbeviteli művelet, amely azonos tartalmú, de később egymástól független
 tőkeesemény-példányokat hoz létre több szőlőtőkén.
