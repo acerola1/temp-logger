@@ -30,6 +30,7 @@ interface VineDetailProps {
   selectedVine: Vine | null;
   knownVarieties: readonly string[];
   knownRootstockVarieties: readonly string[];
+  knownLocations: readonly string[];
   knownTags: readonly string[];
   cuttingOptions: readonly VineCuttingOption[];
   cuttingOptionsLoading: boolean;
@@ -79,6 +80,7 @@ function toFormValues(vine: Vine): VineFormValues {
     plantingDatePrecision: vine.plantingDate.precision,
     plantingDate: vine.plantingDate.precision === 'date' ? vine.plantingDate.date : '',
     plantingYear: vine.plantingDate.precision === 'year' ? String(vine.plantingDate.year) : '',
+    location: vine.location ?? '',
     areaDescription: vine.areaDescription,
     status: vine.status,
     tags: vine.tags.join(', '),
@@ -103,6 +105,7 @@ export function VineDetail({
   selectedVine,
   knownVarieties,
   knownRootstockVarieties,
+  knownLocations,
   knownTags,
   cuttingOptions,
   cuttingOptionsLoading,
@@ -333,6 +336,9 @@ export function VineDetail({
                     <MetaRow label="Alanyfajta">
                       {selectedVine.rootstockVariety || <span className="text-vine-500 dark:text-vine-300">Nincs megadva</span>}
                     </MetaRow>
+                    <MetaRow label="Helyszín">
+                      {selectedVine.location || <span className="text-vine-500 dark:text-vine-300">Nincs megadva</span>}
+                    </MetaRow>
                     <MetaRow label="Eredeti dugvány">
                       {!selectedVine.sourceCuttingId ? (
                         <span className="text-vine-500 dark:text-vine-300">Nincs hivatkozás</span>
@@ -401,6 +407,7 @@ export function VineDetail({
                   defaultValues={editFormValues}
                   knownVarieties={knownVarieties}
                   knownRootstockVarieties={knownRootstockVarieties}
+                  knownLocations={knownLocations}
                   knownTags={knownTags}
                   cuttingOptions={editCuttingOptions}
                   cuttingOptionsLoading={cuttingOptionsLoading}

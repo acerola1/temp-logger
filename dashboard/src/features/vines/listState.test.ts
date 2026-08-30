@@ -32,6 +32,7 @@ function vine(
     updatedAt: `2026-01-${String(serialNumber).padStart(2, '0')}T00:00:00.000Z`,
     createdByUid: null,
     ...overrides,
+    location: overrides.location === undefined ? 'Telek' : overrides.location,
   };
 }
 
@@ -52,6 +53,7 @@ describe('vine list URL state', () => {
       query: ' Kék 12 ',
       status: 'ceased',
       rootType: 'own_rooted',
+      location: ' Erkély ',
       tag: ' öreg tőke ',
       fruited: 'yes',
       sort: 'planting_desc',
@@ -60,8 +62,17 @@ describe('vine list URL state', () => {
     expect(parseVineListState(serializeVineListState(value))).toEqual({
       ...value,
       query: 'Kék 12',
+      location: 'Erkély',
       tag: 'öreg tőke',
     });
+  });
+
+  it('round-trips the missing-location filter separately from the all default', () => {
+    expect(parseVineListState('?location=')).toEqual({
+      ...DEFAULT_VINE_LIST_STATE,
+      location: null,
+    });
+    expect(serializeVineListState(state({ location: null }))).toBe('?location=');
   });
 });
 
@@ -71,12 +82,14 @@ describe('selectVisibleVines', () => {
       variety: 'Kékfrankos',
       hasFruited: true,
       rootType: 'grafted',
+      location: 'Erkély',
       tags: ['pergola'],
       areaDescription: 'Ház mögötti sor',
     }),
     vine(2, {
       variety: 'Othello',
       rootType: 'own_rooted',
+      location: null,
       tags: ['öreg tőke'],
       areaDescription: 'Régi lugas',
       status: 'ceased',
@@ -111,6 +124,18 @@ describe('selectVisibleVines', () => {
         (item) => item.id,
       ),
     ).toEqual(['vine-12']);
+  });
+
+  it('combines case-insensitive exact location filtering with other filters', () => {
+    expect(
+      selectVisibleVines(vines, state({ status: 'all', location: 'erkély', fruited: 'yes' }))
+        .map((item) => item.id),
+    ).toEqual(['vine-12']);
+    expect(selectVisibleVines(vines, state({ status: 'all', location: null })).map(
+      (item) => item.id,
+    )).toEqual(['vine-2']);
+    expect(selectVisibleVines(vines, state({ status: 'all', location: 'Erkély alsó polc' })))
+      .toEqual([]);
   });
 
   it('sorts by updated time descending by default without mutating the input', () => {

@@ -14,6 +14,7 @@ interface VineFormProps {
   defaultValues: VineFormValues;
   knownVarieties: readonly string[];
   knownRootstockVarieties: readonly string[];
+  knownLocations: readonly string[];
   knownTags: readonly string[];
   cuttingOptions: readonly VineCuttingOption[];
   cuttingOptionsLoading?: boolean;
@@ -36,6 +37,7 @@ export function VineForm({
   defaultValues,
   knownVarieties,
   knownRootstockVarieties,
+  knownLocations,
   knownTags,
   cuttingOptions,
   cuttingOptionsLoading = false,
@@ -68,6 +70,7 @@ export function VineForm({
   const rootType = useWatch({ control, name: 'rootType' });
   const firstError =
     errors.variety?.message ??
+    errors.location?.message ??
     errors.areaDescription?.message ??
     errors.plantingDate?.message ??
     errors.plantingYear?.message ??
@@ -201,6 +204,20 @@ export function VineForm({
       </div>
 
       <label className="mt-4 block space-y-1">
+        <span className={LABEL_CLASS}>Helyszín</span>
+        <input
+          list={`${datalistId}-locations`}
+          {...register('location')}
+          className={INPUT_CLASS}
+          placeholder="pl. Erkély vagy Telek"
+          autoComplete="off"
+        />
+        <span className="text-xs text-vine-500 dark:text-vine-400">
+          Válassz egy korábbit, vagy írj be új helyszínt.
+        </span>
+      </label>
+
+      <label className="mt-4 block space-y-1">
         <span className={LABEL_CLASS}>Területleírás</span>
         <input
           {...register('areaDescription')}
@@ -274,6 +291,9 @@ export function VineForm({
       </datalist>
       <datalist id={`${datalistId}-rootstocks`}>
         {knownRootstockVarieties.map((variety) => <option key={variety} value={variety} />)}
+      </datalist>
+      <datalist id={`${datalistId}-locations`}>
+        {knownLocations.map((location) => <option key={location} value={location} />)}
       </datalist>
       <datalist id={`${datalistId}-tags`}>
         {knownTags.map((tag) => <option key={tag} value={tag} />)}

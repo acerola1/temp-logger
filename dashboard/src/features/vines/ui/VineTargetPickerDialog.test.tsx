@@ -23,6 +23,7 @@ function makeVine(overrides: Partial<Vine> & Pick<Vine, 'id' | 'serialNumber' | 
     updatedAt: '2026-08-01T10:00:00.000Z',
     createdByUid: null,
     ...overrides,
+    location: overrides.location === undefined ? 'Telek' : overrides.location,
   };
 }
 

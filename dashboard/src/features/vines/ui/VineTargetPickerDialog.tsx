@@ -8,6 +8,7 @@ import {
   type VineListState,
 } from '../listState';
 import type { Vine } from '../model';
+import { getVineLocationSuggestions } from '../vineLocations';
 import { VineCard } from './VineCard';
 import { VineListFilters } from './VineListFilters';
 
@@ -42,6 +43,7 @@ export function VineTargetPickerDialog({
 
   const draftSet = useMemo(() => new Set(draftIds), [draftIds]);
   const filteredVines = useMemo(() => selectVisibleVines(vines, listState), [listState, vines]);
+  const locationSuggestions = useMemo(() => getVineLocationSuggestions(vines), [vines]);
   // A „csak a kiválasztottak" a szűrőktől független halmazt mutat, de a
   // rendezést megtartja: a sorrend ne ugorjon a pipa be- és kikapcsolásával.
   const selectedVines = useMemo(
@@ -88,6 +90,8 @@ export function VineTargetPickerDialog({
 
       <VineListFilters
         state={listState}
+        locationSuggestions={locationSuggestions}
+        hasMissingLocation={vines.some((vine) => vine.location === null)}
         tagSuggestions={tagSuggestions}
         onPatch={(patch) => setListState((current) => ({ ...current, ...patch }))}
         onReset={() => setListState({ ...DEFAULT_VINE_LIST_STATE })}

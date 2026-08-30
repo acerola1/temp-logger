@@ -19,6 +19,7 @@ function validVineForm(overrides: Partial<VineFormValues> = {}): VineFormValues 
     plantingDatePrecision: 'unknown',
     plantingDate: '',
     plantingYear: '',
+    location: ' Telek ',
     areaDescription: ' Ház mögötti sor ',
     status: 'active',
     tags: ' pergola, Öreg tőke, PERGOLA, ',
@@ -29,11 +30,12 @@ function validVineForm(overrides: Partial<VineFormValues> = {}): VineFormValues 
 }
 
 describe('vineFormSchema', () => {
-  it('requires a non-empty trimmed variety and area description', () => {
+  it('requires a non-empty trimmed variety, location and area description', () => {
     expect(vineFormSchema.safeParse(validVineForm({ variety: '   ' })).success).toBe(false);
     expect(vineFormSchema.safeParse(validVineForm({ areaDescription: '\t' })).success).toBe(
       false,
     );
+    expect(vineFormSchema.safeParse(validVineForm({ location: '  ' })).success).toBe(false);
     expect(vineFormSchema.safeParse(validVineForm({ variety: 'Ismeretlen' })).success).toBe(
       true,
     );
@@ -76,6 +78,7 @@ describe('toVineInput', () => {
       rootType: 'grafted',
       rootstockVariety: 'Teleki 5C',
       plantingDate: { precision: 'unknown' },
+      location: 'Telek',
       areaDescription: 'Ház mögötti sor',
       status: 'active',
       tags: ['pergola', 'Öreg tőke'],
@@ -107,6 +110,11 @@ describe('toVineInput', () => {
 
   it('normalizes an empty cutting reference to null', () => {
     expect(toVineInput(validVineForm({ sourceCuttingId: '  ' })).sourceCuttingId).toBeNull();
+  });
+
+  it('uses an existing location spelling case-insensitively', () => {
+    expect(toVineInput(validVineForm({ location: ' telek ' }), ['Erkély', 'Telek']).location)
+      .toBe('Telek');
   });
 });
 

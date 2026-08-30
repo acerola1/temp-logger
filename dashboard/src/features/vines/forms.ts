@@ -10,6 +10,7 @@ import {
   type VineEventType,
   type VinePlantingDate,
 } from './model';
+import { resolveVineLocation } from './vineLocations';
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_DATE_TIME_PATTERN =
@@ -54,6 +55,7 @@ export const vineFormSchema = z
     plantingDatePrecision: z.enum(['date', 'year', 'unknown']),
     plantingDate: z.string(),
     plantingYear: z.string(),
+    location: z.string().trim().min(1, 'A helyszín megadása kötelező.'),
     areaDescription: z.string().trim().min(1, 'A területleírás megadása kötelező.'),
     status: z.enum(VINE_STATUSES),
     tags: z.string(),
@@ -168,7 +170,10 @@ function toPlantingDate(values: VineFormValues): VinePlantingDate {
   }
 }
 
-export function toVineInput(values: VineFormValues): CreateVineInput {
+export function toVineInput(
+  values: VineFormValues,
+  knownLocations: readonly string[] = [],
+): CreateVineInput {
   return {
     variety: values.variety.trim(),
     hasFruited: values.hasFruited,
@@ -176,6 +181,7 @@ export function toVineInput(values: VineFormValues): CreateVineInput {
     rootstockVariety:
       values.rootType === 'grafted' ? values.rootstockVariety.trim() : '',
     plantingDate: toPlantingDate(values),
+    location: resolveVineLocation(values.location, knownLocations),
     areaDescription: values.areaDescription.trim(),
     status: values.status,
     tags: normalizeTags(values.tags),

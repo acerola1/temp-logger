@@ -40,6 +40,8 @@ export interface Vine {
   rootType: VineRootType;
   rootstockVariety: string;
   plantingDate: VinePlantingDate;
+  /** A mező nélküli, régi Firestore-rekordok kompatibilis értéke `null`. */
+  location: string | null;
   areaDescription: string;
   status: VineStatus;
   tags: string[];
@@ -60,6 +62,7 @@ export interface CreateVineInput {
   rootType: VineRootType;
   rootstockVariety: string;
   plantingDate: VinePlantingDate;
+  location: string;
   areaDescription: string;
   status: VineStatus;
   tags: string[];

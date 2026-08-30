@@ -19,6 +19,7 @@ test('mobilon három fotó kiválasztható az első feltöltés befejezése elő
     rootType: 'own_rooted',
     rootstockVariety: '',
     plantingDate: { precision: 'unknown' },
+    location: 'Telek',
     areaDescription: 'E2E sor',
     status: 'active',
     tags: [],

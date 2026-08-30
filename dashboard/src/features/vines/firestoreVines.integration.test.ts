@@ -141,6 +141,7 @@ function vineDocument(
     rootType: 'unknown',
     rootstockVariety: '',
     plantingDate: { precision: 'unknown' },
+    location: 'Telek',
     areaDescription: 'Tesztterület',
     status: 'active',
     tags: [],
@@ -247,6 +248,7 @@ describe('Firestore vine catalog', () => {
         rootType: 'grafted',
         rootstockVariety: '5BB',
         plantingDate: { precision: 'year', year: 2021 },
+        location: null,
         areaDescription: 'Déli kerítés',
         status: 'active',
         tags: ['csemege'],
@@ -319,6 +321,7 @@ describe('Firestore vine catalog', () => {
       rootType: 'unknown',
       rootstockVariety: '',
       plantingDate: { precision: 'unknown' },
+      location: '  Telek  ',
       areaDescription: '  Felső sor  ',
       status: 'active',
       tags: ['új'],
@@ -340,6 +343,7 @@ describe('Firestore vine catalog', () => {
       rootType: 'unknown',
       rootstockVariety: '',
       plantingDate: { precision: 'unknown' },
+      location: 'Telek',
       areaDescription: 'Felső sor',
       status: 'active',
       tags: ['új'],
@@ -361,6 +365,7 @@ describe('Firestore vine catalog', () => {
       rootType: 'unknown',
       rootstockVariety: '',
       plantingDate: { precision: 'unknown' },
+      location: 'telek',
       areaDescription: 'Középső sor',
       status: 'active',
       tags: [],
@@ -374,6 +379,13 @@ describe('Firestore vine catalog', () => {
     ]);
 
     expect(results.map((result) => result.serialNumber).sort((a, b) => a - b)).toEqual([2, 3]);
+    const vines = await waitForVines(
+      adminClientDb,
+      (nextVines) => results.every((result) => nextVines.some((vine) => vine.id === result.vineId)),
+    );
+    expect(
+      results.map((result) => vines.find((vine) => vine.id === result.vineId)?.location),
+    ).toEqual(['Telek', 'Telek']);
   });
 
   it('a végleges törléssel felszabadult legkisebb sorszámot újra kiosztja', async () => {
@@ -388,6 +400,7 @@ describe('Firestore vine catalog', () => {
       rootType: 'unknown',
       rootstockVariety: '',
       plantingDate: { precision: 'unknown' },
+      location: 'Telek',
       areaDescription: 'Tesztterület',
       status: 'active',
       tags: [],
@@ -405,6 +418,7 @@ describe('Firestore vine catalog', () => {
       rootType: 'own_rooted',
       rootstockVariety: 'ezt el kell dobni',
       plantingDate: { precision: 'date', date: '2022-04-03' },
+      location: ' Erkély ',
       areaDescription: '  Alsó lugas ',
       status: 'ceased',
       tags: ['borszőlő'],
@@ -425,6 +439,7 @@ describe('Firestore vine catalog', () => {
       rootType: 'own_rooted',
       rootstockVariety: '',
       plantingDate: { precision: 'date', date: '2022-04-03' },
+      location: 'Erkély',
       areaDescription: 'Alsó lugas',
       status: 'ceased',
       tags: ['borszőlő'],
@@ -850,6 +865,7 @@ describe('Firestore vine catalog', () => {
         rootType: 'own_rooted',
         rootstockVariety: '',
         plantingDate: { precision: 'unknown' },
+        location: 'Telek',
         areaDescription: 'E2E sor',
         status: 'active',
         tags: [],

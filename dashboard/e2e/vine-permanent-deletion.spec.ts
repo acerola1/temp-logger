@@ -22,6 +22,7 @@ for (const layout of layouts) {
       rootType: 'own_rooted',
       rootstockVariety: '',
       plantingDate: { precision: 'year', year: 2025 },
+      location: 'Telek',
       areaDescription: 'E2E veszélyzóna',
       status: 'active',
       tags: ['törlési teszt'],

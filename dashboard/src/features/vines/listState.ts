@@ -6,6 +6,7 @@ import {
   type VineRootType,
   type VineStatus,
 } from './model';
+import { locationKey } from './vineLocations';
 
 export type VineListStatus = VineStatus | 'all';
 export type VineListRootType = VineRootType | 'all';
@@ -16,6 +17,8 @@ export interface VineListState {
   query: string;
   status: VineListStatus;
   rootType: VineListRootType;
+  /** `undefined`: mind; `null`: régi, helyszín nélküli; szöveg: pontos helyszín. */
+  location: string | null | undefined;
   tag: string;
   fruited: VineListFruited;
   sort: VineListSort;
@@ -25,6 +28,7 @@ export const DEFAULT_VINE_LIST_STATE: Readonly<VineListState> = {
   query: '',
   status: 'active',
   rootType: 'all',
+  location: undefined,
   tag: '',
   fruited: 'all',
   sort: 'updated_desc',
@@ -43,6 +47,7 @@ export function parseVineListState(search: string): VineListState {
   const rootType = params.get('rootType');
   const fruited = params.get('fruited');
   const sort = params.get('sort');
+  const rawLocation = params.get('location');
 
   return {
     query: (params.get('q') ?? '').trim(),
@@ -52,6 +57,7 @@ export function parseVineListState(search: string): VineListState {
     rootType: isOneOf(rootType, VINE_LIST_ROOT_TYPES)
       ? rootType
       : DEFAULT_VINE_LIST_STATE.rootType,
+    location: rawLocation === null ? undefined : rawLocation.trim() || null,
     tag: (params.get('tag') ?? '').trim(),
     fruited: isOneOf(fruited, ['yes', 'no', 'all'])
       ? fruited
@@ -72,6 +78,7 @@ export function serializeVineListState(state: VineListState): string {
   if (state.rootType !== DEFAULT_VINE_LIST_STATE.rootType) {
     params.set('rootType', state.rootType);
   }
+  if (state.location !== undefined) params.set('location', state.location ?? '');
   if (tag) params.set('tag', tag);
   if (state.fruited !== DEFAULT_VINE_LIST_STATE.fruited) params.set('fruited', state.fruited);
   if (state.sort !== DEFAULT_VINE_LIST_STATE.sort) params.set('sort', state.sort);
@@ -113,6 +120,14 @@ export function selectVisibleVines(
   const visible = vines.filter((vine) => {
     if (state.status !== 'all' && vine.status !== state.status) return false;
     if (state.rootType !== 'all' && vine.rootType !== state.rootType) return false;
+    if (
+      state.location !== undefined &&
+      (state.location === null
+        ? vine.location !== null
+        : vine.location === null || locationKey(vine.location) !== locationKey(state.location))
+    ) {
+      return false;
+    }
     if (state.tag && !vine.tags.includes(state.tag)) return false;
     if (state.fruited !== 'all' && vine.hasFruited !== (state.fruited === 'yes')) return false;
     if (!query) return true;
@@ -120,6 +135,7 @@ export function selectVisibleVines(
     return (
       vine.variety.toLocaleLowerCase('hu').includes(query) ||
       String(vine.serialNumber).includes(query) ||
+      locationKey(vine.location ?? '').includes(query) ||
       vine.areaDescription.toLocaleLowerCase('hu').includes(query)
     );
   });

@@ -15,6 +15,7 @@ import {
   type VineFormValues,
 } from '../forms';
 import { getNextVineSerialNumber, useVineCatalog } from '../useVineCatalog';
+import { getLatestVineLocation } from '../vineLocations';
 import { useVinePhotoUploadQueue } from '../vinePhotoUploadQueueContext';
 import { VineDetail } from './VineDetail';
 import { VineForm, type VineCuttingOption } from './VineForm';
@@ -29,6 +30,7 @@ const DEFAULT_FORM_VALUES: VineFormValues = {
   plantingDatePrecision: 'unknown',
   plantingDate: '',
   plantingYear: '',
+  location: '',
   areaDescription: '',
   status: 'active',
   tags: '',
@@ -120,6 +122,10 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
         })),
     [cuttings],
   );
+  const createFormValues = useMemo(
+    () => ({ ...DEFAULT_FORM_VALUES, location: getLatestVineLocation(catalog.vines) }),
+    [catalog.vines],
+  );
 
   const patchListState = (patch: Partial<VineListState>) => {
     setListState((current) => ({ ...current, ...patch }));
@@ -156,13 +162,15 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
   };
 
   const handleCreate = async (values: VineFormValues) => {
-    const { vineId } = await catalog.createVine(toVineInput(values));
+    const { vineId } = await catalog.createVine(
+      toVineInput(values, catalog.locationSuggestions),
+    );
     setShowCreateForm(false);
     navigateToVine(vineId);
   };
 
   const handleEdit = async (vineId: string, values: VineFormValues) => {
-    await catalog.editVine(vineId, toVineInput(values));
+    await catalog.editVine(vineId, toVineInput(values, catalog.locationSuggestions));
   };
 
   const handleAddEvents = async (targetVineIds: string[], values: VineEventFormValues) => {
@@ -271,9 +279,10 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
       {showCreateForm && isAdmin && (
         <VineForm
           serialNumber={nextSerialNumber}
-          defaultValues={DEFAULT_FORM_VALUES}
+          defaultValues={createFormValues}
           knownVarieties={knownVarieties}
           knownRootstockVarieties={knownRootstockVarieties}
+          knownLocations={catalog.locationSuggestions}
           knownTags={catalog.tagSuggestions}
           cuttingOptions={cuttingOptions}
           cuttingOptionsLoading={loadingCuttings}
@@ -291,6 +300,8 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
         <aside className="space-y-3">
           <VineListFilters
             state={listState}
+            locationSuggestions={catalog.locationSuggestions}
+            hasMissingLocation={catalog.vines.some((vine) => vine.location === null)}
             tagSuggestions={catalog.tagSuggestions}
             onPatch={patchListState}
             onReset={() => setListState({ ...DEFAULT_VINE_LIST_STATE })}
@@ -320,6 +331,7 @@ export function VinesPage({ isAdmin }: VinesPageProps) {
           selectedVine={selectedVine}
           knownVarieties={knownVarieties}
           knownRootstockVarieties={knownRootstockVarieties}
+          knownLocations={catalog.locationSuggestions}
           knownTags={catalog.tagSuggestions}
           cuttingOptions={cuttingOptions}
           cuttingOptionsLoading={loadingCuttings}

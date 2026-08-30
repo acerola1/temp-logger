@@ -14,6 +14,7 @@ test('a publikus adatlap közvetlenül nyitható, megőrzi a listaállapotot és
   await expect(page.getByText('Szőlőtőke #1')).toBeVisible();
   await expect(page.getByTestId('vine-detail').getByRole('heading', { name: 'Kékfrankos' })).toBeVisible();
   await expect(page.getByText('Déli kerítés mellett')).toBeVisible();
+  await expect(page.getByTestId('vine-detail').locator('dt', { hasText: 'Helyszín' }).locator('xpath=following-sibling::dd')).toHaveText('Telek');
   await expect(page.getByText('Déli fekvésű, rendszeresen termő tőke.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Első fürtök' })).toBeVisible();
   await expect(page.getByText('Egészséges lomb és két fürt.')).toBeVisible();

@@ -30,6 +30,7 @@ function vine(photos: VinePhoto[], coverPhotoId: string | null = null): Vine {
     rootType: 'own_rooted',
     rootstockVariety: '',
     plantingDate: { precision: 'unknown' },
+    location: 'Telek',
     areaDescription: 'Déli sor',
     status: 'active',
     tags: [],

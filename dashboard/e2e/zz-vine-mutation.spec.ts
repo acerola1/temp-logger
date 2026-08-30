@@ -44,6 +44,8 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await page.getByRole('button', { name: 'Új tőke' }).click();
   const createForm = page.getByRole('form', { name: 'Szőlőtőke #4 űrlap' });
   await expect(createForm.getByText('#4', { exact: true })).toBeVisible();
+  await expect(createForm.locator('[name="location"]')).toHaveValue('Erkély');
+  await expect(createForm.locator('datalist[id$="-locations"] option')).toHaveCount(2);
   await expect(page).toHaveScreenshot('toke-urlap-desktop.png', {
     fullPage: true,
     animations: 'disabled',
@@ -57,12 +59,21 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   });
   await page.setViewportSize({ width: 1280, height: 900 });
   await createForm.locator('[name="variety"]').fill('  Cabernet franc  ');
+  await createForm.locator('[name="areaDescription"]').fill('  Nyugati támrendszer  ');
+  await createForm.locator('[name="location"]').fill('  ');
+  await createForm.getByRole('button', { name: 'Mentés' }).click();
+  await expect(createForm.getByRole('alert')).toHaveText('A helyszín megadása kötelező.');
+  await expect(page).toHaveScreenshot('toke-helyszin-validacio-desktop.png', {
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await createForm.locator('[name="location"]').fill('  Présház  ');
+  await expect(createForm.locator('[name="location"]')).toHaveValue('  Présház  ');
   await createForm.locator('[name="rootType"]').selectOption('grafted');
   await createForm.locator('[name="rootstockVariety"]').fill('  Teleki 5C  ');
   await createForm.locator('[name="plantingDatePrecision"]').selectOption('year');
   await createForm.locator('[name="plantingYear"]').fill('2025');
   await createForm.locator('[name="sourceCuttingId"]').selectOption('cutting-e2e-1');
-  await createForm.locator('[name="areaDescription"]').fill('  Nyugati támrendszer  ');
   await createForm.locator('[name="tags"]').fill('új, teszt');
   await createForm.locator('[name="hasFruited"]').check();
   await createForm.locator('[name="notes"]').fill('Első production űrlapos tőke.');
@@ -74,6 +85,7 @@ test('az admin tőkét hoz létre, majd a sorszám változtatása nélkül szerk
   await expect(page.getByText('Szőlőtőke #4')).toBeVisible();
   await expect(vineDetail.getByRole('heading', { name: 'Cabernet franc' })).toBeVisible();
   await expect(page.getByText('2025', { exact: true })).toBeVisible();
+  await expect(vineDetail.locator('dt', { hasText: 'Helyszín' }).locator('xpath=following-sibling::dd')).toHaveText('Présház');
   await expect(page.getByText('#1 - Kékfrankos')).toBeVisible();
 
   await page.getByRole('button', { name: 'Alapadatok szerkesztése' }).click();

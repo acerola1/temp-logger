@@ -27,6 +27,7 @@ import type {
   SetVineCoverPhotoInput,
   Vine,
 } from './model';
+import { getVineLocationSuggestions } from './vineLocations';
 export { getNextVineSerialNumber } from './vineSerialNumber';
 
 export interface VineCatalogMutationState {
@@ -37,6 +38,7 @@ export interface VineCatalogMutationState {
 
 export interface VineCatalog {
   vines: readonly Vine[];
+  locationSuggestions: readonly string[];
   tagSuggestions: readonly string[];
   loadingVines: boolean;
   error: string | null;
@@ -220,12 +222,14 @@ export function useVineCatalog(): VineCatalog {
   );
 
   const tagSuggestions = useMemo(() => getVineTagSuggestions(vines), [vines]);
+  const locationSuggestions = useMemo(() => getVineLocationSuggestions(vines), [vines]);
   const clearMutationError = useCallback(() => {
     setMutation((current) => current.error ? { ...current, error: null } : current);
   }, []);
 
   return {
     vines,
+    locationSuggestions,
     tagSuggestions,
     loadingVines,
     error,

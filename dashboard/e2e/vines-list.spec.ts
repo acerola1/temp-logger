@@ -63,9 +63,35 @@ test('a production tőkelista keres, szűr, rendez és URL-ben tartja az állapo
   await expect(page.getByTestId('vine-card')).toContainText('Irsai Olivér');
   await page.getByLabel('Termés').selectOption('all');
 
+  await page.getByLabel('Helyszín').selectOption({ label: 'Erkély' });
+  await expect(page).toHaveURL(/location=Erk%C3%A9ly/);
+  await expect(page.getByTestId('vine-card')).toHaveCount(1);
+  await expect(page.getByTestId('vine-card')).toContainText('Irsai Olivér');
+  await page.reload();
+  await expect(page.getByLabel('Helyszín')).toHaveValue('value:Erkély');
+  await page.getByLabel('Helyszín').selectOption('all');
+
+  await page.getByLabel('Állapot').selectOption('all');
+  await page.getByLabel('Helyszín').selectOption('missing');
+  await expect(page).toHaveURL(/(?:[?&])location=(?:&|$)/);
+  await expect(page.getByTestId('vine-card')).toHaveCount(1);
+  await expect(page.getByTestId('vine-card')).toContainText('Ismeretlen');
+  await page.getByRole('button', { name: 'Alaphelyzet' }).click();
+
   await page.getByLabel('Címke').selectOption('déli sor');
   await expect(page.getByTestId('vine-card')).toHaveCount(1);
   await expect(page.getByTestId('vine-card')).toContainText('Kékfrankos');
+});
+
+test('az ismeretlen URL-helyszín üres találatként megmarad és visszaállítható', async ({ page }) => {
+  await page.goto('/tokek?location=Neml%C3%A9tez%C5%91');
+
+  await expect(page.getByLabel('Helyszín')).toHaveValue('value:Nemlétező');
+  await expect(page.getByRole('status')).toContainText('Nincs találat');
+  await page.reload();
+  await expect(page.getByLabel('Helyszín')).toHaveValue('value:Nemlétező');
+  await page.getByRole('button', { name: 'Alaphelyzet' }).click();
+  await expect(page.getByTestId('vine-card')).toHaveCount(2);
 });
 
 test('a desktop és mobil tőkelista a prototípus elrendezését követi', async ({ page }) => {

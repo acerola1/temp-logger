@@ -15,6 +15,8 @@ const FILTER_LABEL_CLASS =
 
 interface VineListFiltersProps {
   state: VineListState;
+  locationSuggestions: readonly string[];
+  hasMissingLocation: boolean;
   tagSuggestions: readonly string[];
   onPatch: (patch: Partial<VineListState>) => void;
   onReset: () => void;
@@ -28,6 +30,8 @@ interface VineListFiltersProps {
 // `VineListState` alakra.
 export function VineListFilters({
   state,
+  locationSuggestions,
+  hasMissingLocation,
   tagSuggestions,
   onPatch,
   onReset,
@@ -44,7 +48,7 @@ export function VineListFilters({
               type="search"
               value={state.query}
               onChange={(event) => onPatch({ query: event.target.value })}
-              placeholder="Fajta, # sorszám vagy terület"
+              placeholder="Fajta, # sorszám, helyszín vagy terület"
               className="h-9 w-full rounded-lg border border-vine-200 bg-white px-2.5 text-sm text-vine-900 outline-none placeholder:text-vine-400 focus:border-vine-400 dark:border-vine-700 dark:bg-vine-900 dark:text-vine-50 dark:placeholder:text-vine-400 dark:focus:border-vine-500"
             />
           </label>
@@ -80,6 +84,32 @@ export function VineListFilters({
                 <option value="all">Mind</option>
                 <option value="yes">Termett már</option>
                 <option value="no">Még nem</option>
+              </select>
+            </label>
+            <label className={`col-span-2 ${FILTER_FIELD_CLASS}`}>
+              <span className={FILTER_LABEL_CLASS}>Helyszín</span>
+              <select
+                value={state.location === undefined ? 'all' : state.location === null ? 'missing' : `value:${state.location}`}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  onPatch({
+                    location: value === 'all' ? undefined : value === 'missing' ? null : value.slice('value:'.length),
+                  });
+                }}
+                className={SELECT_CLASS}
+              >
+                <option value="all">Mind</option>
+                {locationSuggestions.map((location) => (
+                  <option key={location} value={`value:${location}`}>{location}</option>
+                ))}
+                {state.location !== undefined && state.location !== null && !locationSuggestions.some(
+                  (location) => location.toLocaleLowerCase('hu') === state.location?.toLocaleLowerCase('hu'),
+                ) && (
+                  <option value={`value:${state.location}`}>{state.location}</option>
+                )}
+                {(hasMissingLocation || state.location === null) && (
+                  <option value="missing">Nincs megadva</option>
+                )}
               </select>
             </label>
             <label className={`col-span-2 ${FILTER_FIELD_CLASS}`}>

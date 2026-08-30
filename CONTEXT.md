@@ -29,6 +29,11 @@ A szőlőtőke listában és adatlapon kiemelten megjelenő tőkefotó. Lehet k�
 kijelölt vagy a fotók sorrendjéből automatikusan választott.
 _Avoid_: Esemény borítóképe, elsődleges eseményfotó
 
+**Helyszín**:
+Több szőlőtőkét összefogó, szabadon bővíthető helynév, például `Erkély` vagy
+`Telek`. Nem azonos a helyszínen belüli pontosabb területleírással.
+_Avoid_: Területleírás, címke
+
 **Tömeges eseményrögzítés**:
 Adatbeviteli művelet, amely azonos tartalmú, de később egymástól független
 tőkeesemény-példányokat hoz létre több szőlőtőkén.

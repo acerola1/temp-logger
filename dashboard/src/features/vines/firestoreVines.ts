@@ -45,10 +45,21 @@ import {
   vinePhotoStoragePaths,
 } from './vinePhotos';
 import { getNextVineSerialNumber } from './vineSerialNumber';
+import { resolveVineLocation } from './vineLocations';
 
 export type VineMutationProgress = (progress: number) => void;
 
-function editableFields(input: CreateVineInput) {
+/**
+ * A meglévő írásmódra való feloldás az űrlaprétegben történik, a betöltött
+ * katalógusból. Az írási határon már csak a kötelező, nem üres érték a feltétel.
+ */
+function requireVineLocation(value: string): string {
+  const location = value.trim();
+  if (!location) throw new Error('A helyszín megadása kötelező.');
+  return location;
+}
+
+function editableFields(input: CreateVineInput, location: string) {
   return {
     variety: input.variety.trim(),
     hasFruited: input.hasFruited,
@@ -56,6 +67,7 @@ function editableFields(input: CreateVineInput) {
     rootstockVariety:
       input.rootType === 'grafted' ? input.rootstockVariety.trim() : '',
     plantingDate: input.plantingDate,
+    location,
     areaDescription: input.areaDescription.trim(),
     status: input.status,
     tags: input.tags,
@@ -146,6 +158,9 @@ function mapVine(snapshot: QueryDocumentSnapshot<DocumentData>): Vine {
     rootstockVariety:
       typeof value.rootstockVariety === 'string' ? value.rootstockVariety.trim() : '',
     plantingDate: value.plantingDate as VinePlantingDate,
+    location: typeof value.location === 'string' && value.location.trim()
+      ? value.location.trim()
+      : null,
     areaDescription:
       typeof value.areaDescription === 'string' ? value.areaDescription.trim() : '',
     status: value.status as VineStatus,
@@ -183,11 +198,22 @@ export async function createVine(
   createdByUid: string | null,
   input: CreateVineInput,
 ): Promise<{ vineId: string; serialNumber: number }> {
+  const requestedLocation = requireVineLocation(input.location);
+
   // A katalógus-lekérdezés adja a legkisebb rést, a sorszám-claim pedig a két
   // azonos pillanatban induló kliens között dönt. Ütközés után friss listából
   // számolunk újra; a tőke és a claim ugyanabban a tranzakcióban jön létre.
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const vinesSnapshot = await getDocs(collection(firestore, 'vines'));
+    // A sorszámhoz úgyis kell a teljes katalógus, ezért a meglévő írásmód
+    // feloldása itt nem kerül külön olvasásba.
+    const location = resolveVineLocation(
+      requestedLocation,
+      vinesSnapshot.docs.flatMap((snapshot) => {
+        const value = snapshot.data().location;
+        return typeof value === 'string' ? [value] : [];
+      }),
+    );
     const serialNumber = getNextVineSerialNumber(
       vinesSnapshot.docs.map((snapshot) => ({
         serialNumber: snapshot.data().serialNumber as number,
@@ -203,7 +229,7 @@ export async function createVine(
       const timestamp = serverTimestamp();
       transaction.set(claimReference, { vineId: vineReference.id });
       transaction.set(vineReference, {
-        ...editableFields(input),
+        ...editableFields(input, location),
         serialNumber,
         photos: [],
         coverPhotoId: null,
@@ -272,7 +298,7 @@ export async function editVine(
   input: EditVineInput,
 ): Promise<void> {
   await updateDoc(doc(firestore, 'vines', vineId), {
-    ...editableFields(input),
+    ...editableFields(input, requireVineLocation(input.location)),
     updatedAt: serverTimestamp(),
   });
 }
